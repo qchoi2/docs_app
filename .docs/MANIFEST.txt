@@ -1,0 +1,19 @@
+./CHANGELOG_20260708.md
+./CLAUDE_v2.md
+./CODING_AGENT_RULES.md
+./CODING_SEQUENCE.md
+./DESIGN_INTEGRATION.md
+./IMPLEMENTATION_BRIEF.md
+./MANIFEST.txt
+./PILOT_ROLLOUT.md
+./UI_PRODUCT_SPEC.md
+./UI_ROADMAP.md
+./api_budget.yaml
+./docs_progress_v2.md
+./extract_prompt_v1.md
+./golden_queries.yaml
+./manual_overrides.yaml
+./term_dict.yaml
+./type_rules.yaml
+
+Final hardening: CODING_AGENT_RULES.md and CODING_SEQUENCE.md now require one tested git commit per implementation Step.
