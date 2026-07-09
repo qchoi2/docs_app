@@ -89,3 +89,8 @@
 - Ran a smoke search against local pilot `cs_index`: `python search_contracts.py --out .\cs_index --kw 손해배상 --limit 3 --json`.
 - Verified Python 3.9 syntax compatibility with `ast.parse(..., feature_version=(3, 9))`.
 - Ran the full test suite with `python -m pytest`; result: `36 passed` with one existing pytest cache warning.
+- Completed a critical `.docs` alignment pass after Step 6.
+- Updated `search_contracts.py` so exact terms also carry term_dict canonical tags, snippet generation honors `--context`, and RRF scoring uses the best file rank per exact/expanded source rather than accumulating score for every synonym variant.
+- Reworked `index_contracts.py` reports into the nine Brief §2.5 sections, including explicit status, duplicate, unsupported/excluded, error, batch, and stale doc_meta sections.
+- Refreshed README current scope and added a minimal search CLI example.
+- Kept no-result searches as exit code 0 per the user's Step 6 instruction, despite the older `.docs` exit-code note.

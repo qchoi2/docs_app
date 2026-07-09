@@ -46,8 +46,18 @@ Use `--dry-run` to create a change report without writing the database or text c
 
 The YAML files in `data/` are runtime configuration. Update those files rather than changing code when term dictionaries, type rules, golden queries, API budget settings, or manual metadata overrides need adjustment.
 
+## Search
+
+Search the current index with JSON output:
+
+```powershell
+python search_contracts.py --out .\cs_index --kw 손해배상 --limit 10 --json
+```
+
+Repeat `--kw` for AND conditions. Term dictionary expansion is on by default; use `--expand strict`, `--expand broad`, or `--no-expand` to control it. Result sets are deduplicated by default, and `--show-duplicates` expands duplicate groups.
+
 ## Current Scope
 
-Implemented so far: normalization, catalog schema creation, DOCX/PDF indexing, txt cache generation, FTS population, incremental indexing, pilot/full options, and index reports.
+Implemented so far: normalization, catalog schema creation, DOCX/PDF indexing, txt cache generation, FTS population, incremental indexing, pilot/full options, index reports, and the FTS-backed search CLI.
 
-Next Phase 1A work: search CLI, stats CLI, file inspection helpers, evaluation, and fuller README/FAQ coverage.
+Next Phase 1A work: stats CLI, file inspection helpers, evaluation, and fuller README/FAQ coverage.

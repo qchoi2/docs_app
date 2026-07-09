@@ -68,6 +68,7 @@ def test_exact_search_ranks_above_expanded_search(tmp_path):
     assert count == 2
     assert result["results"][0]["file_key"] == "exact"
     assert result["results"][0]["score_breakdown"]["exact_rank"] == 1
+    assert result["results"][0]["matched_terms"][0]["canonical"] == "손해배상"
     assert result["results"][1]["file_key"] == "expanded"
     assert result["results"][1]["score_breakdown"]["expanded_rank"] == 1
 
@@ -174,6 +175,36 @@ def test_json_schema_and_query_log(tmp_path, capsys):
     assert (out / "query_log.jsonl").exists()
     log_line = json.loads((out / "query_log.jsonl").read_text(encoding="utf-8").splitlines()[-1])
     assert log_line["result_count"] == payload["total"]
+
+
+def test_snippet_context_includes_surrounding_paragraphs(tmp_path):
+    out, db_path = make_search_db(tmp_path)
+    with closing(sqlite3.connect(db_path)) as conn:
+        insert_doc(conn, "ctx", "ctx.docx", "first\n손해배상\nthird\nfourth")
+        conn.commit()
+
+    result, count = search_contracts(out, keywords=["손해배상"], no_expand=True, context=1)
+
+    assert count == 1
+    item = result["results"][0]
+    assert item["snippet_paras"] == [1, 2, 3]
+    assert "[¶1] first" in item["snippet"]
+    assert "[¶2] 손해배상" in item["snippet"]
+    assert "[¶3] third" in item["snippet"]
+
+
+def test_expanded_rrf_uses_best_rank_per_source_not_variant_count(tmp_path):
+    out, db_path = make_search_db(tmp_path)
+    with closing(sqlite3.connect(db_path)) as conn:
+        insert_doc(conn, "exact", "exact.docx", "손해배상")
+        insert_doc(conn, "many_variants", "many.docx", "면책\nindemnity\nindemnification")
+        conn.commit()
+
+    result, count = search_contracts(out, keywords=["손해배상"])
+
+    assert count == 2
+    assert result["results"][0]["file_key"] == "exact"
+    assert result["results"][1]["file_key"] == "many_variants"
 
 
 def test_no_results_is_not_error(tmp_path, capsys):

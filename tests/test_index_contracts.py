@@ -463,8 +463,8 @@ def test_type_rules_classify_and_report_unclassified_folders(tmp_path):
         ("unknown/mystery.docx", "미분류", "국문"),
     ]
     report = Path(result["report"]).read_text(encoding="utf-8")
-    assert "### Type x Language" in report
-    assert "### Unclassified Folders" in report
+    assert "## 2. Type x Language" in report
+    assert "## 3. Unclassified Folders" in report
     assert "- unknown: 1" in report
 
 

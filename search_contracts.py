@@ -65,9 +65,19 @@ def strength_allowed(term_strength: str, mode: str) -> bool:
     return order.get(term_strength, 1) <= order.get(mode, 1)
 
 
+def find_term_entry(keyword: str, entries: Sequence[TermEntry]) -> Optional[TermEntry]:
+    lowered = normalize(keyword).lower()
+    for entry in entries:
+        if any(lowered == normalize(variant).lower() for variant, _ in entry.variants):
+            return entry
+    return None
+
+
 def expand_keyword(keyword: str, entries: Sequence[TermEntry], mode: str, no_expand: bool) -> List[Dict[str, str]]:
     original = normalize(keyword)
-    terms = [{"term": original, "canonical": "", "source": "exact"}]
+    matched_entry = find_term_entry(original, entries)
+    exact_canonical = matched_entry.canonical if matched_entry else ""
+    terms = [{"term": original, "canonical": exact_canonical, "source": "exact"}]
     if no_expand:
         return terms
 
@@ -76,8 +86,7 @@ def expand_keyword(keyword: str, entries: Sequence[TermEntry], mode: str, no_exp
     for entry in entries:
         if not strength_allowed(entry.strength, mode):
             continue
-        variant_values = [variant for variant, _ in entry.variants]
-        if not any(lowered == normalize(variant).lower() for variant in variant_values):
+        if entry is not matched_entry and not any(lowered == normalize(variant).lower() for variant, _ in entry.variants):
             continue
         avoid = {normalize(value).lower() for value in entry.avoid}
         for variant, variant_strength in entry.variants:
@@ -166,7 +175,7 @@ def search_contracts(
             terms = expand_keyword(keyword, entries, expand, no_expand)
             expanded_query[keyword] = [term["term"] for term in terms if term["source"] == "expanded"]
             kw_scores: Dict[str, float] = {}
-            kw_seen_files = set()
+            source_best_ranks: Dict[str, Dict[str, int]] = {"exact": {}, "expanded": {}}
 
             for term_info in terms:
                 term = term_info["term"]
@@ -181,8 +190,9 @@ def search_contracts(
                 for rank, row in enumerate(rows, start=1):
                     file_key = row["file_key"]
                     if file_key not in file_rank_seen:
-                        weight = 2.0 if term_info["source"] == "exact" else 1.0
-                        kw_scores[file_key] = kw_scores.get(file_key, 0.0) + reciprocal_rank(rank, weight)
+                        source = term_info["source"]
+                        best_ranks = source_best_ranks[source]
+                        best_ranks[file_key] = min(best_ranks.get(file_key, rank), rank)
                         file_rank_seen.add(file_key)
                         if term_info["source"] == "exact":
                             all_exact_ranks[file_key] = min(all_exact_ranks.get(file_key, rank), rank)
@@ -201,7 +211,10 @@ def search_contracts(
                         }
                     )
                     details["snippet_candidates"].append((row["para"], row["content"]))
-                    kw_seen_files.add(file_key)
+            for source, best_ranks in source_best_ranks.items():
+                weight = 2.0 if source == "exact" else 1.0
+                for file_key, rank in best_ranks.items():
+                    kw_scores[file_key] = kw_scores.get(file_key, 0.0) + reciprocal_rank(rank, weight)
             per_kw_scores.append(kw_scores)
 
         if keywords:
@@ -259,7 +272,7 @@ def search_contracts(
         results = []
         for score, row in selected_rows:
             details = per_file_details.get(row["file_key"], {"matched_terms": [], "snippet_candidates": []})
-            snippet, snippet_paras = build_snippet(details["snippet_candidates"], context)
+            snippet, snippet_paras = build_snippet(conn, row["file_key"], details["snippet_candidates"], context)
             why = []
             if all_exact_ranks.get(row["file_key"]) is not None:
                 why.append("원질의 직접 매칭")
@@ -361,11 +374,31 @@ def unique_matched_terms(items: Iterable[Dict[str, object]]) -> List[Dict[str, o
     return unique[:20]
 
 
-def build_snippet(candidates: List[Tuple[int, str]], context: int) -> Tuple[str, List[int]]:
+def build_snippet(
+    conn: sqlite3.Connection,
+    file_key: str,
+    candidates: List[Tuple[int, str]],
+    context: int,
+) -> Tuple[str, List[int]]:
     if not candidates:
         return "", []
-    para, content = sorted(candidates, key=lambda item: item[0])[0]
-    return f"[¶{para}] {content[:240]}", [para]
+    para, _content = sorted(candidates, key=lambda item: item[0])[0]
+    context = max(context, 0)
+    start = max(1, para - context)
+    end = para + context
+    rows = conn.execute(
+        """
+        SELECT para, content
+        FROM fts
+        WHERE file_key = ? AND para BETWEEN ? AND ?
+        ORDER BY para
+        """,
+        (file_key, start, end),
+    ).fetchall()
+    if not rows:
+        return "", []
+    parts = [f"[¶{row['para']}] {row['content'][:240]}" for row in rows]
+    return "\n".join(parts), [row["para"] for row in rows]
 
 
 def count_unsearchable(conn: sqlite3.Connection, ctype: Optional[str], lang: Optional[str], exclude_drafts: bool) -> int:

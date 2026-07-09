@@ -492,6 +492,21 @@ def summarize_db(conn: sqlite3.Connection) -> Dict[str, object]:
         ORDER BY COUNT(*) DESC, dup_group
         """
     ).fetchall()
+    existing_duplicate_groups = conn.execute(
+        """
+        SELECT dup_group, file_key, path
+        FROM files
+        WHERE dup_group IN (
+          SELECT dup_group
+          FROM files
+          WHERE dup_group IS NOT NULL AND status != 'missing'
+          GROUP BY dup_group
+          HAVING COUNT(*) >= 2
+        )
+          AND status != 'missing'
+        ORDER BY dup_group, path
+        """
+    ).fetchall()
     stale_doc_meta = conn.execute(
         """
         SELECT COUNT(*)
@@ -525,6 +540,7 @@ def summarize_db(conn: sqlite3.Connection) -> Dict[str, object]:
         "batch_labels": batch_counts,
         "errors": error_counts,
         "duplicate_groups": duplicate_groups,
+        "duplicate_group_members": existing_duplicate_groups,
         "stale_doc_meta": stale_doc_meta,
         "type_lang": type_lang,
         "unclassified_folders": unclassified_folders,
@@ -538,10 +554,26 @@ def write_report(
     db_summary: Optional[Dict[str, object]],
 ) -> Path:
     report_path = unique_report_path(out_dir)
+    new_paths = {item.split(": ", 1)[0] for item in changes.new}
+    changed_new_keys = {
+        item.split("->", 1)[1]
+        for item in changes.content_changed
+        if "->" in item
+    }
+    new_duplicate_groups = []
+    if db_summary is not None:
+        group_members: Dict[str, List[Tuple[str, str]]] = {}
+        for dup_group, file_key, path in db_summary["duplicate_group_members"]:
+            group_members.setdefault(dup_group, []).append((file_key, path))
+        for dup_group, count in db_summary["duplicate_groups"]:
+            members = group_members.get(dup_group, [])
+            if any(file_key in changed_new_keys or path in new_paths for file_key, path in members):
+                new_duplicate_groups.append((dup_group, count))
+
     lines = [
         "# Index Report",
         "",
-        "## Run",
+        "## 1. Run And Changes",
         "",
         f"- root: `{result['root']}`",
         f"- out: `{result['out']}`",
@@ -568,39 +600,71 @@ def write_report(
         ("Missing", changes.missing),
         ("Restored", changes.restored),
         ("Content Changed", changes.content_changed),
-        ("Excluded", changes.excluded),
-        ("Unsupported", changes.unsupported),
-        ("Errors", changes.errors),
     ]:
-        lines.extend([f"## {title}", ""])
+        lines.extend([f"### {title}", ""])
         if items:
             lines.extend(f"- {item}" for item in items)
         else:
             lines.append("- none")
         lines.append("")
 
-    lines.extend(["## Database Summary", ""])
     if db_summary is None:
+        lines.extend(["## 2. Type x Language", ""])
         lines.append("- dry-run: database not modified")
+        lines.extend(["", "## 3. Unclassified Folders", "", "- dry-run: database not modified"])
+        lines.extend(["", "## 4. Status Counts", "", "- dry-run: database not modified"])
+        lines.extend(["", "## 5. Duplicate Groups", "", "- dry-run: database not modified"])
+        lines.extend(["", "## 6. Unsupported And Excluded", ""])
+        lines.extend(f"- {item} (unsupported)" for item in changes.unsupported)
+        lines.extend(f"- {item} (excluded)" for item in changes.excluded)
+        if not changes.unsupported and not changes.excluded:
+            lines.append("- none")
+        lines.extend(["", "## 7. Error Reasons", "", "- dry-run: database not modified"])
+        lines.extend(["", "## 8. Batch Labels", "", "- dry-run: database not modified"])
+        lines.extend(["", "## 9. Stale Doc Meta", "", "- dry-run: database not modified"])
     else:
-        lines.extend(["### Type x Language", ""])
+        lines.extend(["## 2. Type x Language", ""])
         type_lang = db_summary["type_lang"]
         if type_lang:
             lines.extend(f"- {ctype} / {lang}: {count}" for ctype, lang, count in type_lang)
         else:
             lines.append("- none")
-        lines.extend(["", "### Unclassified Folders", ""])
+        lines.extend(["", "## 3. Unclassified Folders", ""])
         unclassified = db_summary["unclassified_folders"]
         if unclassified:
             lines.extend(f"- {folder}: {count}" for folder, count in unclassified)
         else:
             lines.append("- none")
-        lines.append("")
-        lines.append(f"- status counts: `{db_summary['statuses']}`")
-        lines.append(f"- error counts: `{db_summary['errors']}`")
-        lines.append(f"- batch label counts: `{db_summary['batch_labels']}`")
-        lines.append(f"- duplicate groups size>=2: `{db_summary['duplicate_groups']}`")
-        lines.append(f"- stale doc_meta: `{db_summary['stale_doc_meta']}`")
+        lines.extend(["", "## 4. Status Counts", ""])
+        if db_summary["statuses"]:
+            lines.extend(f"- {status}: {count}" for status, count in db_summary["statuses"].items())
+        else:
+            lines.append("- none")
+        lines.extend(["", "## 5. Duplicate Groups", ""])
+        if db_summary["duplicate_groups"]:
+            for dup_group, count in db_summary["duplicate_groups"]:
+                marker = " (new in this run)" if (dup_group, count) in new_duplicate_groups else ""
+                lines.append(f"- {dup_group}: {count}{marker}")
+        else:
+            lines.append("- none")
+        lines.extend(["", "## 6. Unsupported And Excluded", ""])
+        if changes.unsupported or changes.excluded:
+            lines.extend(f"- {item} (unsupported)" for item in changes.unsupported)
+            lines.extend(f"- {item} (excluded)" for item in changes.excluded)
+        else:
+            lines.append("- none")
+        lines.extend(["", "## 7. Error Reasons", ""])
+        if db_summary["errors"]:
+            lines.extend(f"- {reason}: {count}" for reason, count in db_summary["errors"].items())
+        else:
+            lines.append("- none")
+        lines.extend(["", "## 8. Batch Labels", ""])
+        if db_summary["batch_labels"]:
+            lines.extend(f"- {label or '(none)'}: {count}" for label, count in db_summary["batch_labels"].items())
+        else:
+            lines.append("- none")
+        lines.extend(["", "## 9. Stale Doc Meta", ""])
+        lines.append(f"- stale doc_meta: {db_summary['stale_doc_meta']}")
     lines.append("")
 
     out_dir.mkdir(parents=True, exist_ok=True)
