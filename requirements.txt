@@ -1,0 +1,4 @@
+# Core runtime dependencies for the contract search project
+python-docx>=0.8.11,<0.9
+pdfminer.six>=20221105,<202404
+PyYAML>=6.0,<7.0
