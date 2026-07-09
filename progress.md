@@ -32,3 +32,14 @@
 - Updated `requirements.txt` to Python 3.14-compatible `python-docx` and `pdfminer.six` ranges after the previous pinned range failed to install in this environment.
 - Verified CLI shape with `python index_contracts.py --help`; only `--root` and `--out` are present.
 - Ran the full test suite with `python -m pytest`; result: `8 passed` with one existing pytest cache warning.
+- Completed Step 5: added operational indexing options to `index_contracts.py`.
+- Added `--full`, `--include-misc`, `--batch-label`, `--file-list`, `--sample`, `--sample-seed`, and `--dry-run`.
+- Added incremental handling for unchanged skip, newly added files, moved files, deleted files marked `missing`, restored files, and same-path content changes with old file keys marked `missing`.
+- Added validation that `--file-list` and `--sample` cannot be used together.
+- Added deterministic sampling with `--sample-seed`.
+- Added partial-run behavior for `--file-list` and `--sample`: unlisted/unselected existing files are not marked `missing`.
+- Added `--full` behavior to rebuild only the generated `files` and `fts` index data.
+- Added `report_YYYYMMDD.md` generation with change counts/lists and database summary sections.
+- Added tests for rerun skip, add-only incremental indexing, deletion-to-missing, file-list pilot followed by full expansion, deterministic sampling, file-list/sample conflict, move, restore, content change, dry-run, full batch-label recording, and include-misc filtering.
+- Verified CLI shape with `python index_contracts.py --help`; all Step 5 options are present.
+- Ran the full test suite with `python -m pytest`; result: `20 passed` with one existing pytest cache warning.
