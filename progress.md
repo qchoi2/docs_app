@@ -56,3 +56,14 @@
 - Added `.gitignore` entries for Python cache and pytest cache artifacts, and removed previously tracked `.pyc` cache files from the working tree.
 - Verified `python index_contracts.py --help`; Step 5 options remain present.
 - Ran the full test suite with `python -m pytest`; result: `22 passed` with one existing pytest cache warning.
+- Completed second implementation-brief alignment pass.
+- Placed runtime YAML files in `data/`: `term_dict.yaml`, `type_rules.yaml`, `golden_queries.yaml`, `api_budget.yaml`, and `manual_overrides.yaml`.
+- Replaced the partial custom `type_rules.yaml` parser with `PyYAML` loading.
+- Changed unsupported-file scanning so arbitrary non-supported, non-zip files are recorded as `status='unsupported'` instead of being silently ignored.
+- Added `report_YYYYMMDD-2.md`, `-3.md`, etc. collision handling.
+- Added `PRAGMA wal_checkpoint(TRUNCATE)` after successful write runs.
+- Expanded README with Windows local setup, local `cs_index` disk warning, pilot/full indexing commands, dry-run note, and runtime data guidance.
+- Added tests for runtime YAML placement, arbitrary unsupported extension recording, and report filename collision handling.
+- Verified `python index_contracts.py --help`; Step 5 options remain present.
+- Verified Python 3.9 syntax compatibility with `ast.parse(..., feature_version=(3, 9))`.
+- Ran the full test suite with `python -m pytest`; result: `25 passed` with one existing pytest cache warning.

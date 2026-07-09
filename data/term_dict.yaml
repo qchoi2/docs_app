@@ -1,0 +1,568 @@
+# ============================================================
+# M&A 계약 조항·개념 용어사전 v2.1 (Claude 사전 작성 — AI-fill A1)
+# ------------------------------------------------------------
+# v1 → v2: 35 → 79항목. 계약유형별 섹션, kind 필드 도입.
+# v2 → v2.1: 진술보장 하위 주제 7항목 + 정의조항·별지 추가 (총 88항목).
+#            유지보수 파이프라인(아래) 명문화. dict_version: 2.1
+#
+# 이 사전은 시스템 전체의 "통제 어휘"다. 다음 네 곳이 canonical
+# 태그를 조인 키로 공유한다:
+#   1. search_contracts.py 검색어 동의어 확장 (T2)
+#   2. doc_meta.clause_map 의 조항 태그 체계 (T3)
+#   3. 조항 단위 청킹의 경계/라벨 (T4 임베딩)
+#   4. CLAUDE.md 질의 해석 단계의 정규화 목표
+#
+# 필드:
+#   canonical: 표준 태그. kind=clause 항목은 extract_prompt의
+#              clause_map canonical 목록과 반드시 동기화할 것.
+#   kind:      clause  = 조항으로 태깅·청킹되는 단위
+#              concept = 검색 확장 전용 개념어 (조항 태그 아님)
+#   ko / en:   부분일치 전제의 표기 변이 (조사·어미 제외 어간 위주)
+#   scope:     주로 등장하는 계약유형 (검색 힌트용, 강제 아님)
+#   note:      오탐/판독 주의사항
+#   expansion_strength: optional. strict|normal|broad. 없으면 normal로 간주.
+#              strict+normal은 기본 검색 확장에 포함, broad는 사용자가
+#              --broad-expand 같은 별도 옵션을 켰을 때만 포함하는 것을 권장.
+#   avoid_expanding_to: optional. 유사하지만 법적으로 구분해야 하므로
+#              자동 확장하지 말아야 할 canonical/표현 목록.
+#
+# 띄어쓰기 변이: FTS5 trigram 색인이 흡수하므로 전수 나열하지 않되,
+#   붙여쓰기가 관행인 표기는 명시적으로 수록했다.
+# ---- 유지보수 파이프라인 (AI-fill A11, DB 완성 후 반복 실행) ----
+# 이 사전은 "선험적 초안 → 코퍼스 유래 보강"의 2단계로 완성된다.
+# doc_meta·FTS 색인이 완성될 때마다:
+#   1. [수집] definitions_json의 정의어 + FTS 히트 통계(변이별 문서빈도)
+#   2. [진단] (a) 고빈도인데 미수록인 표현 → 추가 후보
+#            (b) 0히트 변이 → 오타/불필요 후보 (오탐원 제거)
+#            (c) 한 변이가 여러 canonical에 걸치는 충돌 → note 보강 후보
+#   3. [제안] Claude Code가 pending_terms.yaml 생성 (근거 히트 수 포함)
+#   4. [승인] 사람이 승인분만 병합 → dict_version 증가 → 검색 계층은
+#            버전만 참조하므로 재색인 불필요 (질의 시점 확장이라서)
+# 골든 세트 eval을 병합 전후로 돌려 사전 변경의 회귀 여부를 확인한다.
+# ============================================================
+
+terms:
+
+  # ================= 공통: 핵심 조항 =================
+
+  - canonical: 진술보장
+    kind: clause
+    ko: [진술보장, 진술 및 보장, 진술과 보장, 진술 및 보증, 진술보증, 진술및보장]
+    en: [representations and warranties, representation and warranty, reps and warranties, R&W, RW, warranties]
+    note: "'보증'은 保證(guarantee)과 동철 — '연대보증' 문맥 오탐 주의. 영문 warranties 단독은 SHA의 품질보증 문맥 오탐 가능"
+
+  - canonical: 진술보장보험
+    kind: concept
+    ko: [진술보장보험, 진술 및 보장 보험, 진술보장 보험]
+    en: [W&I insurance, R&W insurance, warranty and indemnity insurance, representations and warranties insurance, RWI]
+
+  - canonical: 선행조건
+    kind: clause
+    ko: [선행조건, 거래종결의 조건, 거래 종결 조건, 종결의 선행조건, 이행의 조건, 종결조건]
+    en: [conditions precedent, CP, closing conditions, conditions to closing, conditions to completion]
+
+  - canonical: 확약
+    kind: clause
+    ko: [확약, 서약, 이행사항, 준수사항, 종결 전 확약, 종결 후 확약]
+    en: [covenants, undertakings, pre-closing covenants, post-closing covenants, interim covenants]
+
+  - canonical: 손해배상
+    kind: clause
+    ko: [손해배상, 면책, 손해전보, 배상책임, 손해의 배상]
+    en: [indemnification, indemnity, indemnities]
+    note: "국문 '면책'은 indemnification 번역 관행과 exemption(책임 제외) 의미가 혼재"
+
+  - canonical: 특별손해배상
+    kind: clause
+    ko: [특별 손해배상, 특별면책, 개별 손해배상, 특정 사항에 대한 배상]
+    en: [special indemnity, specific indemnity, special indemnification]
+    note: "특정 리스크(소송·조세 등)를 상한·바스켓 예외로 배상하는 조항 — 손해배상과 별도 태그"
+
+  - canonical: 배상상한
+    kind: concept
+    ko: [배상 상한, 책임의 상한, 배상책임의 한도, 손해배상 한도, 총 한도, 책임한도]
+    en: [cap, liability cap, aggregate cap, maximum liability, overall cap]
+
+  - canonical: 바스켓
+    kind: concept
+    ko: [바스켓, 최소 배상액, 공제액, 기준금액, 누적 최소금액]
+    en: [basket, deductible, tipping basket, threshold, first dollar]
+
+  - canonical: 디미니미스
+    kind: concept
+    ko: [소액 청구 제외, 개별 최소금액, 최소 청구금액]
+    en: [de minimis, de-minimis]
+
+  - canonical: 존속기간
+    kind: concept
+    ko: [존속기간, 존속 기간, 배상청구 기간, 진술보장의 존속, 청구기한]
+    en: [survival, survival period, time limitations on claims, limitation period]
+
+  - canonical: 손해범위
+    kind: concept
+    ko: [손해의 범위, 특별손해, 간접손해, 일실이익, 결과적 손해]
+    en: [consequential damages, indirect damages, loss of profit, punitive damages, damages definition]
+    note: "배상 대상 손해의 정의·제외 — 상한과 함께 실무상 최다 협상 지점"
+
+  - canonical: 해제
+    kind: clause
+    ko: [해제, 계약의 해제, 해지, 계약해지, 해제 및 해지]
+    en: [termination, rescission]
+    note: "국문 해제(소급)/해지(장래) 구분 — 검색은 둘 다, 판독 단계에서 구분"
+    expansion_strength: normal
+    avoid_expanding_to: [cancellation]
+
+  - canonical: 해제수수료
+    kind: concept
+    ko: [해약금, 위약금, 위약벌, 해제 수수료, 이행보증금 몰취]
+    en: [break fee, break-up fee, termination fee, reverse break fee, reverse termination fee]
+
+  - canonical: 분쟁해결
+    kind: clause
+    ko: [분쟁해결, 분쟁의 해결, 중재, 관할, 관할법원, 재판관할, 전속관할]
+    en: [dispute resolution, arbitration, jurisdiction, governing forum, exclusive jurisdiction]
+    note: "중재기관: 대한상사중재원, KCAB, ICC, SIAC, HKIAC, LCIA — Q25 통계에 활용"
+
+  - canonical: 준거법
+    kind: clause
+    ko: [준거법]
+    en: [governing law, applicable law, choice of law]
+
+  - canonical: 비밀유지
+    kind: clause
+    ko: [비밀유지, 비밀 유지, 기밀유지, 비밀보호, 비밀정보]
+    en: [confidentiality, non-disclosure, NDA, confidential information]
+
+  - canonical: 완전합의
+    kind: clause
+    ko: [완전합의, 완전한 합의, 최종합의, 완결조항]
+    en: [entire agreement, whole agreement, integration clause]
+
+  - canonical: 양도금지
+    kind: clause
+    ko: [양도금지, 권리의무의 양도, 양도 제한, 계약상 지위의 양도]
+    en: [assignment, no assignment, transfer of rights and obligations]
+    note: "SHA의 '주식양도제한'과 구분 — 이건 계약상 지위 양도 조항"
+
+  - canonical: 공표
+    kind: clause
+    ko: [공표, 공시, 보도자료, 대외 발표, 공개]
+    en: [announcement, publicity, press release, public disclosure]
+
+  - canonical: 불가항력
+    kind: clause
+    ko: [불가항력]
+    en: [force majeure]
+
+  - canonical: 통상적사업과정
+    kind: concept
+    ko: [통상적인 사업과정, 통상적인 영업, 정상적인 사업과정, 통상의 업무]
+    en: [ordinary course of business, ordinary course]
+    note: "종결 전 확약과 진술보장 양쪽에서 등장하는 기준 개념"
+
+  - canonical: 특수관계인
+    kind: concept
+    ko: [특수관계인, 계열회사, 계열사, 관계회사]
+    en: [affiliates, related parties, subsidiaries]
+
+  # ================= 공통: 거래 구조·수치 =================
+
+  - canonical: 거래종결
+    kind: clause
+    ko: [거래종결, 거래 종결, 종결일, 거래완결, 클로징]
+    en: [closing, completion, closing date, completion date]
+
+  - canonical: 대금조정
+    kind: clause
+    ko: [대금 조정, 매매대금의 조정, 가격 조정, 정산, 대금의 정산]
+    en: [purchase price adjustment, PPA, price adjustment, adjustment mechanism, true-up]
+
+  - canonical: 락박스
+    kind: concept
+    ko: [락박스, 락드박스, 락트박스]
+    en: [locked box, locked-box, leakage, permitted leakage]
+
+  - canonical: 완결계정
+    kind: concept
+    ko: [완결계정, 종결 재무제표, 종결일 정산, 종결계정]
+    en: [completion accounts, closing accounts, closing balance sheet, net debt, working capital adjustment]
+
+  - canonical: earn-out
+    kind: clause
+    ko: [언아웃, 조건부 대금, 성과연동 대금, 추가 대금, 사후 정산 대금]
+    en: [earn-out, earnout, contingent consideration, deferred consideration]
+    note: "deferred consideration은 단순 분할지급 포함 — 판독 단계 구분"
+
+  - canonical: 에스크로
+    kind: clause
+    ko: [에스크로, 예치, 대금의 예치, 예치계좌]
+    en: [escrow, escrow account, escrow agent]
+
+  - canonical: 홀드백
+    kind: concept
+    ko: [유보금, 대금 유보, 지급 유보]
+    en: [holdback, hold-back, retention amount]
+
+  - canonical: 이행보증금
+    kind: concept
+    ko: [이행보증금, 계약금, 보증금]
+    en: [deposit, down payment, earnest money]
+
+  - canonical: 롱스탑
+    kind: concept
+    ko: [종결기한, 거래종결 기한, 장기 미종결]
+    en: [long stop date, longstop, outside date, drop dead date, end date]
+
+  - canonical: MAC
+    kind: clause
+    ko: [중대한 부정적 변경, 중대한 부정적 영향, 중대한 악영향, 중대한 변경]
+    en: [material adverse change, material adverse effect, MAC, MAE]
+
+  - canonical: 브링다운
+    kind: concept
+    ko: [진술보장의 반복, 종결일 기준 진술, 재확인]
+    en: [bring-down, bring down, repetition of warranties]
+
+  - canonical: 인식제한
+    kind: concept
+    ko: [알고 있는 범위, 인식하는 범위, 인지하는 한, 매도인이 아는 한]
+    en: [knowledge qualifier, to the knowledge of, to seller's knowledge, awareness]
+
+  - canonical: 중요성제한
+    kind: concept
+    ko: [중요한 측면에서, 중대한 측면에서, 중요성 기준]
+    en: [materiality qualifier, in all material respects, materiality scrape]
+
+  - canonical: 샌드배깅
+    kind: concept
+    ko: [샌드배깅, 위반 인지 후 청구]
+    en: [sandbagging, pro-sandbagging, anti-sandbagging]
+    note: "국문 계약엔 명시 규정이 드묾 — '없음'이 유의미한 검색 결과"
+
+  - canonical: 공개목록
+    kind: concept
+    ko: [공개목록, 공개서한, 공개자료, 별지 공개사항]
+    en: [disclosure schedule, disclosure letter, disclosed matters, data room]
+
+  - canonical: 치유기간
+    kind: concept
+    ko: [치유기간, 시정기간, 위반의 치유]
+    en: [cure period, remedy period, grace period]
+
+  - canonical: 노력의무
+    kind: concept
+    ko: [최선의 노력, 합리적인 노력, 상업적으로 합리적인 노력, 성실히 협조]
+    en: [best efforts, reasonable efforts, commercially reasonable efforts, reasonable endeavours, best endeavours]
+
+  # ================= 공통: 절차·규제 =================
+
+  - canonical: 기업결합신고
+    kind: clause
+    ko: [기업결합신고, 기업결합 신고, 공정거래위원회, 공정위, 경쟁당국]
+    en: [merger clearance, merger control, antitrust approval, HSR, competition authority, KFTC]
+    note: "선행조건의 하위 항목으로 흔함 — key_conditions와 중복 태깅 허용"
+
+  - canonical: 정부승인
+    kind: clause
+    ko: [정부 승인, 인허가, 관계기관 승인, 규제 승인, 승인 및 신고]
+    en: [governmental approvals, regulatory approvals, consents and approvals]
+
+  - canonical: 외국인투자신고
+    kind: concept
+    ko: [외국인투자, 외국인투자촉진법, 외투 신고, 산업통상자원부]
+    en: [foreign direct investment, FDI, foreign investment report]
+
+  - canonical: 실사
+    kind: concept
+    ko: [실사, 기업실사, 정밀실사]
+    en: [due diligence, DD, due diligence investigation]
+    scope: [MOU, SPA]
+
+  - canonical: 배타적협상
+    kind: clause
+    ko: [배타적 협상, 독점적 협상, 우선협상, 배타적 협상권]
+    en: [exclusivity, no-shop, no shop, exclusive negotiation]
+    scope: [MOU]
+
+  - canonical: 구속력
+    kind: clause
+    ko: [법적 구속력, 구속력 있는, 구속력 없는, 법적 효력]
+    en: [binding, non-binding, legally binding, no legal effect]
+    scope: [MOU]
+    note: "MOU 검색의 핵심 축 — 구속력 유무·범위(비밀유지만 구속 등)"
+
+  - canonical: 제3자청구
+    kind: clause
+    ko: [제3자 청구, 제삼자 청구, 배상청구 절차, 청구 절차, 제3자 청구 절차]
+    en: [third party claims, third-party claim, claims procedure, conduct of claims]
+
+  # ================= SPA / 자산·영업양수도 =================
+
+  - canonical: 경업금지
+    kind: clause
+    ko: [경업금지, 경업 금지, 경쟁금지, 경쟁사업 금지, 경업피지]
+    en: [non-compete, non-competition, covenant not to compete, restrictive covenants]
+    scope: [SPA, ATA/BTA]
+
+  - canonical: 유인금지
+    kind: clause
+    ko: [유인금지, 권유금지, 임직원 유인 금지, 고객 유인 금지, 스카웃 금지]
+    en: [non-solicitation, non-solicit, no solicitation, no poaching]
+    scope: [SPA, ATA/BTA]
+
+  - canonical: 임직원승계
+    kind: clause
+    ko: [고용승계, 임직원 승계, 근로관계 승계, 전적, 승계 대상 근로자]
+    en: [transferred employees, employee matters, transfer of employment]
+    scope: [ATA/BTA]
+
+  - canonical: 승계자산부채
+    kind: clause
+    ko: [양수도 대상, 이전 대상 자산, 승계 대상, 제외 자산, 승계 부채, 제외 부채]
+    en: [transferred assets, assumed liabilities, excluded assets, excluded liabilities]
+    scope: [ATA/BTA]
+    note: "영업양수도의 핵심 — 무엇이 넘어가고 무엇이 남는가"
+
+  - canonical: 계약이전동의
+    kind: clause
+    ko: [계약의 이전, 계약 이전 동의, 상대방 동의, 승계 동의]
+    en: [assignment of contracts, third party consents, change of control consents]
+    scope: [ATA/BTA, SPA]
+
+  - canonical: 조세배상
+    kind: clause
+    ko: [조세, 세무, 조세 배상, 세금의 부담, 제세공과금]
+    en: [tax indemnity, tax matters, tax covenant, taxes]
+
+  # ================= SHA / 투자계약 =================
+
+  - canonical: 주식양도제한
+    kind: clause
+    ko: [주식양도제한, 주식의 양도 제한, 처분 제한, 보호예수, 의무보유]
+    en: [transfer restrictions, lock-up, lockup, share transfer restrictions, restriction on disposal]
+    scope: [SHA, 공동투자, JVA]
+
+  - canonical: 우선매수권
+    kind: clause
+    ko: [우선매수권, 우선매수청구권, 우선매수협상권]
+    en: [right of first refusal, ROFR, right of first offer, ROFO]
+    scope: [SHA]
+
+  - canonical: 동반매도참여권
+    kind: clause
+    ko: [동반매도참여권, 동반매각참여권, 태그얼롱, 공동매도권, 공동매각참여권]
+    en: [tag-along, tag along, co-sale right, co-sale]
+    scope: [SHA]
+
+  - canonical: 동반매도요구권
+    kind: clause
+    ko: [동반매도요구권, 동반매각요구권, 드래그얼롱, 동반매도청구권]
+    en: [drag-along, drag along, bring-along, compulsory sale]
+    scope: [SHA]
+
+  - canonical: 풋옵션
+    kind: clause
+    ko: [풋옵션, 매도청구권, 주식매수청구권 부여, 풋 옵션]
+    en: [put option, put right]
+    scope: [SHA, 공동투자, CB인수]
+    note: "상법상 반대주주 주식매수청구(주식매수청구권 canonical)와 혼동 주의 — ctype으로 1차 구분"
+
+  - canonical: 콜옵션
+    kind: clause
+    ko: [콜옵션, 매수청구권, 매도요구권, 콜 옵션]
+    en: [call option, call right]
+    scope: [SHA, 공동투자]
+
+  - canonical: 신주우선인수권
+    kind: clause
+    ko: [신주인수권, 우선청약권, 신주 우선 배정, 지분율 유지 권리]
+    en: [pre-emptive right, preemptive rights, anti-dilution subscription right, pro rata right]
+    scope: [SHA, SSA]
+    note: "BW(신주인수권부사채)와 어휘 충돌 — ctype 필터 병용 필수"
+
+  - canonical: 희석방지
+    kind: clause
+    ko: [희석방지, 희석 방지, 지분희석 방지, 전환가격 조정에 의한 희석 방지]
+    en: [anti-dilution, antidilution, full ratchet, weighted average]
+    scope: [SHA, SSA, CB인수]
+
+  - canonical: 이사지명권
+    kind: clause
+    ko: [이사지명권, 이사 지명, 이사 선임권, 이사회 구성, 임원 지명]
+    en: [board designation, director nomination, board composition, board seats]
+    scope: [SHA, JVA]
+
+  - canonical: 동의사항
+    kind: clause
+    ko: [사전동의, 사전 동의 사항, 동의사항, 거부권, 특별결의 사항, 주주 동의 사항]
+    en: [reserved matters, veto rights, consent rights, protective provisions]
+    scope: [SHA, JVA, 공동투자]
+
+  - canonical: 정보접근권
+    kind: clause
+    ko: [정보접근권, 정보 제공, 자료 요구권, 회계장부 열람]
+    en: [information rights, access to information, inspection rights]
+    scope: [SHA]
+
+  - canonical: 배당정책
+    kind: clause
+    ko: [배당, 배당정책, 이익배당]
+    en: [dividend policy, dividends, distribution policy]
+    scope: [SHA, JVA]
+
+  - canonical: 교착해소
+    kind: clause
+    ko: [교착상태, 교착 해소, 데드락, 의사결정 교착]
+    en: [deadlock, deadlock resolution, russian roulette, texas shoot-out, shotgun clause]
+    scope: [SHA, JVA]
+
+  - canonical: IPO요구
+    kind: clause
+    ko: [상장 요구, 기업공개, 상장 추진, 적격상장]
+    en: [IPO, qualified IPO, listing, registration rights]
+    scope: [SHA, 공동투자]
+
+  - canonical: 출자의무
+    kind: clause
+    ko: [출자, 출자의무, 추가 출자, 자본금 납입]
+    en: [capital contribution, funding obligations, additional funding]
+    scope: [JVA, 공동투자]
+
+  # ================= CB / BW / EB =================
+
+  - canonical: 전환가액조정
+    kind: clause
+    ko: [전환가액, 전환가격, 리픽싱, 전환가액의 조정, 행사가액 조정]
+    en: [conversion price, conversion price adjustment, refixing, exercise price adjustment]
+    scope: [CB인수, BW인수, EB인수]
+
+  - canonical: 전환청구
+    kind: clause
+    ko: [전환청구, 전환청구기간, 전환권 행사, 신주인수권 행사, 교환청구]
+    en: [conversion period, conversion right, exercise period, exchange right]
+    scope: [CB인수, BW인수, EB인수]
+
+  - canonical: 조기상환
+    kind: clause
+    ko: [조기상환, 조기상환청구권, 만기전 상환, 중도상환]
+    en: [early redemption, put right, call right, redemption]
+    scope: [CB인수, BW인수, EB인수]
+
+  - canonical: 이율
+    kind: concept
+    ko: [표면이율, 표면금리, 만기이율, 만기보장수익률, 이자율]
+    en: [coupon, coupon rate, YTM, yield to maturity, YTP, yield to put]
+    scope: [CB인수, BW인수, EB인수]
+
+  - canonical: 기한이익상실
+    kind: clause
+    ko: [기한이익상실, 기한의 이익 상실, 기한이익의 상실]
+    en: [events of default, EOD, acceleration, event of default]
+    scope: [CB인수, BW인수, EB인수]
+
+  - canonical: 담보
+    kind: clause
+    ko: [담보, 담보제공, 질권, 근질권, 담보설정]
+    en: [security, collateral, pledge, security interest]
+    scope: [CB인수, BW인수]
+
+  - canonical: 재무약정
+    kind: clause
+    ko: [재무약정, 재무비율 유지, 재무 특약]
+    en: [financial covenants, maintenance covenants, leverage ratio]
+    scope: [CB인수, BW인수]
+
+  # ================= 조직재편 (합병·분할·주식교환) =================
+
+  - canonical: 비율산정
+    kind: clause
+    ko: [합병비율, 분할비율, 교환비율, 배정비율, 비율의 산정]
+    en: [merger ratio, exchange ratio, allotment ratio]
+    scope: [분할합병, 주식교환, 분할계획서]
+
+  - canonical: 채권자보호
+    kind: clause
+    ko: [채권자보호절차, 채권자 이의, 채권자 보호]
+    en: [creditor protection, creditor objection procedure]
+    scope: [분할합병, 분할계획서]
+
+  - canonical: 주식매수청구권
+    kind: clause
+    ko: [주식매수청구권, 반대주주, 매수청구, 반대주주의 주식매수청구]
+    en: [appraisal rights, dissenting shareholders, appraisal remedy]
+    scope: [분할합병, 주식교환]
+    note: "SHA의 풋옵션(사적 매수청구)과 별개 — 상법상 권리"
+
+  - canonical: 승계재산
+    kind: clause
+    ko: [승계 재산, 이전 재산, 분할대상 재산, 승계 대상 권리의무]
+    en: [transferred business, succeeded assets and liabilities]
+    scope: [분할계획서, 분할합병]
+
+  - canonical: 주주총회승인
+    kind: clause
+    ko: [주주총회 승인, 주주총회의 결의, 특별결의]
+    en: [shareholder approval, general meeting approval, special resolution]
+    scope: [분할합병, 주식교환, SPA]
+
+  # ================= 진술보장 하위 주제 (개념 — 조항 내 검색 축) =================
+  # "지식재산 관련 진술보장 있는 계약" 류 질의를 위한 검색 확장 전용.
+  # 태깅은 진술보장(clause) 하나로 하고, 하위 주제는 스니펫 검색으로 잡는다.
+
+  - canonical: 재무제표진술
+    kind: concept
+    ko: [재무제표, 재무상태, 회계기준에 따라 작성, 우발채무, 부외부채]
+    en: [financial statements, GAAP, K-IFRS, undisclosed liabilities, off-balance]
+    scope: [진술보장 하위]
+
+  - canonical: 소송진술
+    kind: concept
+    ko: [소송, 분쟁, 계속 중인 소송, 법적 절차, 행정처분]
+    en: [litigation, legal proceedings, claims pending, governmental proceedings]
+    scope: [진술보장 하위]
+    note: "분쟁해결(clause)과 별개 — 이것은 '현재 소송 없음' 진술"
+
+  - canonical: 지식재산진술
+    kind: concept
+    ko: [지식재산, 지식재산권, 특허, 상표, 영업비밀, 지재권]
+    en: [intellectual property, IP, patents, trademarks, trade secrets, IP infringement]
+    scope: [진술보장 하위]
+
+  - canonical: 조세진술
+    kind: concept
+    ko: [조세 관련 진술, 세무신고, 납세의무, 세무조사]
+    en: [tax representations, tax returns, tax audits]
+    scope: [진술보장 하위]
+    note: "조세배상(clause)과 별개 — 진술 vs 배상 메커니즘"
+
+  - canonical: 인사노무진술
+    kind: concept
+    ko: [인사노무, 근로관계, 노동조합, 단체협약, 퇴직급여, 4대보험]
+    en: [employment matters, labor, collective bargaining, employee benefits]
+    scope: [진술보장 하위]
+
+  - canonical: 인허가진술
+    kind: concept
+    ko: [인허가, 사업에 필요한 허가, 법령 준수, 컴플라이언스]
+    en: [permits, licenses, compliance with laws, regulatory compliance]
+    scope: [진술보장 하위]
+
+  - canonical: 환경개인정보진술
+    kind: concept
+    ko: [환경, 환경법규, 개인정보, 개인정보보호법, 정보보안]
+    en: [environmental matters, data protection, privacy, cybersecurity]
+    scope: [진술보장 하위]
+
+  # ================= 문서 구조 요소 =================
+
+  - canonical: 정의조항
+    kind: clause
+    ko: [정의, 용어의 정의, 정의 규정]
+    en: [definitions, defined terms, interpretation]
+    note: "definitions_json 추출의 원천 — location만 있어도 가치 큼"
+
+  - canonical: 별지
+    kind: concept
+    ko: [별지, 별첨, 첨부, 부속서]
+    en: [schedule, exhibit, annex, appendix, attachment]
+    note: "공개목록·승계자산 목록 등이 별지에 위치 — 부분 정독 좌표 힌트"

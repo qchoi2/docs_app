@@ -1,0 +1,80 @@
+# ============================================================
+# TYPE_RULES v1 (초안: Claude 사전 작성 — AI-fill A3 선반영)
+# ------------------------------------------------------------
+# 용도: index_contracts.py의 폴더/파일명 → ctype·lang 자동분류 규칙.
+# 원칙:
+#   - 위에서 아래로 첫 매치 승리 (구체적 패턴을 위에)
+#   - 폴더명 우선, 실패 시 파일명으로 폴백
+#   - 매치 실패 → ctype: 미분류 로 남기고 리포트에 노출
+#     (색인 실행 후 미분류 폴더를 보고 이 파일을 보강 — A3 루프)
+#   - 계층 1.5의 ctype_confirmed와 불일치하는 건은 오분류 후보 리포트로
+# 패턴은 대소문자 무시 부분일치. 정규식 아님(단순 포함 검사 권장).
+# ============================================================
+
+ctype_rules:
+  # --- 사채 인수류 (구체적 패턴 먼저: "인수계약" 단독보다 위) ---
+  - ctype: CB인수
+    patterns: [CB_인수, CB 인수, 전환사채 인수, 전환사채인수, CB_매수, 전환사채 매수]
+  - ctype: BW인수
+    patterns: [BW_인수, BW 인수, 신주인수권부사채, BW_매수]
+  - ctype: EB인수
+    patterns: [EB_인수, EB 인수, 교환사채, EB_매수]
+
+  # --- 조직재편 ---
+  - ctype: 분할합병
+    patterns: [분할합병]          # "분할"보다 반드시 위
+  - ctype: 분할계획서
+    patterns: [분할계획, 분할 계획]
+  - ctype: 주식교환
+    patterns: [주식교환, 포괄적 교환, share swap, share exchange]
+
+  # --- 주식/자산 거래 ---
+  - ctype: SPA
+    patterns: [SPA, 주식매매, 구주매매, 주식 매매, share purchase, stock purchase]
+  - ctype: SSA
+    patterns: [SSA, 신주인수계약, 신주 인수, 유상증자, subscription agreement, share subscription]
+    note: "'신주인수권부'(BW)가 위에서 먼저 매치되므로 충돌 없음"
+  - ctype: SHA
+    patterns: [SHA, 주주간, 주주 간, shareholders agreement, shareholders' agreement, SHL]
+  - ctype: ATA/BTA
+    patterns: [ATA, BTA, 자산양수도, 영업양수도, 자산 양수도, 영업 양수도, asset transfer, business transfer, asset purchase, APA]
+
+  # --- 협력/투자 ---
+  - ctype: JVA
+    patterns: [JVA, 합작, joint venture]
+  - ctype: 공동투자
+    patterns: [공동투자, 공동 투자, co-investment, consortium]
+  - ctype: MOU
+    patterns: [MOU, 양해각서, LOI, 의향서, term sheet, 텀시트]
+
+  # --- 잡폴더 (포함 여부 미결 — 별도 플래그) ---
+  - ctype: 기타샘플
+    patterns: [99_MnA_계약_외, Sample_Docs]
+    flag: exclude_by_default   # 검색 기본 제외, --include-misc 로 포함
+
+lang_rules:
+  - lang: 국영문
+    patterns: [국영문, 국·영문, 국영, KOR_ENG, KO_EN, bilingual]   # "국문"보다 위
+  - lang: 국문
+    patterns: [국문, KOR, _KO, 한글]
+  - lang: 영문
+    patterns: [영문, ENG, _EN, English]
+  # 매치 실패 시: txt 캐시의 한글/영문 문자 비율로 추정 (한글>30% → 국문,
+  # 한글<5% → 영문, 그 사이 → 국영문 후보로 리포트)
+
+version_rules:
+  # is_draft / version_hint 휴리스틱 (파일명 대상)
+  draft_patterns: [draft, 드래프트, 초안, _d1, _d2, (안), 검토본, redline, 수정본, markup, comment]
+  executed_patterns: [최종, final, executed, 체결, 서명본, signed, clean]
+  version_capture: ["v(\\d+)", "(\\d+)차", "rev(\\d+)"]   # version_hint 추출용
+  note: >
+    draft/executed 패턴 모두 없으면 is_draft=null(판별불가).
+    Q04류 질의에서 '판별 불가'로 별도 표기하는 근거가 됨.
+
+# ------------------------------------------------------------
+# 알려진 한계 (색인 리포트로 검증할 것):
+# - "인수계약"이라는 단어만 있는 폴더는 CB/BW/EB 패턴 없이는 미분류로
+#   남음 — 의도된 동작 (SPA와 사채인수를 구분 불가하므로 추측 금지)
+# - 영문 약어(SPA 등)가 파일명에 없고 폴더가 번호만인 경우 → 미분류
+#   리포트를 보고 폴더별 수동 매핑 항목(overrides)을 추가:
+overrides: {}   # 예: { "07_특수폴더명": {ctype: SPA, lang: 영문} }

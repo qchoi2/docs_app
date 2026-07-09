@@ -1,14 +1,47 @@
 # Contract Search
 
-This repository contains the initial scaffolding for a local contract search workflow.
+Local Windows-first indexing and search tooling for M&A contract samples.
 
-## Structure
+## Setup
 
-- `lib/` for shared implementation modules
-- `data/` for YAML and runtime configuration files
-- `tests/` for regression and smoke tests
-- `requirements.txt` for pinned runtime dependencies
+Use a local Python environment. Python 3.10+ is recommended, while the code keeps Python 3.9 syntax compatibility.
 
-## Next steps
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+```
 
-Implementation of indexing, search, and evaluation logic will follow in later steps.
+Keep `cs_index/` on a local PC disk. The source contract root may be a local folder or a readable network drive, but `catalog.sqlite`, `txt/`, API cache, and logs should not live on a network filesystem.
+
+## Indexing
+
+Pilot a selected subset:
+
+```powershell
+python index_contracts.py --root C:\path\to\contracts --out C:\path\to\cs_index --file-list pilot_files.txt --batch-label pilot_001
+```
+
+Expand to the full root using the same `--root` and `--out`:
+
+```powershell
+python index_contracts.py --root C:\path\to\contracts --out C:\path\to\cs_index --batch-label full_001
+```
+
+Force a generated index rebuild:
+
+```powershell
+python index_contracts.py --root C:\path\to\contracts --out C:\path\to\cs_index --full --batch-label full_001
+```
+
+Use `--dry-run` to create a change report without writing the database or text cache.
+
+## Runtime Data
+
+The YAML files in `data/` are runtime configuration. Update those files rather than changing code when term dictionaries, type rules, golden queries, API budget settings, or manual metadata overrides need adjustment.
+
+## Current Scope
+
+Implemented so far: normalization, catalog schema creation, DOCX/PDF indexing, txt cache generation, FTS population, incremental indexing, pilot/full options, and index reports.
+
+Next Phase 1A work: search CLI, stats CLI, file inspection helpers, evaluation, and fuller README/FAQ coverage.

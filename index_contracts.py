@@ -24,6 +24,7 @@ from docx.opc.exceptions import PackageNotFoundError
 from pdfminer.high_level import extract_text
 from pdfminer.pdfdocument import PDFEncryptionError
 from pdfminer.pdfparser import PDFSyntaxError
+import yaml
 
 from lib.catalog import CatalogError, initialize_catalog
 from lib.normalize import normalize
@@ -31,7 +32,6 @@ from lib.normalize import normalize
 
 SUPPORTED_EXTENSIONS = {".docx", ".pdf"}
 ZIP_EXTENSIONS = {".zip"}
-UNSUPPORTED_EXTENSIONS = {".doc", ".hwp", ".hwpx", ".rtf", ".txt"}
 TYPE_RULE_PATHS = (Path("data/type_rules.yaml"), Path(".docs/type_rules.yaml"))
 
 
@@ -102,14 +102,6 @@ def hash_text(text: str) -> str:
     return sha256_short(text.encode("utf-8"))
 
 
-def parse_yaml_list(value: str) -> List[str]:
-    value = value.strip()
-    if not value.startswith("[") or not value.endswith("]"):
-        return []
-    raw_items = value[1:-1].split(",")
-    return [item.strip().strip("\"'") for item in raw_items if item.strip()]
-
-
 def load_type_rules(start: Optional[Path] = None) -> TypeRules:
     base = start or Path.cwd()
     selected = None
@@ -121,43 +113,31 @@ def load_type_rules(start: Optional[Path] = None) -> TypeRules:
     if selected is None:
         return TypeRules()
 
-    rules = TypeRules()
-    section = None
-    current = None
-    for raw_line in selected.read_text(encoding="utf-8").splitlines():
-        line = raw_line.split("#", 1)[0].rstrip()
-        stripped = line.strip()
-        if not stripped:
-            continue
-        if stripped in {"ctype_rules:", "lang_rules:", "version_rules:"}:
-            section = stripped[:-1]
-            current = None
-            continue
-        if section in {"ctype_rules", "lang_rules"} and stripped.startswith("- "):
-            match = re.match(r"-\s+(ctype|lang):\s*(.+)", stripped)
-            if not match:
-                current = None
-                continue
-            current = TypeRule(match.group(2).strip().strip("\"'"), [])
-            if section == "ctype_rules":
-                rules.ctype_rules.append(current)
-            else:
-                rules.lang_rules.append(current)
-            continue
-        if current is not None and stripped.startswith("patterns:"):
-            current.patterns = parse_yaml_list(stripped.split(":", 1)[1])
-            continue
-        if current is not None and stripped.startswith("flag:"):
-            current.flag = stripped.split(":", 1)[1].strip().strip("\"'")
-            continue
-        if section == "version_rules":
-            if stripped.startswith("draft_patterns:"):
-                rules.draft_patterns = parse_yaml_list(stripped.split(":", 1)[1])
-            elif stripped.startswith("executed_patterns:"):
-                rules.executed_patterns = parse_yaml_list(stripped.split(":", 1)[1])
-            elif stripped.startswith("version_capture:"):
-                rules.version_capture = parse_yaml_list(stripped.split(":", 1)[1])
-    return rules
+    data = yaml.safe_load(selected.read_text(encoding="utf-8")) or {}
+    ctype_rules = [
+        TypeRule(
+            value=str(item.get("ctype", "")),
+            patterns=[str(pattern) for pattern in item.get("patterns", [])],
+            flag=item.get("flag"),
+        )
+        for item in data.get("ctype_rules", [])
+    ]
+    lang_rules = [
+        TypeRule(
+            value=str(item.get("lang", "")),
+            patterns=[str(pattern) for pattern in item.get("patterns", [])],
+            flag=item.get("flag"),
+        )
+        for item in data.get("lang_rules", [])
+    ]
+    version_rules = data.get("version_rules", {}) or {}
+    return TypeRules(
+        ctype_rules=ctype_rules,
+        lang_rules=lang_rules,
+        draft_patterns=[str(pattern) for pattern in version_rules.get("draft_patterns", [])],
+        executed_patterns=[str(pattern) for pattern in version_rules.get("executed_patterns", [])],
+        version_capture=[str(pattern) for pattern in version_rules.get("version_capture", [])],
+    )
 
 
 def matches_any(text: str, patterns: List[str]) -> bool:
@@ -229,11 +209,7 @@ def is_supported_file(path: Path) -> bool:
 
 
 def is_indexable_file(path: Path) -> bool:
-    return (
-        path.is_file()
-        and not path.is_symlink()
-        and path.suffix.lower() in SUPPORTED_EXTENSIONS.union(UNSUPPORTED_EXTENSIONS).union(ZIP_EXTENSIONS)
-    )
+    return path.is_file() and not path.is_symlink()
 
 
 def iter_indexable_files(root: Path, include_misc: bool, rules: TypeRules) -> List[Path]:
@@ -559,7 +535,7 @@ def write_report(
     changes: ChangeReport,
     db_summary: Optional[Dict[str, object]],
 ) -> Path:
-    report_path = out_dir / f"report_{datetime.now().strftime('%Y%m%d')}.md"
+    report_path = unique_report_path(out_dir)
     lines = [
         "# Index Report",
         "",
@@ -628,6 +604,19 @@ def write_report(
     out_dir.mkdir(parents=True, exist_ok=True)
     report_path.write_text("\n".join(lines), encoding="utf-8")
     return report_path
+
+
+def unique_report_path(out_dir: Path) -> Path:
+    stem = f"report_{datetime.now().strftime('%Y%m%d')}"
+    first = out_dir / f"{stem}.md"
+    if not first.exists():
+        return first
+    suffix = 2
+    while True:
+        candidate = out_dir / f"{stem}-{suffix}.md"
+        if not candidate.exists():
+            return candidate
+        suffix += 1
 
 
 def index_contracts(
@@ -812,6 +801,7 @@ def index_contracts(
             rebuild_dup_groups(conn)
             conn.commit()
             db_summary = summarize_db(conn)
+            conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
         elif conn is not None:
             db_summary = summarize_db(conn)
     finally:

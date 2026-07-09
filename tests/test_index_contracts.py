@@ -406,6 +406,36 @@ def test_unsupported_files_are_recorded_and_zip_is_report_excluded(tmp_path):
     assert read_rows(out / "catalog.sqlite", "SELECT COUNT(*) FROM fts") == [(0,)]
 
 
+def test_arbitrary_unsupported_extension_is_recorded(tmp_path):
+    root = tmp_path / "contracts"
+    out = tmp_path / "cs_index"
+    root.mkdir()
+    (root / "spreadsheet.xlsx").write_bytes(b"not a contract")
+
+    result = index_contracts(root, out)
+
+    assert result["changes"]["unsupported"] == 1
+    assert read_rows(
+        out / "catalog.sqlite",
+        "SELECT path, status, error_reason FROM files",
+    ) == [("spreadsheet.xlsx", "unsupported", "unsupported_ext")]
+
+
+def test_report_filename_collision_uses_numeric_suffix(tmp_path):
+    root = tmp_path / "contracts"
+    out = tmp_path / "cs_index"
+    root.mkdir()
+    write_docx(root / "a.docx", "A")
+
+    first = index_contracts(root, out)
+    second = index_contracts(root, out)
+
+    assert Path(first["report"]).name.startswith("report_")
+    assert Path(second["report"]).name.endswith("-2.md")
+    assert Path(first["report"]).exists()
+    assert Path(second["report"]).exists()
+
+
 def test_type_rules_classify_and_report_unclassified_folders(tmp_path):
     root = tmp_path / "contracts"
     out = tmp_path / "cs_index"

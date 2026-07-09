@@ -1,0 +1,27 @@
+# manual_overrides.yaml — 자동분류/파일 메타데이터 수동 보정 템플릿
+# ------------------------------------------------------------
+# 목적: type_rules.yaml·파일명 휴리스틱이 틀린 문서를 코드 수정 없이 보정한다.
+# 적용 순서: 자동 추정(source_signals) → path 패턴 override → file_key override.
+# file_key override가 최종 우선한다.
+#
+# 주의:
+# - 값이 비어 있으면 아무 보정도 하지 않는다.
+# - path 패턴은 glob 형식으로 해석한다. 예: "**/SPA/**", "**/*최종*"
+# - ctype/lang/is_draft/version_hint만 보정한다. content_hash/file_key는 절대 보정하지 않는다.
+
+paths:
+  # "**/Final/**":
+  #   is_draft: false
+  #   version_hint: final
+  # "**/SPA/**":
+  #   ctype: SPA
+  # "**/국영문/**":
+  #   lang: 국영문
+
+files:
+  # "0123abcd4567ef89":
+  #   ctype: SPA
+  #   lang: 영문
+  #   is_draft: false
+  #   version_hint: final
+  #   note: "파일명은 draft이나 실제 본문은 executed version"

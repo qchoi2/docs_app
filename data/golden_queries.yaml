@@ -1,0 +1,345 @@
+# ============================================================
+# 골든 질의 세트 v1 (초안: Claude 사전 작성)
+# ------------------------------------------------------------
+# 목적: 티어 업그레이드 전후로 검색 재현율/정밀도를 측정하는 기준.
+#       모든 아키텍처 결정(특히 T4 임베딩 착수 여부)은 이 세트의
+#       수치 변화로 판정한다.
+#
+# 사용법:
+#   1. 색인 완료 후, expected_files에 실제 file_key를 채운다.
+#      (Claude Code에게 "Q01의 정답 문서를 코퍼스에서 찾아 채워줘"
+#       라고 시키고 사람이 검수 — AI-fill A4의 후반부)
+#   2. <당사자명>, <계약명> 플레이스홀더를 실제 코퍼스의 값으로 치환.
+#   3. eval_search.py가 tier 필드 이하의 티어만 골라 측정
+#      (예: T2 평가 시 tier가 T1/T2인 질의만).
+#
+# 필드 설명:
+#   tier            이 질의를 통과시키려면 최소 어느 티어가 필요한가
+#   intent          질의 유형 분류 (실패 패턴 분석용)
+#   expected_filter 정답이 만족해야 하는 조건 (자동 부분채점 가능)
+#   expected_files  정답 file_key 목록 (색인 후 채움; 비어있으면
+#                   expected_filter + check로만 채점)
+#   check           사람이/에이전트가 확인할 통과 기준 서술
+#   trap            이 질의가 노리는 실패 모드 (있는 경우)
+# ============================================================
+
+meta:
+  version: 2               # v2: 실사용 상정 질의 Q26~Q33 + user_added 슬롯 추가
+  status: draft            # expected_files 채우면 active로 변경
+  created: 2026-07-08
+  scoring:
+    recall: "expected_files 중 결과에 포함된 비율"
+    precision: "결과 중 expected_filter를 만족하는 비율"
+    count_accuracy: "요청 개수 준수 여부 (해당 질의만)"
+
+queries:
+
+  # ---------- A. 메타 필터 / 목록형 (T1) ----------
+  - id: Q01
+    tier: T1
+    intent: 메타목록
+    query: "국문 SPA 10개 보여줘"
+    expected_filter: { ctype: SPA, lang: 국문 }
+    expected_count: 10
+    expected_files: []
+    check: 정확히 10건, 전부 SPA·국문, 동일 dup_group 중복 없음
+    trap: 개수 초과/미달, 중복 문서 반복 노출
+
+  - id: Q02
+    tier: T1
+    intent: 메타목록
+    query: "영문 주주간계약 전부 나열해줘"
+    expected_filter: { ctype: SHA, lang: 영문 }
+    expected_files: []
+    check: SHA·영문 전수. 국영문 병기 문서 포함 여부를 명시적으로 밝힐 것
+
+  - id: Q03
+    tier: T1
+    intent: 메타집계
+    query: "계약 유형별로 몇 건씩 있는지 표로 정리해줘"
+    expected_filter: {}
+    expected_files: []
+    check: catalog 집계와 일치. dup_group 기준 중복 제거 수치 병기 시 가점
+
+  - id: Q04
+    tier: T1
+    intent: 메타목록+버전
+    query: "분할합병계약서 중 최종본만 보여줘 (드래프트 제외)"
+    expected_filter: { ctype: 분할합병, is_draft: false }
+    expected_files: []
+    check: is_draft=true 제외. 버전 판별 불가 문서는 "판별 불가"로 별도 표기
+    trap: 드래프트 혼입
+
+  # ---------- B. 키워드 / 용어 변이 (T2: FTS5 + 용어사전) ----------
+  - id: Q05
+    tier: T2
+    intent: 키워드
+    query: "earn-out 조항이 들어간 계약서 찾아줘"
+    expected_filter: {}
+    expected_files: []
+    check: earn-out / 언아웃 / 조건부 대금 / contingent consideration 변이 모두 포착
+    trap: 표기 변이 누락 (용어사전 미적용 시 실패)
+
+  - id: Q06
+    tier: T2
+    intent: 키워드+언어교차
+    query: "진술보장 보험을 언급한 계약 있어?"
+    expected_filter: {}
+    expected_files: []
+    check: 국문 질의로 영문 문서의 "W&I insurance / R&W insurance"도 포착
+    trap: 언어 교차 실패 — 용어사전의 국↔영 매핑 검증용
+
+  - id: Q07
+    tier: T2
+    intent: 키워드
+    query: "락박스 방식 대금조정을 쓰는 SPA 있나?"
+    expected_filter: { ctype: SPA }
+    expected_files: []
+    check: locked box / 락박스 / 락드박스 변이 포착. 없으면 "없음"을 근거와 함께
+    trap: 정답이 0건일 수 있는 질의 — 억지로 만들어내는지 확인
+
+  - id: Q08
+    tier: T2
+    intent: 키워드복합
+    query: "경업금지랑 유인금지가 둘 다 있는 국문 계약"
+    expected_filter: { lang: 국문 }
+    expected_files: []
+    check: AND 조건. non-compete + non-solicitation 각각의 국문 변이 처리
+
+  # ---------- C. 조항 태그 / 구조화 질의 (T3: doc_meta) ----------
+  - id: Q09
+    tier: T3
+    intent: 조항존재
+    query: "MAC 조항 있는 계약 전부"
+    expected_filter: { clause: MAC }
+    expected_files: []
+    check: clause_map 기반. 본문 키워드가 아니라 태그로 조회했는지
+
+  - id: Q10
+    tier: T3
+    intent: 조항수치
+    query: "손해배상 상한이 계약금액의 10% 이하인 SPA 찾아줘"
+    expected_filter: { ctype: SPA, clause: 손해배상 }
+    expected_files: []
+    check: consideration/clause_map의 상한 필드 활용. 상한 미기재 문서는
+      "미기재"로 구분 (0%로 오독 금지)
+    trap: 수치 오독, 미기재를 조건 충족으로 처리
+
+  - id: Q11
+    tier: T3
+    intent: 조항수치
+    query: "진술보장 존속기간이 18개월 넘는 계약"
+    expected_filter: { clause: 진술보장 }
+    expected_files: []
+    check: 존속기간 필드 비교. 근본 진술(fundamental reps)의 별도 기간을
+      구분해서 답하면 가점
+
+  - id: Q12
+    tier: T3
+    intent: 부정조건
+    query: "경업금지 조항이 없는 영업양수도 계약"
+    expected_filter: { ctype: ATA/BTA }
+    expected_files: []
+    check: 부정 조건 — "키워드 미검출"이 아니라 clause_map의 부재 태그로 판정.
+      추출 confidence가 low인 문서는 "확인 필요"로 분리
+    trap: 부재 증명을 키워드 부재로 대충 처리
+
+  - id: Q13
+    tier: T3
+    intent: 당사자
+    query: "<당사자명>이 매수인으로 등장하는 계약 전부"
+    expected_filter: { party_role: 매수인 }
+    expected_files: []
+    check: parties_json 실명 매칭. 계열사 표기 변형(주식회사 유무 등) 처리
+    note: 색인 후 실제 당사자명으로 치환
+
+  - id: Q14
+    tier: T3
+    intent: 대금구조
+    query: "대금 일부를 주식으로 지급하는 딜 샘플 있어?"
+    expected_filter: {}
+    expected_files: []
+    check: consideration_json의 지급수단 필드 조회
+
+  # ---------- D. 비교 / 횡단 질의 (T3 워크플로우 검증) ----------
+  - id: Q15
+    tier: T3
+    intent: 조항비교
+    query: "국문 SPA 3개 골라서 손해배상 조항(상한·바스켓·존속기간)을 표로 비교해줘"
+    expected_filter: { ctype: SPA, lang: 국문 }
+    expected_files: []
+    check: 조항맵 먼저 → 해당 조항만 부분 정독 순서 준수. 각 셀에 file_key 인용.
+      원문 전체 정독(컨텍스트 폭발) 없이 수행했는지
+    trap: 전문 정독으로 컨텍스트 낭비, 인용 없는 수치
+
+  - id: Q16
+    tier: T3
+    intent: 조항비교+언어
+    query: "같은 유형의 국문 계약과 영문 계약에서 해제 조항이 어떻게 다른지 예를 들어 설명해줘"
+    expected_filter: { clause: 해제 }
+    expected_files: []
+    check: 국·영문 각 1건 이상 선택 근거 제시, 조항 단위 인용
+
+  - id: Q17
+    tier: T3
+    intent: 정의조회
+    query: "이 코퍼스에서 '중대한 부정적 변경'을 어떻게 정의하고 있는지 몇 가지 예시 보여줘"
+    expected_filter: { clause: MAC }
+    expected_files: []
+    check: definitions_json 활용, 정의문은 부분 정독으로 원문 확인 후 요약
+
+  - id: Q18
+    tier: T3
+    intent: 쌍매칭
+    query: "국문본과 영문본이 둘 다 있는 계약을 찾아서 하나 골라 용어 대응을 보여줘"
+    expected_filter: {}
+    expected_files: []
+    check: A6(국영문 매칭) 결과 활용. 매칭 데이터 없으면 "매칭 미구축" 고지
+    note: A6 완료 전에는 측정 제외 가능
+
+  # ---------- E. 함정 / 견고성 (전 티어) ----------
+  - id: Q19
+    tier: T2
+    intent: 무정답
+    query: "합병 반대주주의 주식매수청구 절차만 다룬 별도 계약서 있어?"
+    expected_filter: {}
+    expected_files: []
+    check: 정답이 없을 가능성이 높은 질의. "없다"를 탐색 근거와 함께 답하는지
+    trap: 유사 문서를 정답으로 억지 제시
+
+  - id: Q20
+    tier: T1
+    intent: 중복함정
+    query: "CB 인수계약 5개 보여줘"
+    expected_filter: { ctype: CB인수 }
+    expected_count: 5
+    expected_files: []
+    check: 동일 dup_group에서 1건만. 중복 존재 시 "동일 문서 n곳 존재" 고지
+    trap: 같은 계약 반복 카운트
+
+  - id: Q21
+    tier: T2
+    intent: 범위이탈
+    query: "우리 회사가 지금 진행 중인 딜에 이 SPA 조항을 그대로 써도 될까?"
+    expected_filter: {}
+    expected_files: []
+    check: 샘플 검색·비교는 수행하되, 구체 딜에 대한 법률 자문이 아님을 명확히.
+      관련 조항 샘플 제시로 대응
+    trap: 검색 도구가 법률 자문으로 월권
+
+  - id: Q22
+    tier: T3
+    intent: 저신뢰
+    query: "스캔본이거나 추출이 불완전한 문서 중에도 조건에 맞는 게 있을 수 있어? 확약 조항 있는 PDF 계약 찾아줘"
+    expected_filter: { ext: pdf, clause: 확약 }
+    expected_files: []
+    check: status=empty/error 문서를 "검색 불가 목록"으로 별도 고지하는지
+    trap: 추출 실패 문서를 조용히 누락
+
+  # ---------- F. 요약 / 판독형 (G1 답변 품질) ----------
+  - id: Q23
+    tier: T2
+    intent: 단건요약
+    query: "<계약명 또는 file_key> 이 계약의 핵심 조건을 요약해줘"
+    expected_filter: {}
+    expected_files: []
+    check: 당사자·대금·주요 조항. 모든 항목에 문단 위치/인용 근거
+    note: 색인 후 실제 문서로 치환
+
+  - id: Q24
+    tier: T3
+    intent: 추천형
+    query: "소수지분 투자에 참고할 만한 주주간계약 샘플을 3개 추천하고 이유를 설명해줘"
+    expected_filter: { ctype: SHA }
+    expected_count: 3
+    expected_files: []
+    check: 추천 근거가 clause_map의 실제 내용(태그얼롱, 이사지명권 등)에 기반
+
+  - id: Q25
+    tier: T3
+    intent: 통계형
+    query: "이 코퍼스의 SPA들은 분쟁해결을 중재와 재판 중 뭘 더 많이 택했어?"
+    expected_filter: { ctype: SPA, clause: 분쟁해결 }
+    expected_files: []
+    check: clause_map 집계 + 미기재/미추출 건수를 분모에서 어떻게 처리했는지 명시
+
+  # ---------- G. 실사용 상정 질의 (Claude 작성 초안, 2026-07-08) ----------
+  # 사용자 요청으로 Claude가 실무 사용을 상정해 채운 8문항.
+  # 실제 사용 패턴과 다르면 자유롭게 수정·삭제하고, 아래 user_added에 추가.
+
+  - id: Q26
+    tier: T3
+    intent: 실무추천
+    query: "매도인에게 유리한 손해배상 구조(낮은 상한, 짧은 존속기간, 바스켓)를 가진 국문 SPA 샘플 추천해줘"
+    expected_filter: { ctype: SPA, lang: 국문, clause: 손해배상 }
+    expected_files: []
+    check: 추천 근거가 clause_map의 실제 수치(cap/survival/basket verbatim)에 기반, 각 근거에 file_key
+
+  - id: Q27
+    tier: T3
+    intent: 실무추천
+    query: "소수지분 투자자 보호 장치(사전동의사항, 태그얼롱, 풋옵션)가 잘 갖춰진 SHA 보여줘"
+    expected_filter: { ctype: SHA }
+    expected_files: []
+    check: 세 조항 태그의 present 여부를 문서별로 표로 제시. 용어 변이(동반매도참여권 등) 정규화 확인
+
+  - id: Q28
+    tier: T3
+    intent: 실무양식
+    query: "표준적인 국문 MOU 양식으로 쓸 만한 샘플 3개 골라줘. 구속력 조항을 어떻게 처리했는지도 알려줘"
+    expected_filter: { ctype: MOU, lang: 국문, clause: 구속력 }
+    expected_count: 3
+    expected_files: []
+    check: 구속력 범위(전부 비구속/비밀유지만 구속 등)를 verbatim 근거와 함께 구분
+
+  - id: Q29
+    tier: T3
+    intent: 크로스보더
+    query: "영문 SPA 중에 준거법이 한국법이 아닌 계약 있어?"
+    expected_filter: { ctype: SPA, lang: 영문, clause: 준거법 }
+    expected_files: []
+    check: clause_map의 law 필드로 판정. 준거법 미기재는 별도 구분. 0건이면 근거와 함께 "없음"
+
+  - id: Q30
+    tier: T3
+    intent: 딜구조
+    query: "신주와 구주를 함께 거래하는 구조의 계약 샘플 있어?"
+    expected_filter: {}
+    expected_files: []
+    check: deal_type_detail(구주+신주) 필드 조회. SPA·SSA 결합형/단일계약형 구분해 제시하면 가점
+
+  - id: Q31
+    tier: T3
+    intent: 문안비교준비
+    query: "국문 SPA의 진술보장 조항 표준 문안을 비교하고 싶어. 대표적인 3건 골라서 해당 조항 위치를 알려줘"
+    expected_filter: { ctype: SPA, lang: 국문, clause: 진술보장 }
+    expected_count: 3
+    expected_files: []
+    check: 각 건의 조항 location(¶범위) 제시 — read_contract 좌표로 바로 쓸 수 있어야 함. 대표성 선정 이유 설명
+
+  - id: Q32
+    tier: T3
+    intent: 통계
+    query: "선행조건에 기업결합신고가 들어간 계약이 몇 건이나 돼?"
+    expected_filter: { clause: 기업결합신고 }
+    expected_files: []
+    check: 태그 집계 + 미추출(doc_meta 없음)·confidence low 건수를 분모 처리와 함께 명시
+
+  - id: Q33
+    tier: T3
+    intent: 수치조사
+    query: "위약금이나 해제수수료 규정을 둔 계약들과 그 금액 수준을 알려줘"
+    expected_filter: { clause: 해제 }
+    expected_files: []
+    check: break_fee_verbatim 필드 활용, 금액은 원문 인용. 정률/정액 구분 제시
+
+  # ---------- 사용자 추가란 ----------
+  # 실제로 물어볼 질의가 생기면 아래 형식으로 추가하세요.
+  # expected_filter/check는 비워도 됨 (Claude Code에게 채우게 한 뒤 검수).
+user_added: []
+  # - id: U01
+  #   tier: T3
+  #   query: "여기에 실제 질의를 쓰세요"
+  #   expected_filter: {}
+  #   expected_files: []
+  #   check: ""
