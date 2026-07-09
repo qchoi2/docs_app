@@ -43,3 +43,16 @@
 - Added tests for rerun skip, add-only incremental indexing, deletion-to-missing, file-list pilot followed by full expansion, deterministic sampling, file-list/sample conflict, move, restore, content change, dry-run, full batch-label recording, and include-misc filtering.
 - Verified CLI shape with `python index_contracts.py --help`; all Step 5 options are present.
 - Ran the full test suite with `python -m pytest`; result: `20 passed` with one existing pytest cache warning.
+- Completed implementation brief hardening pass after reviewing `.docs/IMPLEMENTATION_BRIEF.md` against the code.
+- Removed Python 3.10-only union type syntax from `index_contracts.py` and `lib/catalog.py`; verified both files parse with Python 3.9 syntax rules.
+- Replaced hardcoded misc-folder filtering with `type_rules.yaml`-based `exclude_by_default` pattern handling, preferring `data/type_rules.yaml` and falling back to `.docs/type_rules.yaml`.
+- Added type/language/draft/version classification signals to `files` table writes using the available type rules and text heuristics.
+- Expanded root scanning to account for unsupported legacy extensions and zip files while excluding symlinks.
+- Added DB recording for unsupported files with `status='unsupported'` and `error_reason='unsupported_ext'`; zip files are reported as excluded without DB rows.
+- Added file-level OS error handling for stat/read failures, mapping permission failures to `permission_denied` and other OS failures to `unknown_error` where possible.
+- Expanded `report_YYYYMMDD.md` with type-language distribution, unclassified folders, unsupported/excluded/error lists, and existing DB summary sections.
+- Changed `requirements.txt` dependency ranges to exact pins for deterministic extraction behavior.
+- Added tests for unsupported-file recording, zip report exclusion, type-rule classification, and unclassified folder reporting.
+- Added `.gitignore` entries for Python cache and pytest cache artifacts, and removed previously tracked `.pyc` cache files from the working tree.
+- Verified `python index_contracts.py --help`; Step 5 options remain present.
+- Ran the full test suite with `python -m pytest`; result: `22 passed` with one existing pytest cache warning.

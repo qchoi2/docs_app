@@ -7,6 +7,7 @@ from contextlib import closing
 import sqlite3
 import sys
 from pathlib import Path
+from typing import List, Optional, Union
 
 
 MIN_TRIGRAM_SQLITE_VERSION = (3, 34, 0)
@@ -83,7 +84,7 @@ def ensure_trigram_available() -> None:
         raise _trigram_error(f"Probe failed: {exc}") from exc
 
 
-def initialize_catalog(db_path: str | Path) -> Path:
+def initialize_catalog(db_path: Union[str, Path]) -> Path:
     """Create catalog.sqlite schema at db_path and return the resolved path."""
 
     ensure_trigram_available()
@@ -95,14 +96,14 @@ def initialize_catalog(db_path: str | Path) -> Path:
     return path.resolve()
 
 
-def connect_catalog(db_path: str | Path) -> sqlite3.Connection:
+def connect_catalog(db_path: Union[str, Path]) -> sqlite3.Connection:
     """Open a catalog connection after validating trigram support."""
 
     ensure_trigram_available()
     return sqlite3.connect(db_path)
 
 
-def _main(argv: list[str] | None = None) -> int:
+def _main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="Initialize catalog.sqlite schema.")
     parser.add_argument("db_path", help="Path to catalog.sqlite")
     args = parser.parse_args(argv)

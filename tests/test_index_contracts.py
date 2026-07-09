@@ -385,3 +385,48 @@ def test_include_misc_controls_misc_folder_scan(tmp_path):
     assert read_rows(out / "catalog.sqlite", "SELECT path FROM files") == [
         ("Sample_Docs/misc.docx",)
     ]
+
+
+def test_unsupported_files_are_recorded_and_zip_is_report_excluded(tmp_path):
+    root = tmp_path / "contracts"
+    out = tmp_path / "cs_index"
+    root.mkdir()
+    (root / "legacy.doc").write_bytes(b"legacy")
+    (root / "archive.zip").write_bytes(b"PK\x05\x06")
+
+    result = index_contracts(root, out)
+
+    assert result["changes"]["unsupported"] == 1
+    assert read_rows(
+        out / "catalog.sqlite",
+        "SELECT path, status, error_reason FROM files",
+    ) == [("legacy.doc", "unsupported", "unsupported_ext")]
+    report = Path(result["report"]).read_text(encoding="utf-8")
+    assert "- archive.zip" in report
+    assert read_rows(out / "catalog.sqlite", "SELECT COUNT(*) FROM fts") == [(0,)]
+
+
+def test_type_rules_classify_and_report_unclassified_folders(tmp_path):
+    root = tmp_path / "contracts"
+    out = tmp_path / "cs_index"
+    spa_dir = root / "SPA_국문"
+    unknown_dir = root / "unknown"
+    spa_dir.mkdir(parents=True)
+    unknown_dir.mkdir()
+    write_docx(spa_dir / "final.docx", "계약 본문")
+    write_docx(unknown_dir / "mystery.docx", "본문")
+
+    result = index_contracts(root, out)
+
+    rows = read_rows(
+        out / "catalog.sqlite",
+        "SELECT path, ctype, lang FROM files ORDER BY path",
+    )
+    assert rows == [
+        ("SPA_국문/final.docx", "SPA", "국문"),
+        ("unknown/mystery.docx", "미분류", "국문"),
+    ]
+    report = Path(result["report"]).read_text(encoding="utf-8")
+    assert "### Type x Language" in report
+    assert "### Unclassified Folders" in report
+    assert "- unknown: 1" in report
