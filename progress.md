@@ -74,3 +74,18 @@
 - Ran a 200-file pilot index against local `root/` using `python index_contracts.py --out .\cs_index --sample 200 --sample-seed 42 --batch-label pilot_001`.
 - Re-ran the same pilot with `--full` after fixing ctype classification. Final pilot result: 200 indexed, 195 ok, 5 empty PDFs, 0 errors, 0 unsupported, 1 duplicate group of size 5, and 2 unclassified investment agreement files.
 - Verified `python -m pytest`; result: `27 passed` with one existing pytest cache warning.
+- Completed Step 6: implemented `search_contracts.py`.
+- Added FTS5 trigram search with phrase escaping for hyphen, quotes, and boolean-looking terms.
+- Added runtime loading of `data/term_dict.yaml` through `PyYAML`; no term dictionary content is hardcoded.
+- Added `--expand strict|normal|broad`, `--no-expand`, repeated `--kw` AND semantics, `--exclude-drafts`/`--exclude-draft`, and `--show-duplicates`.
+- Added file-level RRF ranking with exact-match weight 2.0 over expansion matches.
+- Added default dedup representative selection by `dup_group`, with duplicate counts and representative reason in JSON.
+- Added JSON output including `why`, `score_breakdown`, `matched_terms`, `snippet`, and `snippet_paras`.
+- Added `query_log.jsonl` append logging with timestamp, query, filters, expand mode, result count, and warnings.
+- Added 3-character-short term LIKE fallback with `short_term_fallback:<term>` warnings.
+- Implemented no-result searches as normal non-error responses per user instruction.
+- Added tests for exact-vs-expanded ranking, two-character Korean fallback, special FTS escaping, dedup on/off, repeated keyword AND, draft exclusion, strict expansion behavior, JSON schema, query logging, and no-result behavior.
+- Verified `python search_contracts.py --help`; Step 6 options are present.
+- Ran a smoke search against local pilot `cs_index`: `python search_contracts.py --out .\cs_index --kw 손해배상 --limit 3 --json`.
+- Verified Python 3.9 syntax compatibility with `ast.parse(..., feature_version=(3, 9))`.
+- Ran the full test suite with `python -m pytest`; result: `36 passed` with one existing pytest cache warning.
