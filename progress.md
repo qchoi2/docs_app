@@ -18,3 +18,17 @@
 - Verified temporary DB creation successfully: SQLite `3.50.4`, `journal_mode=wal`, all required tables present, and trigram search returned `('K1', 1)`.
 - Ran the full test suite with `python -m pytest`; result: `4 passed` with one existing pytest cache warning.
 - Confirmed `index_contracts.py` was not implemented in this step.
+- Completed Step 4: implemented the first pass of `index_contracts.py`.
+- Added root folder scanning for supported `.docx` and `.pdf` files only.
+- Added `file_key` generation from the first 16 hex characters of the file byte SHA-256 digest.
+- Added `content_hash` generation from the first 16 hex characters of the normalized extracted text SHA-256 digest, excluding paragraph markers.
+- Added txt cache writing at `cs_index/txt/<file_key>.txt` with `[¶N]\t` prefixes and continuous numbering for non-empty paragraphs.
+- Added catalog writes to the `files` table and paragraph writes to the `fts` table for `status='ok'` documents.
+- Implemented DOCX extraction using document body order traversal instead of separate `document.paragraphs` and `document.tables` passes; table rows are emitted as row-level paragraphs with cells joined by ` | `.
+- Added best-effort DOCX header/footer extraction and a non-fatal footnote skipped warning.
+- Implemented PDF text extraction with `pdfminer.six`; blank extracted text is recorded as `status='empty'` with `error_reason='pdf_text_empty'`.
+- Added fixtures/tests for synthetic DOCX paragraphs, DOCX table ordering, text PDF indexing, and blank PDF empty handling.
+- Kept Step 4 scope narrow: did not implement incremental indexing, `--sample`, `--file-list`, or `--dry-run`.
+- Updated `requirements.txt` to Python 3.14-compatible `python-docx` and `pdfminer.six` ranges after the previous pinned range failed to install in this environment.
+- Verified CLI shape with `python index_contracts.py --help`; only `--root` and `--out` are present.
+- Ran the full test suite with `python -m pytest`; result: `8 passed` with one existing pytest cache warning.
