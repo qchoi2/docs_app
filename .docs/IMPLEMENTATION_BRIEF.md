@@ -24,9 +24,8 @@ _2026-07-08 · 이 문서는 코딩을 수행할 AI(또는 사람)를 위한 단
 
 ## 1. 프로젝트 한 줄 요약과 파일 매니페스트
 
-개인 NAS의 M&A 계약서 샘플 **2,245개(855MB, .docx 위주+일부 .pdf)**를
-색인해 자연어로 검색·질의하는 로컬 시스템. 답변은 주로 구독제 Claude
-Code(무료)가 수행하고, API는 폴백·판정용으로만 엄격한 예산 하에 사용.
+개인 PC 또는 읽기 전용 원본 폴더의 M&A 계약서 샘플 **2,245개(855MB, .docx 위주+일부 .pdf)**를
+색인해 자연어로 검색·질의하는 PC 로컬 시스템. 개발·대량 배치 작업은 주로 구독제 Claude Code(무료)가 수행하고, **Codex 구독요금제는 선택적 보조 작업자**로 활용할 수 있다. 반면 `answer_quick.py`의 G1.5 Haiku, A9/A10, G2 답변은 웹앱/CLI 런타임에서 Anthropic API를 직접 호출하는 별도 경로이며, 사용자 제공 `ANTHROPIC_API_KEY`와 예산 가드레일 하에서만 사용한다.
 
 | 동봉 파일 | 역할 | 코더가 할 일 |
 |---|---|---|
@@ -40,18 +39,23 @@ Code(무료)가 수행하고, API는 폴백·판정용으로만 엄격한 예산
 | `manual_overrides.yaml` | 자동분류 보정 템플릿 | data/에 배치, index_contracts.py가 로드 |
 | `PILOT_ROLLOUT.md` | 소규모 파일셋→전체 확장 운용 절차 | README에 요약하고 상세 절차를 유지 |
 | `CODING_SEQUENCE.md` | 코딩 모델에게 단계별로 시킬 구현 명령 | 작업 순서를 이 문서에 맞춰 진행 |
-| `CODING_AGENT_RULES.md` | GPT-5.5/Claude Code 코딩 원칙 | 코딩 작업 전 항상 적용 |
+| `CODING_AGENT_RULES.md` | GPT-5.5/Claude Code/Codex 코딩 원칙 | 코딩 작업 전 항상 적용 |
+| `AGENT_SETUP_AND_MODEL_OPTIONS.md` | Claude Code 설치·로그인 절차 및 Codex 선택 활용 기준 | README 설치 섹션과 작업자 선택 기준에 반영 |
 | `UI_PRODUCT_SPEC.md` | 웹 UI 제품/화면 스펙 | UI 단계에서 기준 문서로 사용 |
 | `DESIGN_INTEGRATION.md` | getdesign.md 디자인 자산 활용 절차 | UI 구현 전 DESIGN_AUDIT.md 작성 |
 | `UI_ROADMAP.md` | UI-0~UI-4 구현 순서 | CLI MVP 이후 UI 확장 순서 |
+| `BACKEND_REVIEW_PC.md` | PC 로컬 실행 기준 백엔드 개선사항 | 백엔드/API/UI 설정 구현 시 필수 점검 |
+| `UI_REVIEW_PC.md` | PC 로컬 실행 기준 UI 개선사항 | 첫 실행 온보딩, 작업 진행률, 설정/검색 UX 구현 시 필수 점검 |
 
 ## 2. 확정 기술 결정 (변경 금지)
 
-- **언어/버전**: Python, **3.9 호환** 하한 (Synology NAS 기본 파이썬 고려).
-  3.10+ 전용 문법(match 등) 금지.
+- **언어/버전**: PC 로컬 실행 기준 Python **3.10+ 권장**, 다만 **3.9 호환** 하한은 유지한다.
+  3.10+ 전용 문법(match 등)은 금지해 이식성을 확보한다.
 - **의존성 화이트리스트**: `python-docx`, `pdfminer.six`, `PyYAML`,
   표준 라이브러리. `answer_quick.py`만 `anthropic` 추가. 그 외 금지
-  (pandas·chroma 등 불필요). requirements.txt 작성.
+  (pandas·chroma 등 불필요). requirements.txt 작성 — **반드시 버전 고정(pin)**.
+  python-docx·pdfminer.six 버전이 바뀌면 문단 분리 결과가 달라져
+  ¶번호 결정성(불변식 3)이 깨질 수 있다.
 - **저장 위치**: 모든 산출물은 단일 색인 디렉토리 `cs_index/` 하위.
   코드는 색인 디렉토리와 분리.
 - **저장소 레이아웃**:
@@ -64,11 +68,27 @@ contract-search/
   data/manual_overrides.yaml
   CLAUDE.md   tests/   requirements.txt   README.md   PILOT_ROLLOUT.md
 ```
-- **실행 환경 확정 (소유자 답변, 2026-07-08)**: **스크립트는 PC에서 실행**
-  (RAM 16GB). 계약서 원본은 NAS를 네트워크 마운트로 **읽기만** 하고,
+- **실행 환경 확정 (소유자 답변, 2026-07-09)**: **Windows PC 로컬 실행**
+  (RAM 16GB). 계약서 원본은 PC 로컬 폴더 또는 읽기 전용 네트워크 드라이브에서 읽고,
   `cs_index/`(sqlite·txt 캐시)는 반드시 **PC 로컬 디스크**에 둔다
   (sqlite를 네트워크 파일시스템에 두지 않는다 — README에 경고 명시).
-  venv 사용 안내 포함. 3.9 하한은 유지하되 PC이므로 최신 파이썬 권장.
+  venv 사용 안내 포함. Python 3.10+ 권장, 3.9 호환 유지.
+
+
+### 2.0 PC 로컬 백엔드 운영 원칙 — 필수
+
+기본 실행 환경은 **Windows PC 로컬 웹앱/CLI**다. NAS, Docker, DSM, tmux, cron/inotify는 기본 경로가 아니라 v2 또는 고급 운영 메모로만 취급한다.
+
+- 웹앱 기본 바인딩은 `127.0.0.1`로 제한한다.
+- 계약서 원본은 PC 로컬 폴더 또는 네트워크 드라이브에서 읽을 수 있으나, `catalog.sqlite`, `txt/`, `api_cache/`, `api_ledger.jsonl`은 반드시 PC 로컬 `cs_index/`에 둔다.
+- 색인/평가/API 답변 생성은 요청-응답 내부에서 오래 실행하지 말고 단일 worker job queue로 실행한다.
+- SQLite writer는 한 번에 하나만 허용하고, 검색은 짧은 read-only connection을 사용한다.
+- API key, 예산 설정, 로그 저장 위치는 `BACKEND_REVIEW_PC.md`의 PC 로컬 저장소 원칙을 따른다.
+- 백엔드는 사용자가 넘긴 임의 파일 경로를 열지 않고, `file_key`로 catalog를 조회해 허용된 root 안의 파일만 다룬다.
+- raw exception을 프론트엔드에 노출하지 않고 표준 오류 코드와 사용자 메시지를 분리한다.
+- **문서 관계**: `BACKEND_REVIEW_PC.md`는 본 절(§2.0)을 구체화한 하위 상세 문서다.
+  본 문서와의 관계는 "충돌"이 아니라 "상세화"로 보며, 본 문서가 침묵하는
+  백엔드 세부(저장 경로, job queue, 오류 코드 등)는 BACKEND_REVIEW_PC.md를 따른다.
 
 ### 2.1 식별자 3종 (혼동 금지 — 가장 중요한 규약)
 - `file_key` = sha256(**파일 바이트**)의 상위 16 hex. 불변 기본키.
@@ -201,6 +221,14 @@ python3 index_contracts.py --root PATH --out ./cs_index
     같은 path의 옛 레코드는 status='missing' 처리 (리포트 "내용변경",
     old_key→new_key 표기).
   - 검색 계층은 status='missing'을 항상 제외한다.
+  - **FTS 정리**: 레코드가 status='missing'으로 전환되면 해당 file_key의
+    fts 행은 **삭제**한다 (txt 캐시·files 레코드·doc_meta는 보존).
+    복원 시 txt 캐시로부터 fts를 재구축한다. missing을 매 검색의 조인으로만
+    걸러내는 방식은 재색인 반복 시 FTS 비대를 유발하므로 금지.
+  - **`--full`의 의미**: files·fts만 전량 재구축한다. `api_ledger.jsonl`,
+    `api_cache/`, `query_log.jsonl`, `eval_history.jsonl`, `ui_state.sqlite`는
+    **삭제·초기화하지 않는다** — 재생성 가능한 색인 산출물과 재생성 불가능한
+    사용자/지출 데이터를 구분한다.
 - zip: 열지 않음. status와 무관하게 "제외 목록" 리포트에만 기록.
 - 미지원 확장자(.doc, .hwp 등): status=`unsupported`.
 - 심볼릭 링크는 따라가지 않는다 (루프 방지).
@@ -228,12 +256,27 @@ python3 search_contracts.py --out ./cs_index
   `avoid_expanding_to`에 기재된 용어는 어떤 강도에서도 자동 확장하지 않는다.
   `--exclude-drafts`가 표준 옵션이며, `--exclude-draft`는 하위호환 alias로만 허용한다.
   `--show-duplicates`는 같은 dup_group의 중복본까지 펼쳐 보여준다.
+- **FTS 질의어 이스케이프 (필수)**: 모든 키워드·확장 변이는 FTS5 MATCH에
+  넘기기 전 구문 문자열(`"..."`)로 감싸고 내부 `"`는 `""`로 이스케이프한다.
+  `earn-out`의 하이픈, `R&W`의 `&`, `AND/OR/NOT` 등이 연산자로 해석되거나
+  구문 오류를 내는 것을 방지한다. 사용자 입력을 원문 그대로 MATCH 식에
+  삽입하는 것은 금지한다.
+- **3글자 미만 질의어 폴백**: trigram 토크나이저는 3글자 미만 질의를 매치하지
+  못한다 (예: `합병`, `해제`와 같은 2음절 국문 용어, term_dict의 `CP`/`DD`/`IP`/`RW`).
+  질의어 또는 확장 변이가 3자 미만이면 해당 항에 대해 FTS 대신 txt 캐시(또는
+  fts content 컬럼) 대상 LIKE 폴백 검색을 수행하고, warnings에
+  `short_term_fallback:<term>`을 기록한다. **조용한 0건 처리는 버그로 간주한다.**
+- **`--exclude-drafts` 의미**: is_draft=1만 제외한다. is_draft=NULL(판별불가)은
+  결과에 **포함**하되 카드·JSON에 판별불가로 표기한다.
+- **`total` 의미**: dedup ON일 때 `total`은 dedup 적용 후 그룹 수이며,
+  dedup 전 파일 수는 `total_files`로 병기한다.
 - **정확일치 우선 랭킹**: 원질의 FTS 결과와 확장질의 FTS 결과를 파일
   단위 RRF(k=60)로 융합하되 원질의 랭크에 가중 2.0.
 - `--json` 출력 (이 스키마 고정 — CLAUDE.md와 G1.5가 파싱):
 ```json
 {"query": {"type":null,"lang":null,"kw":["..."],"expanded":{"원어":["변이",...]}},
  "total": 0,
+ "total_files": 0,
  "results": [{"file_key":"","path":"","ctype":"","lang":"",
    "is_draft":null,"version_hint":null,"dup_group":"","dup_count":1,
    "dup_representative_reason":"final version preferred",
@@ -253,9 +296,13 @@ python3 search_contracts.py --out ./cs_index
   구성 → Haiku 1회 호출 → 2~3문장 답 + file_key 인용 출력.
 - `lib/budget.py` 경유 필수: `data/api_budget.yaml` 로드 (**동봉 파일
   그대로 사용** — 사용자 입력란 2개: per_call/per_run 상한. 값이 null이면
-  모든 API 도구는 실행 거부 + 입력 안내), 호출 전 토큰 추산·견적 출력,
-  상한 검사, `cs_index/api_ledger.jsonl` 기록(추적용), (프롬프트+입력)
-  sha256 캐시(`cs_index/api_cache/`) — 캐시 적중 시 무호출.
+  모든 API 도구는 실행 거부 + 입력 안내). 런타임에 `ANTHROPIC_API_KEY`가 없으면 G1.5/A9/A10/G2는 disabled/설정필요로 처리한다. 호출 전 토큰 추산·견적 출력,
+  상한 검사, `cs_index/api_ledger.jsonl` 기록(추적용, atomic append),
+  응답 캐시(`cs_index/api_cache/`) — **캐시 키 =
+  sha256(model_id + prompt_version + 프롬프트 + 입력 + budget_version)**
+  (BACKEND_REVIEW_PC §2.6과 동일 기준). 모델·프롬프트 버전이 바뀌면 캐시가
+  무효화되어야 하므로 (프롬프트+입력)만으로 키를 만들지 않는다.
+  캐시 적중 시 무호출.
   모델 문자열·단가·용도별 입력 토큰 상한도 api_budget.yaml에서 로드.
 - 재시도 최대 2회(지수 백오프), 그 후 실패 보고. 자동 재실행 루프 금지.
 - 모델 문자열·단가는 코드에 상수로 박지 말고 api_budget.yaml에서 로드
@@ -304,6 +351,8 @@ python3 stats_contracts.py --out ./cs_index --batches
 7. 데이터 파일(term_dict 등) 내용은 하드코딩하지 않는다.
 8. 파일럿 subset에서 전체 코퍼스로 확장할 때 기존 파일의 상대 경로를 임의로 바꾸지 않는다.
 9. 검색 결과에는 가능한 한 why/score_breakdown을 포함해 결과 선정 이유를 설명한다.
+10. UI 필터 옵션은 catalog 값(`DISTINCT ctype/lang/batch_label`)에서 동적으로 만든다. type_rules.yaml 값을 UI 코드에 복사해 하드코딩하지 않는다.
+11. 브라우저에서 원본 폴더 절대경로를 직접 얻는다고 가정하지 않는다. 로컬 루트 설정은 백엔드 경로 검증 API로만 확정한다.
 
 ## 4. 알려진 함정 (구현 시 반드시 처리)
 - **NFD 파일명**: macOS 유래 파일은 파일명이 NFD일 수 있음 — 경로 비교·
@@ -321,12 +370,42 @@ python3 stats_contracts.py --out ./cs_index --batches
 - **WAL 파일**: cs_index를 통째로 복사·백업할 때 -wal/-shm 포함 안내
   (README).
 - **인코딩**: 모든 파일 IO는 encoding='utf-8' 명시.
+- **Windows 콘솔 인코딩(cp949)**: stdout이 파이프/리다이렉트되면 로케일
+  인코딩(cp949)으로 떨어져 `–`, 스마트 따옴표 등에서 UnicodeEncodeError로
+  배치가 죽을 수 있다. 모든 스크립트 시작부에서
+  `sys.stdout.reconfigure(encoding='utf-8', errors='replace')`를 적용하고
+  README에 `PYTHONUTF8=1` 환경변수를 안내한다.
+- **Windows 260자 경로 제한**: 깊은 한글 폴더 경로에서 MAX_PATH 초과가
+  실제로 발생한다. 스캔·열기 시 `\\?\` 확장 경로 처리를 적용하고, 초과로
+  인한 실패가 permission_denied로 오분류되지 않게 한다.
+- **파일당 추출 타임아웃**: 손상 PDF에서 파서가 무한 대기하면 배치 전체가
+  멈춘다. Windows에는 signal.SIGALRM이 없으므로 타임아웃이 필요하면 파일
+  단위 subprocess 또는 watchdog 스레드로 구현해야 한다 (미구현 시
+  NOTES_FOR_OWNER.md에 위험으로 기록).
+- **Windows 명령 표기**: 본 문서의 CLI 예시 `python3`는 Windows에서
+  `python` 또는 `py`다. README와 UI의 복사용 명령은 Windows 기준으로 표기한다.
+- **대량 색인 후 WAL 비대**: 색인 종료 시 `PRAGMA wal_checkpoint(TRUNCATE)`를
+  1회 실행한다.
+- **jsonl 동시 append**: query_log/api_ledger/agent_log의 한 줄은 4KB 미만을
+  유지하고(원자적 append가 보장되는 범위), 웹앱 경로에서는 job worker를
+  경유해 단일 writer로 수렴시킨다.
+- **브라우저 폴더 선택 제약**: `webkitdirectory`는 파일 업로드용이며 로컬 절대경로
+  설정 수단으로 쓰지 않는다. 원본 계약서 루트는 사용자가 경로 문자열을 입력하고
+  `POST /api/settings/root-path/validate`가 존재 여부·읽기 권한·대략 파일 수를
+  검증해 확정한다.
+- **한글 IME Enter 처리**: 검색창에서 `isComposing` 또는 `keyCode==229` 상태의
+  Enter는 검색으로 처리하지 않는다. 검색창 포커스 중에는 j/k 전역 단축키를 끈다.
+- **CSV 인코딩**: 한국어 Windows Excel 호환을 위해 CSV export는 `utf-8-sig`로
+  생성한다. BOM 없는 UTF-8 CSV를 기본으로 두지 않는다.
+- **하이라이트 정규화 불일치**: 검색은 normalize() 기준, 화면 스니펫은 원문
+  표면형 기준이다. matched_terms의 변이 후보로 표면형을 찾되 실패하면 하이라이트
+  없이 표시한다. 하이라이트 실패를 검색 실패로 처리하지 않는다.
 
 
 
-### 2.8 UI 확장용 SQLite 테이블(Phase UI에서 구현)
+### 2.11 UI 확장용 SQLite 테이블(Phase UI에서 구현)
 
-Phase 1A CLI MVP에서는 필수 구현 대상이 아니다. 다만 웹 UI로 확장할 때는 아래 테이블을 같은 `catalog.sqlite` 또는 별도 `ui_state.sqlite`에 둔다. 개인용 로컬 앱이므로 우선 `catalog.sqlite`에 두어도 된다.
+Phase 1A CLI MVP에서는 필수 구현 대상이 아니다. 웹 UI로 확장할 때는 아래 테이블을 **별도 `ui_state.sqlite`에 둔다(기본값)**. `catalog.sqlite`는 재색인·`--full`·DB 재생성으로 언제든 다시 만들 수 있어야 하는 색인 산출물이므로, 북마크·저장된 검색·리서치 세션처럼 재생성 불가능한 사용자 데이터와는 파일 자체를 분리한다.
 
 ```sql
 CREATE TABLE IF NOT EXISTS search_history (
@@ -386,6 +465,24 @@ CREATE TABLE IF NOT EXISTS result_feedback (
   note TEXT,
   created_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS compare_lists (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  is_default INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS compare_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  compare_list_id INTEGER NOT NULL,
+  file_key TEXT NOT NULL,
+  para INTEGER,
+  snippet TEXT,
+  note TEXT,
+  created_at TEXT NOT NULL
+);
 ```
 
 역할 구분:
@@ -395,7 +492,39 @@ CREATE TABLE IF NOT EXISTS result_feedback (
 - `search_history`: 사용자가 UI에서 다시 여는 최근 검색.
 - `saved_searches`: 사용자가 이름 붙여 저장한 검색.
 - `research_sessions`: 하나의 리서치 업무 단위.
+- `compare_lists`, `compare_items`: MVP의 이름 없는 기본 비교 목록 및 이후 사용자 명명 비교 목록.
 - `user_marks`, `result_feedback`: 북마크, 메모, 검색 품질 피드백.
+
+### 2.12 UI API 계약(Phase UI에서 구현)
+
+Phase 1A CLI MVP의 필수 구현 대상은 아니지만, 웹 UI 구현 시 아래 계약을 기준으로 한다.
+
+```text
+GET  /api/catalog/facets
+POST /api/settings/root-path/validate
+POST /api/jobs/index
+POST /api/jobs/eval
+POST /api/jobs/answer
+GET  /api/jobs/{job_id}
+POST /api/jobs/{job_id}/cancel
+GET  /api/jobs/{job_id}/log
+POST /api/search
+GET  /api/compare/default
+POST /api/compare/default/items
+DELETE /api/compare/default/items/{id}
+```
+
+세부 원칙:
+
+- `/api/catalog/facets`는 현재 catalog에서 `ctype`, `lang`, `batch_label`의 distinct 값과 건수를 반환한다. UI는 이 응답으로 고급 필터를 만든다.
+- `/api/settings/root-path/validate`는 사용자가 입력한 원본 루트 경로의 존재 여부, 읽기 권한, 대략적 파일 수, 허용 확장자 수, 네트워크 드라이브 여부를 반환한다. 브라우저가 로컬 절대경로를 제공한다고 가정하지 않는다.
+- `/api/jobs/{job_id}`는 `status`, `progress_done`, `progress_total`, `current_item`, `started_at`, `finished_at`, `error_code`를 반환한다. MVP UI는 1~2초 폴링으로 갱신한다.
+- `/api/search` 응답의 `warnings`는 UI 결과 요약줄에 표시한다. 특히 `short_term_fallback:<term>`은 별도 안내 배지로 노출한다.
+- AI 기능 상태는 단순 boolean이 아니라 `enabled`, `disabled_reason`을 함께 반환한다. 이유 값은 `missing_key`, `budget_not_set`, `missing_key_and_budget`, `no_selection`, `budget_exceeded`, `provider_error` 중 하나를 우선 사용한다.
+- CSV export API 또는 UI 생성 로직은 `utf-8-sig`를 사용한다.
+- 검색 상태(`query`, `filters`, `expand_mode`, `corpus_scope`, `offset`)는 URL query parameter로 복원 가능해야 한다.
+- 진행률/검색 완료 메시지는 화면에서 aria-live 영역에 반영한다.
+- SSE/WebSocket은 v2 이후 최적화로 미루고 MVP에서는 폴링만 구현한다.
 
 ## 5. 구현 범위와 추천 구현 순서 (Phase 0~1)
 한 번에 전체를 구현하지 말고 아래 순서대로 모듈을 나누어 진행한다. 각 단계가 끝나면 테스트와 실행 예시 1개를 남긴 뒤 다음 단계로 넘어간다. 더 자세한 코딩 명령은 `CODING_SEQUENCE.md`를 따른다.
@@ -425,11 +554,15 @@ CREATE TABLE IF NOT EXISTS result_feedback (
 
 Phase UI는 Phase 1A 검색 MVP가 안정화된 뒤 시작한다. `UI_PRODUCT_SPEC.md`, `DESIGN_INTEGRATION.md`, `UI_ROADMAP.md`를 기준으로 진행한다.
 
-1. **UI-0 디자인 인수**: `getdesign.md`를 읽고 `DESIGN_AUDIT.md` 작성. 디자인 자산이 없으면 기능 우선 MVP로 진행.
-2. **UI-1 읽기 전용 검색 UI**: 검색창, 고급 필터, 필터 칩, 결과 카드, 문단 주변 보기, 중복본 보기, 최근 검색, Markdown/CSV 내보내기.
-3. **UI-2 운영 UI**: 색인 상태 대시보드, 실패 파일 목록, saved searches, result feedback, manual_overrides 후보 export.
-4. **UI-3 리서치 UI**: 비교 목록, 북마크/메모, 리서치 세션.
-5. **UI-4 AI 보조**: 선택 결과 기반 요약/비교표, API 예산 표시, file_key/¶번호 인용.
+1. **UI-0 디자인 인수**: `getdesign.md`를 읽고 `DESIGN_AUDIT.md` 및 `STACK_DECISION.md` 작성. 디자인 자산이 없으면 기능 우선 MVP로 진행하되, 프론트엔드 스택을 임의로 무겁게 선택하지 않는다.
+2. **UI-0.4 PC Backend Foundation**: `BACKEND_REVIEW_PC.md` 기준으로 로컬 설정 저장소, 관리자 인증, job queue, 표준 오류 코드, SQLite one-writer 원칙, file_key 기반 파일 접근을 먼저 확정한다.
+3. **UI-0.5 Agent Setup Wizard**: 관리자용 `설정 > AI 코딩 에이전트` 화면. Claude Code/Codex 설치·로그인 상태를 진단하고, 복사 가능한 설치/로그인 명령과 [다시 검사] UX를 제공한다. 로그인 토큰은 수집하지 않는다. Codex는 API key를 가져오지 않는 구조로 유지한다.
+4. **UI-0.6 Runtime API Settings**: 관리자용 `설정 > API 예산 및 키` 화면. 이 화면에 `ANTHROPIC_API_KEY` 입력창을 만든다. G1.5 Haiku/A9/A10/G2는 백엔드가 Anthropic API를 직접 호출하는 기능이므로, 사용자가 UI에서 `ANTHROPIC_API_KEY`와 `api_budget.yaml`의 per_call/per_run 상한을 설정해야 enabled가 된다. 저장 후 키 전문은 다시 표시하지 않고 마지막 4자리만 표시하며, [저장] [연결 테스트] [삭제/교체]를 제공한다. 이 화면은 Agent Setup Wizard와 분리한다.
+5. **UI-0.7 PC UI Foundation**: `UI_REVIEW_PC.md` 기준으로 첫 실행 온보딩, split view 문단 보기, 작업 진행률, 빈/부분 성공 상태, 로컬 데이터 관리 UI를 먼저 확정한다.
+6. **UI-1 읽기 전용 검색 UI**: 검색창, catalog facets 기반 고급 필터, 필터 칩, 결과 카드, 문단 주변 보기, 중복본 보기, 최근 검색, URL 상태 복원, Markdown/CSV(utf-8-sig) 내보내기, 한글 IME 보호.
+7. **UI-2 운영 UI**: 색인 상태 대시보드, 실패 파일 목록, saved searches, result feedback, manual_overrides 후보 export.
+8. **UI-3 리서치 UI**: ui_state.sqlite에 영속 저장되는 기본 비교 목록, 북마크/메모, 리서치 세션.
+9. **UI-4 AI 보조**: 선택 결과 기반 요약/비교표, API 예산 표시, file_key/¶번호 인용.
 
 UI 금지 원칙:
 
@@ -437,6 +570,9 @@ UI 금지 원칙:
 - 파일럿 코퍼스 결과를 전체 경향처럼 표현하지 않는다.
 - `getdesign.md` 확인 없이 임의 디자인 시스템을 만들지 않는다.
 - 검색 히스토리를 `query_log.jsonl`만으로 대체하지 않는다. 사용자가 보는 최근 검색/저장된 검색은 별도 UI 상태로 관리한다.
+- Agent Setup Wizard는 계정 비밀번호, OAuth/세션 토큰, 로그인 코드를 저장하지 않는다.
+- Codex 구독요금제 활용을 OpenAI API key 입력 방식으로 구현하지 않는다.
+- Haiku/Sonnet/Opus API 경로는 사용자의 Anthropic API key가 필요하며, 별도 Runtime API Settings UI의 `ANTHROPIC_API_KEY` 입력창에서 받는다. 서버 `.env` 직접 설정은 고급/수동 백업 경로로만 둔다.
 
 참고: `update_contracts.py`(색인→추출→임베딩→eval 체인 오케스트레이터)는
 **Phase 2 산출물**이다 — 지금은 만들지 마라. 단, 위의 변경분 처리 규칙과
@@ -457,8 +593,24 @@ UI 금지 원칙:
 - [ ] inspect_file.py/open_text.py가 실제 file_key 기준으로 동작
 - [ ] stats_contracts.py가 ctype/lang/status/error/batch 집계를 출력
 - [ ] UI 단계 착수 시 getdesign.md 확인 후 DESIGN_AUDIT.md 작성
+- [ ] UI 단계에서 첫 실행 온보딩, 작업 진행률, 빈/부분 성공 상태, 로컬 데이터 관리 UI가 반영됨
 - [ ] UI 단계에서 최근 검색, 저장된 검색, 결과 피드백, 비교 목록의 상태 저장 설계가 반영됨
-- [ ] 성능 기준 기록: 파일럿 문서 수, 색인 소요시간, 검색 소요시간, peak memory를 README 또는 report에 남김
+- [ ] 성능 기준 기록: 파일럿 문서 수, 색인 소요시간, 검색 소요시간, peak memory, **디스크 사용량(catalog.sqlite+FTS, txt 캐시)**을 README 또는 report에 남김
+- [ ] FTS 질의어 이스케이프(하이픈·`&`·따옴표·AND/OR) 및 3자 미만 질의어 폴백 테스트 통과
+- [ ] status='missing' 전환 시 fts 행 삭제, 복원 시 재구축 테스트 통과
+- [ ] `--full` 실행이 api_ledger/api_cache/query_log/eval_history/ui_state를 보존함
+- [ ] README 설치 섹션에 Claude Code 미설치/미로그인 시 절차와 Codex 선택 활용 기준 포함
+- [ ] UI 단계에서 Agent Setup Wizard가 상태 진단/명령 복사/다시 검사 방식으로 구현되고, 계정 토큰을 수집하지 않음
+- [ ] Runtime API Settings가 Agent Setup Wizard와 분리되어 있고, `ANTHROPIC_API_KEY` 입력창·마스킹·저장·연결 테스트·삭제/교체 기능을 제공하며, Haiku/Sonnet/Opus API 경로는 사용자 제공 ANTHROPIC_API_KEY + api_budget.yaml 상한이 모두 있을 때만 enabled
+- [ ] UI 필터 옵션이 `/api/catalog/facets` 또는 catalog DISTINCT 값에서 동적으로 생성되고, SPA/SHA 등 목록을 UI 코드에 하드코딩하지 않음
+- [ ] 첫 실행 원본 루트 설정이 경로 텍스트 입력 + `/api/settings/root-path/validate`로 동작하며, 브라우저 폴더 피커 절대경로 취득에 의존하지 않음
+- [ ] 검색창 한글 IME 조합 중 Enter가 검색을 실행하지 않고, 검색창 포커스 중 j/k 전역 단축키가 비활성화됨
+- [ ] CSV export가 `utf-8-sig`로 생성되어 한국어 Windows Excel에서 깨지지 않음
+- [ ] `short_term_fallback` 등 search warnings가 결과 요약줄 배지로 노출됨
+- [ ] AI disabled 상태가 missing_key / budget_not_set / missing_key_and_budget / no_selection 등 원인별로 표시됨
+- [ ] 비교 목록이 `ui_state.sqlite`의 기본 비교 목록에 영속 저장되어 새로고침 후에도 유지됨
+- [ ] query/filters/expand_mode가 URL query parameter로 복원됨
+- [ ] 진행률·검색 완료가 aria-live로 전달되고 split view 포커스 이동 규칙이 구현됨
 
 ## 7. 하지 말 것
 - T3/T4 구현(임베딩, 벡터DB, reranker, doc_meta 기록) — 스키마 예약까지만
@@ -470,8 +622,9 @@ UI 금지 원칙:
 ## 8. 소유자 제공값 (확정 답변 반영, 2026-07-08)
 | 항목 | 확정 내용 |
 |---|---|
-| 실행 환경 | **PC** (RAM 16GB). NAS는 원본 읽기 전용, cs_index는 PC 로컬 |
-| Claude Code 플랜 | Pro — 전량 추출은 1~2주 분할 전제 (Phase 2 참고사항) |
+| 실행 환경 | **Windows PC 로컬 실행** (RAM 16GB). 원본 폴더는 PC 로컬 또는 읽기 전용 네트워크 드라이브 가능. `cs_index`는 반드시 PC 로컬 디스크 |
+| Claude Code 플랜 | Pro — 전량 추출은 1~2주 분할 전제 (Phase 2 참고사항). 최초 미설치/미로그인 시 `AGENT_SETUP_AND_MODEL_OPTIONS.md` 절차를 따른다. |
+| Codex 활용 | 선택 가능 — VS Code 내 작은 패치, 테스트 수정, Claude Code 한도 도달 시 Step 단위 대체 작업자로 사용. 동일 지침·동일 git commit 규칙 적용. **Codex는 ChatGPT 구독계정 로그인 기반으로 사용하며, OpenAI API key를 가져오지 않는다.** |
 | 추출 우선순위 | SPA → SHA → SSA → MOU → ATA/BTA → JVA·공동투자 → CB·BW·EB → 주식교환 → 분할합병·분할계획서 → 기타 (enrich의 --priority 기본값) |
 | api_budget 수치 | **동봉 api_budget.yaml의 입력란을 사용자가 채움** — null이면 API 도구 실행 거부 |
 | 99_ 잡폴더 | 기본 제외, `--include-misc`로 포함 (type_rules 플래그) |
@@ -485,6 +638,9 @@ UI 금지 원칙:
 - report 파일명 충돌 시 -2, -3 접미
 - 로그는 stdout, --quiet 옵션 제공
 - dedup 대표 선택: non-draft → final/signed/clean → 짧은 경로 → 읽기 쉬운 filename → file_key 사전순
+- --exclude-drafts에서 is_draft=NULL은 포함 + "판별불가" 표기
+- dedup ON의 total = 그룹 수, total_files 병기
+- 3자 미만 질의어: LIKE 폴백 + warnings에 short_term_fallback 기록
 - 성능 목표(초기 가이드): 파일럿 100~300건 색인 5분 이내, 검색 3초 이내, peak memory 1GB 이하. 전체 코퍼스 기준은 실측 후 조정
 - 기타 사소한 결정: 관례적 선택 후 NOTES_FOR_OWNER.md에 기록
 

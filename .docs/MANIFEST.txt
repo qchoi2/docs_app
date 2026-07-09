@@ -1,4 +1,5 @@
 ./CHANGELOG_20260708.md
+./AGENT_SETUP_AND_MODEL_OPTIONS.md
 ./CLAUDE_v2.md
 ./CODING_AGENT_RULES.md
 ./CODING_SEQUENCE.md
@@ -17,3 +18,17 @@
 ./type_rules.yaml
 
 Final hardening: CODING_AGENT_RULES.md and CODING_SEQUENCE.md now require one tested git commit per implementation Step.
+
+2026-07-09 update: Agent Setup Wizard principles added; Codex remains ChatGPT subscription login based and does not request/store OpenAI API keys.
+
+2026-07-09 correction: Haiku/Sonnet/Opus runtime paths use user-provided ANTHROPIC_API_KEY via Runtime API Settings or .env; Codex still does not request/store OpenAI API keys.
+2026-07-09 update: Runtime API Settings now explicitly includes ANTHROPIC_API_KEY input UI with masking, test, delete/replace; Codex still does not request OpenAI API keys.
+
+BACKEND_REVIEW_PC.md — Windows PC 로컬 실행 기준 백엔드 개선사항 및 DoD.
+2026-07-09 update: default runtime shifted from NAS/server assumptions to Windows PC local execution.
+
+- UI_REVIEW_PC.md — PC 로컬 실행 기준 UI 개선 검토 및 MVP/v2 반영 우선순위
+- 2026-07-09 2차 백엔드 리뷰 반영: FTS 폴백/이스케이프, --full 의미론, 캐시 키 통일, Windows 함정(§4), job 영속화, ui_state.sqlite 분리. 상세는 CHANGELOG 참조.
+
+2026-07-09 frontend hardening: UI-0 산출물에 STACK_DECISION.md 추가.
+2026-07-09 frontend hardening: UI_PRODUCT_SPEC/UI_ROADMAP/IMPLEMENTATION_BRIEF/CODING_SEQUENCE/CODING_AGENT_RULES/BACKEND_REVIEW_PC/DESIGN_INTEGRATION/UI_REVIEW_PC 갱신.

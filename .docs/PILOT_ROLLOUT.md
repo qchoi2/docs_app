@@ -3,6 +3,10 @@
 ## 목적
 처음부터 2,000개 이상의 계약서를 전부 색인하지 않고, 일부 샘플로 성능·검색 품질·분류 규칙을 검증한 뒤 전체 코퍼스로 확장한다.
 
+## PC 로컬 실행 주의
+
+기본 환경은 Windows PC 로컬 실행이다. 원본 계약서는 PC 로컬 폴더 또는 읽기 전용 네트워크 드라이브에 둘 수 있지만, `--out`으로 지정하는 `cs_index`는 반드시 PC 로컬 디스크에 둔다. SQLite 파일을 네트워크 드라이브에 두지 않는다.
+
 ## 권장 방식
 가장 안전한 방식은 **최종 운영 루트를 그대로 두고, root 기준 상대경로 목록(`--file-list`)으로 일부 파일만 먼저 색인하는 것**이다. 이렇게 하면 파일을 복사하지 않아도 되고, 나중에 전체 파일을 추가 색인할 때 path 충돌이 생기지 않는다.
 
@@ -42,7 +46,7 @@ python3 index_contracts.py --root /path/to/contracts_root --out ./cs_index \
 python3 index_contracts.py --root /tmp/pilot_contracts --out ./cs_index_pilot --batch-label pilot_001
 
 # 전체 운영 색인은 새로 생성
-python3 index_contracts.py --root /nas/contracts_root --out ./cs_index_full --batch-label full_001 --full
+python index_contracts.py --root "D:\Contracts\contracts_root" --out "C:\contract-search\cs_index_full" --batch-label full_001 --full
 ```
 
 ## 파일럿 완료 기준

@@ -1,4 +1,4 @@
-# CODING_AGENT_RULES — GPT-5.5 / Claude Code 코딩 원칙
+# CODING_AGENT_RULES — GPT-5.5 / Claude Code / Codex 코딩 원칙
 _2026-07-08 · Andrej Karpathy식 LLM 코딩 원칙을 이 프로젝트에 맞게 구체화한 지침._
 
 ## 1. Think before coding
@@ -69,6 +69,8 @@ python -m py_compile ...
 - `cs_index/`는 PC 로컬 디스크에 둔다.
 - 색인 중 원본을 이동/수정/삭제하지 않는다.
 - API 실호출은 사용자가 명시적으로 허용하기 전까지 금지한다.
+- Haiku/Sonnet/Opus 런타임 API 경로(G1.5/A9/A10/G2)는 사용자의 ANTHROPIC_API_KEY와 api_budget.yaml 상한이 모두 있을 때만 동작한다.
+- Codex 사용을 위해 OpenAI API key를 입력받거나 저장하지 않는다. Codex는 ChatGPT 구독계정 로그인 기반 도구로만 다룬다.
 
 ## 8. UI coding rules
 
@@ -79,6 +81,17 @@ UI 단계에서는 다음을 지킨다.
 - 검색 결과 카드에는 근거와 ¶번호를 숨기지 않는다.
 - AI 답변은 검색 결과 확인 이후의 보조 기능으로 둔다.
 - 검색 히스토리, 저장된 검색, 비교 목록은 사용자의 리서치 흐름을 보존하기 위한 기능으로 구현한다.
+- Agent Setup Wizard는 상태 진단과 절차 안내만 제공한다. 계정 비밀번호, OAuth/세션 토큰, 로그인 코드를 수집·저장하지 않는다.
+- API key 입력이 필요한 기능은 별도 Runtime API Settings에서만 다룬다. Runtime API Settings에는 `ANTHROPIC_API_KEY` 입력창을 만들고, 저장 후 키 전문은 마스킹한다. Codex용 OpenAI API key 입력란은 만들지 않는다.
+- 초기 UI에서는 설치 명령 자동 실행을 만들지 말고, 복사 가능한 명령어와 다시 검사 버튼을 우선 구현한다.
+- 고급 필터의 ctype/lang 목록을 UI 코드에 하드코딩하지 말고 catalog facets에서 동적으로 불러온다.
+- 첫 실행 원본 폴더 설정은 브라우저 폴더 피커가 아니라 경로 텍스트 입력 + 백엔드 검증 API로 구현한다.
+- 검색창 Enter 처리에는 한글 IME composition(`isComposing`, `keyCode==229`) 방어를 넣는다.
+- CSV 다운로드는 한국어 Windows Excel 호환을 위해 `utf-8-sig`로 만든다.
+- 매칭어 하이라이트가 원문 표면형에서 실패하면 하이라이트 없이 정상 표시한다.
+- 검색 상태(query/filters/expand_mode)는 URL query parameter로 복원 가능하게 한다.
+- search warnings와 AI disabled 사유를 사용자에게 숨기지 않는다.
+- 진행률·검색 완료는 aria-live로 알리고, split view 키보드 포커스 이동 규칙을 둔다.
 
 ## 9. Git commit discipline
 

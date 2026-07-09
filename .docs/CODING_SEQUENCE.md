@@ -1,8 +1,9 @@
-# CODING_SEQUENCE — GPT-5.5/Claude Code 단계별 구현 명령
+# CODING_SEQUENCE — GPT-5.5/Claude Code/Codex 단계별 구현 명령
 _2026-07-08 · IMPLEMENTATION_BRIEF.md를 단일 기준으로 삼고, 이 문서는 구현 순서를 강제하는 실행 지침이다._
 
 ## 원칙
 - `CODING_AGENT_RULES.md`를 모든 Step의 상위 코딩 행동 원칙으로 적용한다.
+- 작업 시작 전 Claude Code 설치·로그인 상태를 확인하고, 문제가 있으면 `AGENT_SETUP_AND_MODEL_OPTIONS.md` 절차를 따른다. Codex를 쓸 경우에도 동일한 Step 단위 지침을 적용하되, Codex는 ChatGPT 구독계정 로그인 기반으로 사용하고 OpenAI API key를 가져오지 않는다.
 - 전체를 한 번에 구현하지 않는다. 색인 → 검색 → 운영도구 → 평가 → API 보조 순서로 나눈다.
 - 각 Step 종료 시 반드시 `pytest` 또는 해당 스모크 테스트를 실행하고, 실행 예시 1개를 남긴다.
 - 각 Step 완료 후 테스트가 통과하면 즉시 git commit을 만든다. commit message는 `step-N: <short description>` 또는 `ui-N: <short description>` 형식을 사용한다.
@@ -29,6 +30,26 @@ _2026-07-08 · IMPLEMENTATION_BRIEF.md를 단일 기준으로 삼고, 이 문서
 
 UI 단계는 `ui-N: <short description>` 형식으로 commit한다.
 
+
+
+## Preflight — 에이전트 설치·로그인 확인
+
+Step 1에 들어가기 전에 아래를 확인한다.
+
+```text
+1. claude --version으로 Claude Code 설치 여부를 확인한다.
+2. 미설치이면 AGENT_SETUP_AND_MODEL_OPTIONS.md §2 절차에 따라 설치한다.
+3. claude 실행 또는 세션 내 /login으로 로그인 상태를 확인한다.
+4. Claude Code가 불가하거나 한도에 도달한 경우, Codex 구독요금제를 선택적으로 사용하되 현재 Step 하나만 맡긴다.
+5. Codex 사용 시 OpenAI API key를 입력·저장·요구하지 않는다. VS Code 확장 또는 CLI의 ChatGPT 로그인 흐름을 사용한다.
+6. Haiku/Sonnet/Opus API 경로는 Codex/Claude Code 로그인과 별개이며, 실제 런타임 호출에는 사용자의 ANTHROPIC_API_KEY와 api_budget.yaml 상한이 필요함을 확인한다.
+6. 어느 에이전트를 쓰든 IMPLEMENTATION_BRIEF.md / CODING_SEQUENCE.md / CODING_AGENT_RULES.md를 먼저 읽고 진행한다.
+```
+
+완료 기준:
+- Claude Code 또는 Codex 중 실제 작업자가 명확히 정해짐
+- 프로젝트 루트에서 `git status` 확인 가능
+- 유료 API 실호출 금지 원칙 재확인
 
 ## Step 1 — 저장소 골격 만들기
 코딩 모델에게 줄 명령:
@@ -157,7 +178,7 @@ eval_history.jsonl에 결과를 추가 기록한다.
 
 ```text
 README.md를 완성하라.
-설치, 최초 파일럿 색인, --file-list 파일럿, --sample 파일럿, 검색 예시, 결과 해석, 전체 코퍼스 확장, 평가, manual_overrides.yaml, 백업/복구, 오류 FAQ를 포함한다.
+Claude Code 미설치/미로그인 절차, Codex 선택 활용, Codex는 API key를 가져오지 않는다는 원칙, 최초 파일럿 색인, --file-list 파일럿, --sample 파일럿, 검색 예시, 결과 해석, 전체 코퍼스 확장, 평가, manual_overrides.yaml, 백업/복구, 오류 FAQ를 포함한다.
 ```
 
 완료 기준:
@@ -207,23 +228,77 @@ CLI 검색 MVP가 안정화된 뒤 UI 구현을 시작하라.
 
 완료 기준:
 - DESIGN_AUDIT.md 작성
+- STACK_DECISION.md 작성: 서버 렌더링+경량 JS(htmx/vanilla)와 SPA(React+Vite 등)를 비교하고 선택 사유 기록
 - 사용 가능한 색상/폰트/간격/컴포넌트 목록 정리
 - UI_PRODUCT_SPEC.md와의 충돌 또는 부족한 항목 기록
+
+
+## UI-0.4 — PC Backend Foundation
+명령:
+
+```text
+BACKEND_REVIEW_PC.md를 읽고 Windows PC 로컬 실행 기준의 백엔드 기반을 먼저 확정하라.
+기본 바인딩은 127.0.0.1로 제한하고, 관리자 보호가 필요한 엔드포인트를 분리한다.
+cs_index가 PC 로컬 디스크인지 검증하고, 네트워크 드라이브의 SQLite 사용은 거부한다.
+색인/평가/API 호출용 단일 worker job queue와 job status API를 설계하라.
+MVP 진행률 갱신은 GET /api/jobs/{job_id} 1~2초 폴링으로 처리하고 SSE/WebSocket은 v2로 미뤄라.
+Runtime API Settings의 secret 저장소는 프론트엔드 저장소가 아니라 PC 로컬 사용자 전용 저장소를 사용한다.
+원본 계약서 루트 설정은 POST /api/settings/root-path/validate로 존재 여부·읽기 권한·대략 파일 수를 검증하라.
+필터 옵션을 위한 GET /api/catalog/facets를 제공해 ctype/lang/batch_label을 catalog에서 동적으로 내려줘라.
+파일 열기는 file_key 기반 catalog 조회로만 처리하고, 임의 경로 입력을 허용하지 마라.
+```
+
+완료 기준:
+- BACKEND_REVIEW_PC.md의 DoD가 구현 계획 또는 코드에 반영됨
+- 임의 shell 실행 기능 없음
+- raw exception이 사용자 화면으로 전달되지 않음
+- SQLite writer 단일화 원칙이 반영됨
+
+## UI-0.5 — Agent Setup Wizard
+명령:
+
+```text
+UI_PRODUCT_SPEC.md의 Agent Setup Wizard 섹션과 AGENT_SETUP_AND_MODEL_OPTIONS.md §7을 읽어라.
+관리자용 `설정 > AI 코딩 에이전트` 화면을 구현하라.
+Claude Code, Codex CLI, Node.js/npm, Git, 프로젝트 경로 쓰기 권한, 샌드박스/파일시스템 상태를 진단해 표시한다.
+미설치/로그인 필요/오류 상태별로 Windows PowerShell/VS Code 터미널용 복사 가능한 명령과 수동 절차를 보여주고, [다시 검사] 버튼을 제공한다.
+초기 버전에서는 설치 명령을 서버에서 직접 실행하지 마라.
+웹앱의 Agent Setup Wizard는 Claude/ChatGPT 비밀번호, OAuth 토큰, 세션 토큰, 로그인 코드를 입력받거나 저장하지 마라.
+Codex는 API key를 가져오지 않는 구조로 유지하고, ChatGPT 구독계정 로그인 기반의 VS Code 확장/CLI 절차만 안내하라.
+단, G1.5 Haiku/A9/A10/G2는 백엔드가 Anthropic API를 직접 호출하는 기능이므로, 별도 Runtime API Settings 화면에 `ANTHROPIC_API_KEY` 입력창과 api_budget 상한 입력을 두는 구조를 분리 설계하라. `.env` 직접 설정은 고급/수동 백업 경로로만 둔다.
+```
+
+완료 기준:
+- 각 도구 상태가 installed / missing / needs_login / ready / error 중 하나로 표시됨
+- OS/환경별 복사 가능한 설치·로그인 명령 표시
+- [다시 검사] 버튼으로 상태 갱신 가능
+- Agent Setup Wizard에는 API key 입력란 없음
+- 로그인 토큰/코드 저장 없음
+- Runtime API Settings는 별도 화면/섹션으로 분리되어 ANTHROPIC_API_KEY 입력창, 저장/연결 테스트/삭제 기능, 예산 상한 상태를 표시
+- 임의 shell 명령 실행 기능 없음
 
 ## UI-1 — 읽기 전용 검색 UI
 명령:
 
 ```text
 UI_PRODUCT_SPEC.md의 UI MVP 범위만 구현하라.
-검색창, 고급 필터, 필터 칩, 코퍼스 상태 배너, 결과 카드, 문단 주변 보기, 중복본 보기, 최근 검색, Markdown/CSV 내보내기를 구현한다.
+검색창, catalog facets 기반 고급 필터, 필터 칩, 코퍼스 상태 배너, 결과 카드, 문단 주변 보기, 중복본 보기, 최근 검색, URL 상태 복원, Markdown/CSV 내보내기를 구현한다.
 검색 결과 카드에는 why, matched_terms, score_breakdown, ¶번호, draft 여부, 중복 수를 표시하라.
+한글 IME composition 중 Enter는 검색을 실행하지 않게 하고, 검색창 포커스 중 j/k 단축키는 비활성화하라.
+CSV 다운로드는 utf-8-sig로 생성하라.
+검색 결과 warnings(short_term_fallback, unsearchable_docs 등)는 결과 요약줄 배지로 표시하라.
+매칭어 하이라이트가 전각/하이픈/따옴표 변이 때문에 실패하면 하이라이트 없이 원문 스니펫을 표시하라.
 ```
 
 완료 기준:
-- 검색 상태가 URL 또는 UI state로 복원 가능
+- 필터 옵션이 catalog facets에서 동적으로 로드됨
+- 검색 상태(query/filters/expand_mode)가 URL query parameter로 복원 가능
 - 최근 검색이 UI에 표시되고 다시 실행 가능
 - 파일럿 코퍼스 배너가 항상 표시됨
 - 결과 카드에서 문단 주변 보기로 이동 가능
+- CSV가 utf-8-sig로 생성됨
+- 한글 IME Enter·검색창 포커스 단축키 충돌 방지
+- search warnings 배지와 하이라이트 폴백 동작
 
 ## UI-2 — 운영 UI
 명령:
@@ -244,6 +319,8 @@ saved searches, result feedback, manual_overrides 후보 export를 구현한다.
 
 ```text
 비교 목록, 북마크/메모, 리서치 세션을 구현하라.
+비교 목록은 메모리 상태만 쓰지 말고 ui_state.sqlite의 이름 없는 기본 비교 목록에 영속 저장하라.
+MVP 비교 목록은 메모리 상태만 쓰지 말고 ui_state.sqlite의 이름 없는 기본 비교 목록에 영속 저장하라.
 선택한 문단을 Markdown/CSV로 내보낼 수 있게 하라.
 ```
 
