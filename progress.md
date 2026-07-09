@@ -102,3 +102,10 @@
 - Verified `python stats_contracts.py --help`.
 - Verified Python 3.9 syntax compatibility for `stats_contracts.py` and `tests/test_stats_contracts.py`.
 - Ran the full test suite with `python -m pytest -q`; result: `41 passed` with one existing pytest cache warning.
+- Completed Step 8: implemented `inspect_file.py` and `open_text.py`.
+- Added `inspect_file.py --out ... --file-key K [--show-dup-group] [--json]` with ctype/lang/status/error_reason/source_signals, duplicate group details, and a doc_meta stale status slot.
+- Added `open_text.py --out ... --file-key K --para N --context C` and `--search TERM --context C`, reading paragraph windows from txt cache only.
+- Added tests for file_key inspection lookup, surrounding paragraph output, search-term paragraph output, and JSON CLI output.
+- Verified `python inspect_file.py --help` and `python open_text.py --help`.
+- Verified Python 3.9 syntax compatibility for the new Step 8 files.
+- Ran the full test suite with `python -m pytest -q`; result: `45 passed` with one existing pytest cache warning.
