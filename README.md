@@ -22,6 +22,12 @@ Pilot a selected subset:
 python index_contracts.py --root C:\path\to\contracts --out C:\path\to\cs_index --file-list pilot_files.txt --batch-label pilot_001
 ```
 
+For local test runs, if `root/` exists next to `index_contracts.py`, `--root` may be omitted:
+
+```powershell
+python index_contracts.py --out .\cs_index --sample 200 --sample-seed 42 --batch-label pilot_001
+```
+
 Expand to the full root using the same `--root` and `--out`:
 
 ```powershell

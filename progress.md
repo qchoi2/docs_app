@@ -67,3 +67,10 @@
 - Verified `python index_contracts.py --help`; Step 5 options remain present.
 - Verified Python 3.9 syntax compatibility with `ast.parse(..., feature_version=(3, 9))`.
 - Ran the full test suite with `python -m pytest`; result: `25 passed` with one existing pytest cache warning.
+- Added a local test convenience extension: `index_contracts.py --root` now defaults to the repository-local `root/` folder when omitted, while explicit `--root` remains supported for real corpus runs.
+- Added `root/` and `cs_index/` to `.gitignore` so local sample contracts and generated indexes are not committed.
+- Fixed ctype classification to use path/file-name signals only; body text is still used for language heuristics. This avoids SPA contracts being over-classified as BW/CB due to boilerplate terms in the extracted text.
+- Added regression tests for the default root parser behavior and path-only ctype classification.
+- Ran a 200-file pilot index against local `root/` using `python index_contracts.py --out .\cs_index --sample 200 --sample-seed 42 --batch-label pilot_001`.
+- Re-ran the same pilot with `--full` after fixing ctype classification. Final pilot result: 200 indexed, 195 ok, 5 empty PDFs, 0 errors, 0 unsupported, 1 duplicate group of size 5, and 2 unclassified investment agreement files.
+- Verified `python -m pytest`; result: `27 passed` with one existing pytest cache warning.

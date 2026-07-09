@@ -5,7 +5,7 @@ from pathlib import Path
 
 from docx import Document
 
-from index_contracts import IndexOptions, choose_candidates, index_contracts, main
+from index_contracts import DEFAULT_ROOT, IndexOptions, build_parser, choose_candidates, index_contracts, main
 
 
 def short_sha256(data: bytes) -> str:
@@ -277,6 +277,12 @@ def test_file_list_and_sample_together_is_error(tmp_path):
     assert rc == 1
 
 
+def test_root_defaults_to_repo_root_folder():
+    args = build_parser().parse_args(["--out", "cs_index"])
+
+    assert args.root == DEFAULT_ROOT
+
+
 def test_moved_file_updates_path_without_missing(tmp_path):
     root = tmp_path / "contracts"
     out = tmp_path / "cs_index"
@@ -460,3 +466,14 @@ def test_type_rules_classify_and_report_unclassified_folders(tmp_path):
     assert "### Type x Language" in report
     assert "### Unclassified Folders" in report
     assert "- unknown: 1" in report
+
+
+def test_ctype_classification_uses_path_not_body_text(tmp_path):
+    root = tmp_path / "contracts"
+    out = tmp_path / "cs_index"
+    root.mkdir()
+    write_docx(root / "Project_SPA.docx", "본문에 신주인수권부사채라는 말이 있어도 파일명은 SPA")
+
+    index_contracts(root, out)
+
+    assert read_rows(out / "catalog.sqlite", "SELECT ctype FROM files") == [("SPA",)]

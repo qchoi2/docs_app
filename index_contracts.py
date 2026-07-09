@@ -33,6 +33,7 @@ from lib.normalize import normalize
 SUPPORTED_EXTENSIONS = {".docx", ".pdf"}
 ZIP_EXTENSIONS = {".zip"}
 TYPE_RULE_PATHS = (Path("data/type_rules.yaml"), Path(".docs/type_rules.yaml"))
+DEFAULT_ROOT = Path(__file__).resolve().parent / "root"
 
 
 @dataclass
@@ -146,19 +147,20 @@ def matches_any(text: str, patterns: List[str]) -> bool:
 
 
 def classify_path(rel_path: str, text: str, rules: TypeRules) -> Tuple[str, str, Optional[int], Optional[str], str]:
-    haystack = f"{rel_path} {text}"
+    path_haystack = rel_path
+    lang_haystack = f"{rel_path} {text}"
     ctype = "미분류"
     lang = "미상"
     source_signals = {}
 
     for rule in rules.ctype_rules:
-        if matches_any(haystack, rule.patterns):
+        if matches_any(path_haystack, rule.patterns):
             ctype = rule.value
             source_signals["ctype"] = {"value": ctype, "patterns": rule.patterns}
             break
 
     for rule in rules.lang_rules:
-        if matches_any(haystack, rule.patterns):
+        if matches_any(lang_haystack, rule.patterns):
             lang = rule.value
             source_signals["lang"] = {"value": lang, "patterns": rule.patterns}
             break
@@ -838,7 +840,12 @@ def index_contracts(
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Index DOCX/PDF contracts.")
-    parser.add_argument("--root", required=True, help="Root folder to scan.")
+    parser.add_argument(
+        "--root",
+        default=DEFAULT_ROOT,
+        type=Path,
+        help="Root folder to scan. Defaults to ./root next to index_contracts.py.",
+    )
     parser.add_argument("--out", required=True, help="Output cs_index folder.")
     parser.add_argument("--include-misc", action="store_true")
     parser.add_argument("--full", action="store_true")
