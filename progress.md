@@ -94,3 +94,11 @@
 - Reworked `index_contracts.py` reports into the nine Brief §2.5 sections, including explicit status, duplicate, unsupported/excluded, error, batch, and stale doc_meta sections.
 - Refreshed README current scope and added a minimal search CLI example.
 - Kept no-result searches as exit code 0 per the user's Step 6 instruction, despite the older `.docs` exit-code note.
+- Completed Step 7: implemented `stats_contracts.py`.
+- Added `--by ctype`, `--by ctype,lang`, `--status`, `--errors`, `--batches`, `--dedup`, and `--json`.
+- Added grouped statistics that distinguish `status='ok'` counts from all non-missing catalog counts.
+- Added dedup representative-based counting for grouped/status/error/batch statistics and a `dedup_summary` with file-vs-group totals.
+- Added tests for ok-vs-all grouped counts, dedup group counting, and CLI JSON output for status/error/batch/dedup sections.
+- Verified `python stats_contracts.py --help`.
+- Verified Python 3.9 syntax compatibility for `stats_contracts.py` and `tests/test_stats_contracts.py`.
+- Ran the full test suite with `python -m pytest -q`; result: `41 passed` with one existing pytest cache warning.
