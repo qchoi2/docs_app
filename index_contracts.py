@@ -537,17 +537,27 @@ def mark_missing(conn: sqlite3.Connection, file_key: str) -> None:
 
 
 def rebuild_dup_groups(conn: sqlite3.Connection) -> None:
+    """Group only successfully extracted documents by content hash.
+
+    Documents without extracted text (empty/error/unsupported) all share the
+    hash of the empty string, so grouping them by content_hash would join
+    unrelated scanned contracts into one spurious dup_group. They keep their
+    own file_key as dup_group instead.
+    """
     rows = conn.execute(
-        """
-        SELECT file_key, content_hash
-        FROM files
-        WHERE content_hash IS NOT NULL AND content_hash != ''
-        ORDER BY file_key
-        """
+        "SELECT file_key, content_hash, status FROM files ORDER BY file_key"
     ).fetchall()
     groups: Dict[str, List[str]] = {}
-    for file_key, content_hash in rows:
-        groups.setdefault(content_hash, []).append(file_key)
+    solo_keys: List[str] = []
+    for file_key, content_hash, status in rows:
+        if status == "ok" and content_hash:
+            groups.setdefault(content_hash, []).append(file_key)
+        else:
+            solo_keys.append(file_key)
+    conn.executemany(
+        "UPDATE files SET dup_group = ? WHERE file_key = ?",
+        [(key, key) for key in solo_keys],
+    )
     for keys in groups.values():
         dup_group = min(keys)
         conn.executemany(

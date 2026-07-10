@@ -562,3 +562,27 @@ def test_manual_override_priority_auto_then_path_then_file_key(tmp_path, monkeyp
     rows = read_rows(out / "catalog.sqlite", "SELECT ctype, lang FROM files")
     # file_key override wins over path override; path override's lang still applies
     assert rows == [("SPA", "국문")]
+
+
+def test_documents_without_text_do_not_share_dup_group(tmp_path):
+    root = tmp_path / "contracts"
+    out = tmp_path / "cs_index"
+    root.mkdir()
+    # two unrelated scanned PDFs: both extract to empty text
+    write_pdf(root / "scan_a.pdf", None)
+    write_pdf(root / "scan_b.pdf", None)
+    # make the two files byte-distinct (comment after %%EOF is ignored by parsers)
+    with (root / "scan_b.pdf").open("ab") as handle:
+        handle.write(b"\n% second scan\n")
+
+    index_contracts(root, out)
+
+    rows = read_rows(
+        out / "catalog.sqlite",
+        "SELECT file_key, dup_group, status FROM files ORDER BY path",
+    )
+    assert all(status == "empty" for _, _, status in rows)
+    # each empty document keeps its own dup_group (no spurious duplicates)
+    assert rows[0][1] == rows[0][0]
+    assert rows[1][1] == rows[1][0]
+    assert rows[0][1] != rows[1][1]
