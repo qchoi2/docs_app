@@ -23,6 +23,7 @@ import json
 import re
 import sqlite3
 import sys
+import time
 import traceback
 from contextlib import closing
 from pathlib import Path
@@ -31,6 +32,7 @@ from urllib.parse import parse_qs
 from wsgiref.simple_server import make_server
 
 from lib.console import configure_utf8_stdio
+from lib.ui_state import ensure_ui_state, recent_searches, record_search
 from open_text import open_text
 from search_contracts import connect_search_db, search_contracts
 
@@ -201,7 +203,38 @@ def handle_corpus_status(app, match, query, body):
 
 def handle_search(app, match, query, body):
     params = validated_search_params(body)
-    return 200, run_search(app.out, params)
+    started = time.perf_counter()
+    result = run_search(app.out, params)
+    # 최근 검색은 ui_state.sqlite(사용자 UI 상태)에 기록한다.
+    # query_log.jsonl은 search_contracts가 남기는 운영 로그로, 여기서 겸용하지 않는다.
+    if params["keywords"] or params["ctype"] or params["lang"]:
+        try:
+            record_search(
+                app.out,
+                query=", ".join(params["keywords"]),
+                filters={
+                    "kw": params["keywords"],
+                    "type": params["ctype"],
+                    "lang": params["lang"],
+                    "exclude_drafts": params["exclude_drafts"],
+                    "show_duplicates": params["show_duplicates"],
+                },
+                expand_mode=params["expand"],
+                result_count=result["total"],
+                top_file_keys=[row["file_key"] for row in result["results"][:5]],
+                duration_ms=int((time.perf_counter() - started) * 1000),
+            )
+        except Exception as exc:  # 기록 실패가 검색을 막으면 안 된다
+            print(f"[webapp] search_history write failed: {exc}", file=sys.stderr)
+    return 200, result
+
+
+def handle_recent_searches(app, match, query, body):
+    try:
+        limit = max(1, min(int(query.get("limit", "10")), 30))
+    except ValueError:
+        raise ApiError(400, "VALIDATION_ERROR", "'limit' must be an integer.")
+    return 200, {"items": recent_searches(app.out, limit)}
 
 
 def handle_context(app, match, query, body):
@@ -347,6 +380,7 @@ ROUTES = [
     ("GET", re.compile(r"^/api/health$"), handle_health),
     ("GET", re.compile(r"^/api/corpus/status$"), handle_corpus_status),
     ("POST", re.compile(r"^/api/search$"), handle_search),
+    ("GET", re.compile(r"^/api/history/recent$"), handle_recent_searches),
     ("GET", re.compile(r"^/api/files/(?P<file_key>[^/]+)/context$"), handle_context),
     ("GET", re.compile(r"^/api/files/(?P<file_key>[^/]+)/duplicates$"), handle_duplicates),
     ("POST", re.compile(r"^/api/export/markdown$"), handle_export_markdown),
@@ -359,6 +393,7 @@ ROUTES = [
 class App:
     def __init__(self, out: Path):
         self.out = ensure_local_cs_index(Path(out))
+        ensure_ui_state(self.out)
 
     def __call__(self, environ, start_response):
         status, content_type, payload, extra = self.dispatch(environ)

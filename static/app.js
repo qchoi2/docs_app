@@ -16,6 +16,7 @@ const esc = (value) => String(value == null ? "" : value)
 /* ---------- init ---------- */
 document.addEventListener("DOMContentLoaded", () => {
   loadCorpusStatus();
+  loadRecentSearches();
   loadFacets().then(() => {
     restoreFromUrl();
     if (state.kw.length || state.type || state.lang) runSearch(false);
@@ -164,6 +165,7 @@ async function runSearch(append, skipUrl) {
     renderSummary(data);
     renderResults(data, append);
     announce(`검색 완료: 대표 ${data.total}건, 전체 파일 ${data.total_files}건`);
+    if (!append) loadRecentSearches();
   } catch (error) {
     announce("검색 실패: " + error.message);
     $("summary-text").textContent = "검색 중 오류가 발생했습니다 (" + error.message + ")";
@@ -317,6 +319,62 @@ async function exportResults(kind, filename) {
     URL.revokeObjectURL(url);
     announce("내보내기 완료: " + filename);
   } catch (error) { announce("내보내기 실패: " + error.message); }
+}
+
+/* ---------- 최근 검색 (ui_state.sqlite 영속 — query_log와 별개) ---------- */
+async function loadRecentSearches() {
+  try {
+    const data = await (await api("/api/history/recent?limit=10")).json();
+    renderRecentSearches(data.items || []);
+  } catch (error) { /* 최근 검색은 보조 기능 — 실패해도 검색은 가능 */ }
+}
+
+function renderRecentSearches(items) {
+  const box = $("recent-searches");
+  const list = $("recent-list");
+  list.innerHTML = "";
+  box.hidden = items.length === 0;
+  for (const item of items) {
+    const label = describeHistoryItem(item);
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "chip";
+    chip.innerHTML = esc(label) +
+      (item.result_count != null ? ` <span class="count">${item.result_count}건</span>` : "");
+    chip.title = new Date(item.ts).toLocaleString();
+    chip.addEventListener("click", () => applyHistoryItem(item));
+    list.appendChild(chip);
+  }
+}
+
+function describeHistoryItem(item) {
+  const filters = item.filters || {};
+  const parts = [];
+  if (item.query) parts.push(item.query);
+  if (filters.type) parts.push(filters.type);
+  if (filters.lang) parts.push(filters.lang);
+  if (item.expand_mode && item.expand_mode !== "normal")
+    parts.push({ strict: "정확하게", broad: "넓게" }[item.expand_mode] || item.expand_mode);
+  if (filters.exclude_drafts) parts.push("Draft 제외");
+  return parts.join(" · ") || "(빈 검색)";
+}
+
+function applyHistoryItem(item) {
+  const filters = item.filters || {};
+  state.kw = Array.isArray(filters.kw) ? filters.kw.slice() : [];
+  state.type = filters.type || "";
+  state.lang = filters.lang || "";
+  state.expand = ["strict", "normal", "broad"].includes(item.expand_mode) ? item.expand_mode : "normal";
+  state.excludeDrafts = Boolean(filters.exclude_drafts);
+  state.showDuplicates = Boolean(filters.show_duplicates);
+  state.offset = 0;
+  $("search-input").value = state.kw.join(", ");
+  $("filter-type").value = state.type;
+  $("filter-lang").value = state.lang;
+  $("filter-expand").value = state.expand;
+  $("filter-drafts").checked = state.excludeDrafts;
+  $("filter-dups").checked = state.showDuplicates;
+  runSearch(false);   // updateUrl()이 URL도 복원한다
 }
 
 function announce(message) { $("live").textContent = message; }

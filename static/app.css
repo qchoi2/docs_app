@@ -57,6 +57,11 @@ body { margin: 0; background: var(--color-canvas); color: var(--color-ink);
 .chip button { border: 0; background: none; cursor: pointer; color: var(--color-mute); font-size: 12px; }
 .chip button:hover { color: var(--color-error); }
 
+.recent { margin-top: var(--sp-sm); display: flex; gap: var(--sp-xs); align-items: baseline; flex-wrap: wrap; }
+.recent .chip { cursor: pointer; }
+.recent .chip:hover { border-color: var(--color-mute); }
+.recent .chip .count { color: var(--color-mute); }
+
 .summary-row { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-xs);
   margin: var(--sp-lg) 0 var(--sp-sm); color: var(--color-body); }
 .summary-row .spacer { flex: 1; }

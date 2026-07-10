@@ -189,7 +189,8 @@ python webapp.py --out C:\cs_index          # 브라우저에서 http://127.0.0.
 
 검색 화면 기능: 검색창(쉼표로 AND 조건, 한글 IME 조합 중 Enter 보호), catalog 기반 동적
 고급 필터와 필터 칩, 결과 카드(왜 검색됐나·score·¶위치·배지), warnings 배지, 문단 주변
-보기, 중복본 보기, Markdown/CSV(utf-8-sig) 내보내기, URL로 검색 상태 복원, j/k 결과 이동.
+보기, 중복본 보기, Markdown/CSV(utf-8-sig) 내보내기, URL로 검색 상태 복원, j/k 결과 이동,
+최근 검색(클릭 시 검색 조건·URL 복원 — `cs_index/ui_state.sqlite`에 영속, 재색인·`--full`과 무관).
 
 엔드포인트: `GET /api/health`, `GET /api/corpus/status`, `POST /api/search`(limit/offset),
 `GET /api/files/{file_key}/context`, `GET /api/files/{file_key}/duplicates`,

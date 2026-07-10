@@ -206,3 +206,61 @@ def test_ui_does_not_hardcode_facet_options():
     # 계약 유형/언어 옵션은 "전체"만 정적으로 두고 나머지는 facets에서 채운다
     for value in ["SPA", "SHA", "국문", "영문"]:
         assert f'<option value="{value}"' not in html, value
+
+
+def test_search_history_persisted_in_ui_state(tmp_path):
+    app = make_app(tmp_path)
+    out = tmp_path / "cs_index"
+
+    # ui_state.sqlite는 catalog와 분리 생성된다
+    assert (out / "ui_state.sqlite").exists()
+
+    status, _ = get_json(app, "POST", "/api/search",
+                         body={"kw": ["손해배상"], "type": "SPA", "expand": "broad",
+                               "exclude_drafts": True, "no_expand": True})
+    assert status == 200
+
+    with closing(sqlite3.connect(out / "ui_state.sqlite")) as conn:
+        rows = conn.execute(
+            "SELECT query, filters_json, expand_mode, result_count FROM search_history"
+        ).fetchall()
+    assert len(rows) == 1
+    query, filters_json, expand_mode, result_count = rows[0]
+    assert query == "손해배상"
+    filters = json.loads(filters_json)
+    assert filters["kw"] == ["손해배상"]
+    assert filters["type"] == "SPA" and filters["exclude_drafts"] is True
+    assert expand_mode == "broad"
+    assert result_count >= 1
+
+    # catalog.sqlite에는 사용자 상태 테이블이 없어야 한다 (경계 유지)
+    with closing(sqlite3.connect(out / "catalog.sqlite")) as conn:
+        tables = {row[0] for row in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'")}
+    assert "search_history" not in tables
+
+
+def test_recent_searches_endpoint_dedupes_and_orders(tmp_path):
+    app = make_app(tmp_path)
+
+    for _ in range(2):  # 같은 검색 2번 → 1건으로 dedupe
+        get_json(app, "POST", "/api/search", body={"kw": ["손해배상"], "no_expand": True})
+    get_json(app, "POST", "/api/search", body={"kw": ["주주간"], "no_expand": True})
+    get_json(app, "POST", "/api/search", body={})  # 빈 검색은 기록하지 않음
+
+    status, data = get_json(app, "GET", "/api/history/recent")
+    assert status == 200
+    queries = [item["query"] for item in data["items"]]
+    assert queries == ["주주간", "손해배상"]
+    assert data["items"][0]["filters"]["kw"] == ["주주간"]
+
+
+def test_export_does_not_add_history_rows(tmp_path):
+    app = make_app(tmp_path)
+    out = tmp_path / "cs_index"
+
+    call(app, "POST", "/api/export/csv", body={"kw": ["손해배상"], "no_expand": True})
+
+    with closing(sqlite3.connect(out / "ui_state.sqlite")) as conn:
+        count = conn.execute("SELECT COUNT(*) FROM search_history").fetchone()[0]
+    assert count == 0
