@@ -98,3 +98,13 @@ doc_meta·read_contract.py 구축 후 활성화._
 - 파일럿 색인 결과만 보고 일반성을 단정하지 마라. 답변에는 "파일럿 코퍼스 기준" 또는 "현재 색인된 문서 기준"이라고 표시한다.
 - `batch_label`이 pilot인 결과와 full인 결과가 섞이면, 필요한 경우 결과 표에 batch_label을 표시한다.
 - 파일럿 후 전체 파일을 추가한 직후에는 `eval_search.py`를 다시 실행해 검색 품질 회귀를 확인한다.
+
+
+## term_dict 확장 제안 (2026-07-10 소유자 지시로 추가)
+검색이 표현 변이 때문에 빈약하다고 판단되면(코퍼스에 분명히 있을 개념이 0~소수 건),
+동의어 확장을 넓혀 재시도한 뒤에도 부족하면 **term_dict 확장을 적극 제안하라**:
+- `python3 term_dict_tools.py --suggest --out .`을 실행해 `pending_terms.yaml`에
+  후보를 남기거나, 답변 말미에 "term_dict 추가 후보: <표현> (근거: 시도한 검색·결과 수)"를 명시한다.
+- **data/term_dict.yaml을 직접 수정하지 마라.** 병합은 소유자가 pending_terms.yaml을
+  검토·승인한 뒤 수행하고 dict_version을 올린다. 병합 전후 eval_search로 회귀를 확인한다.
+- 이 제안 과정은 로컬 분석만 사용한다 — 유료 API 호출 금지 원칙(답변 원칙 9)은 그대로 적용된다.
