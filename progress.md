@@ -138,3 +138,21 @@
 - Added four UI tests (static serving, traversal/unknown-file blocking, offline no-external-resources rule, no hardcoded facet options); suite now 71 passed. Verified live serving of /, app.css, app.js against the pilot index.
 - Completed UI-3 recent searches: added `lib/ui_state.py` creating `cs_index/ui_state.sqlite` with the Brief §2.11 user-state tables (search_history active; saved_searches/user_marks/result_feedback reserved). POST /api/search now records query, filters_json (kw/type/lang/exclude_drafts/show_duplicates), expand_mode, result_count, top_file_keys, and duration_ms into search_history — empty searches and export re-runs are not recorded, and a failed history write never blocks the search. New GET /api/history/recent returns the latest searches deduped by identical conditions. The search screen shows them as clickable chips that restore the full search state, inputs, and URL query parameters. Boundary kept: query_log.jsonl remains the operational log written by search_contracts; user state lives only in ui_state.sqlite; catalog.sqlite holds no user tables (asserted by test).
 - Added three tests (history persistence + catalog boundary, recent-endpoint dedupe/ordering/empty-search skip, exports not recording); suite now 74 passed. Live-smoked recording and retrieval against the pilot index.
+
+## 2026-07-11
+
+Note: the UI-0 / UI-1 / UI-3 entries above were completed in the early hours of 2026-07-11 (same working session as 2026-07-10).
+
+### Session summary (2026-07-10 -> 2026-07-11, 17 commits)
+
+Review and hardening of the CLI MVP, the real-sample pilot, and the first web layer. Full test suite: **74 passed**.
+
+- Recovery/hygiene: recovered a corrupt `.git/index`, added `.gitattributes` (`61084df`).
+- Step 10-11: completed Korean README for the CLI MVP (`cba1e6f`); manual_overrides.yaml loading with path-glob/file_key priority (`b8886dd`).
+- Fixes from the review pass: non-ok documents no longer share dup groups (`e02f2bd`); runtime YAML files resolve from the script directory as fallback with a `term_dict_not_found` warning (`b4d39ed`); UTF-8 console output + NFC path matching for Windows (`de91809`); CLI polish — --quiet, 240-char snippet budget, honest meta_filter_match, inspect char_count/term_matches, eval `kw:` support (`bf949ea`); owner notes (`6679e3b`).
+- Pilot on the local sample corpus (271 docs): found and fixed lang misclassification — all 43 "영문" documents were Korean contracts matched via body-text language clauses; lang now classifies from path signals only and the catalog was reclassified (`ad2ed4e`); findings in PILOT_REPORT_20260710.md (`a7805ce`).
+- term_dict loop: owner-approved variants merged (dict v2.2 — "손해배상 상한" 1->92, "계약해제" 9->264) (`5bd9054`); `term_dict_tools.py` --validate/--suggest/--zero-hits writing pending_terms.yaml for human approval (`e8586f0`); CLAUDE.md/AGENTS.md now direct agents to propose term_dict candidates without paid API calls (`5c6433a`).
+- Web layer: read-only API (8 endpoints, stdlib WSGI, 127.0.0.1, standard error codes, utf-8-sig CSV) (`0767f85`); UI-0 design audit + stack decision (`e5f3d4e`); UI-1 read-only search screen (`0ff3c6b`); UI-3 recent searches persisted in ui_state.sqlite (`072801a`).
+
+Current state: Phase 1A CLI MVP complete and pilot-validated; web read-only search (UI-1) and recent searches (UI-3 subset) shipped.
+Remaining (in roadmap order): real-corpus pilot on D:\Contracts re-run by the owner, UI-0.4 job queue / backend foundation, UI-2 operations dashboard, rest of UI-3 (bookmarks/sessions/compare), Phase 1B (budget.py, answer_quick.py) after search-quality sign-off, then UI-4 AI answers.
