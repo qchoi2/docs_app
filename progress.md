@@ -109,3 +109,16 @@
 - Verified `python inspect_file.py --help` and `python open_text.py --help`.
 - Verified Python 3.9 syntax compatibility for the new Step 8 files.
 - Ran the full test suite with `python -m pytest -q`; result: `45 passed` with one existing pytest cache warning.
+
+## 2026-07-10
+
+- Completed Step 9: implemented `eval_search.py` with T1/T2 golden-query execution, partial (filter-only) scoring, unscored-query reporting, and `eval_history.jsonl` regression logging.
+- Recovered a corrupt `.git/index` (zeroed by an interrupted git process) and added `.gitattributes` for line-ending normalization.
+- Completed Step 10: rewrote `README.md` in Korean covering Windows-local setup, venv, pilot indexing, full-corpus expansion, search/eval usage, manual overrides, backup/restore with WAL files, Claude Code install/login, optional Codex usage without OpenAI API keys, the ANTHROPIC_API_KEY runtime path, an error FAQ, and web UI as a follow-up phase.
+- Completed Step 11: `index_contracts.py` now loads `data/manual_overrides.yaml` with path-glob and file_key overrides, applied as auto classification -> path override -> file_key override; only ctype/lang/is_draft/version_hint can be corrected and applied overrides are recorded in source_signals. Added three tests covering path override, file_key override (including ignoring file_key/content_hash keys), and precedence.
+- Fixed a real dedup bug found in the pilot index: documents without extracted text (empty scanned PDFs) all share the empty-string content hash and were grouped into one spurious dup_group of size 5. `rebuild_dup_groups` now groups only status='ok' documents; others keep their own file_key as dup_group. Added a regression test.
+- Fixed silent cwd dependence of runtime data loading: `term_dict.yaml`, `type_rules.yaml`, `manual_overrides.yaml`, and `golden_queries.yaml` are now resolved from the current directory first and the script directory as a fallback, and searches emit a `term_dict_not_found` warning instead of silently disabling expansion. Verified the same query previously returned 2 vs 5 results depending on launch directory.
+- Added `lib/console.py` and wired `configure_utf8_stdio()` into every CLI entrypoint to prevent cp949 UnicodeEncodeError on piped output (brief §4), and NFC-normalized both sides of path/pattern matching for macOS-origin NFD filenames.
+- Polished CLI tools per brief defaults: `index_contracts.py --quiet`, 240-character total snippet budget centered on the matched paragraph, `meta_filter_match` null when no meta filter was requested, `inspect_file.py` now reports char_count and matched term_dict entries, and `eval_search.py` uses an optional `kw:` field from golden queries when present.
+- Wrote `NOTES_FOR_OWNER.md` recording applied defaults, intentional deviations (no-result exit code 0, dry-run report file), unimplemented risks (per-file extraction timeout, long-path handling), remaining Phase 1B/UI work, and the golden-query `kw:` suggestion.
+- Ran the full test suite with `python -m pytest -q`; result: `58 passed`.
