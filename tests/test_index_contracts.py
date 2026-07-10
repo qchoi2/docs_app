@@ -477,3 +477,88 @@ def test_ctype_classification_uses_path_not_body_text(tmp_path):
     index_contracts(root, out)
 
     assert read_rows(out / "catalog.sqlite", "SELECT ctype FROM files") == [("SPA",)]
+
+
+def test_manual_override_by_path_glob(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    root = tmp_path / "contracts"
+    out = tmp_path / "cs_index"
+    (root / "SPA").mkdir(parents=True)
+    write_docx(root / "SPA" / "deal.docx", "계약 본문")
+    (tmp_path / "data").mkdir()
+    (tmp_path / "data" / "manual_overrides.yaml").write_text(
+        'paths:\n  "**/SPA/**":\n    ctype: SPA\n    is_draft: false\n',
+        encoding="utf-8",
+    )
+
+    index_contracts(root, out)
+
+    rows = read_rows(out / "catalog.sqlite", "SELECT ctype, is_draft FROM files")
+    assert rows == [("SPA", 0)]
+
+
+def test_manual_override_by_file_key(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    root = tmp_path / "contracts"
+    out = tmp_path / "cs_index"
+    root.mkdir()
+    docx_path = root / "mystery.docx"
+    write_docx(docx_path, "본문")
+    file_key = short_sha256(docx_path.read_bytes())
+    (tmp_path / "data").mkdir()
+    (tmp_path / "data" / "manual_overrides.yaml").write_text(
+        "files:\n"
+        f'  "{file_key}":\n'
+        "    ctype: SPA\n"
+        "    lang: 영문\n"
+        "    is_draft: true\n"
+        "    version_hint: final\n"
+        "    file_key: hacked\n"
+        "    content_hash: hacked\n",
+        encoding="utf-8",
+    )
+
+    index_contracts(root, out)
+
+    rows = read_rows(
+        out / "catalog.sqlite",
+        "SELECT file_key, ctype, lang, is_draft, version_hint, content_hash FROM files",
+    )
+    assert len(rows) == 1
+    key, ctype, lang, is_draft, version_hint, content_hash = rows[0]
+    # file_key/content_hash must never be overridden
+    assert key == file_key
+    assert content_hash != "hacked"
+    assert (ctype, lang, is_draft, version_hint) == ("SPA", "영문", 1, "final")
+
+
+def test_manual_override_priority_auto_then_path_then_file_key(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    root = tmp_path / "contracts"
+    out = tmp_path / "cs_index"
+    (root / "SHA_folder").mkdir(parents=True)
+    docx_path = root / "SHA_folder" / "deal.docx"
+    write_docx(docx_path, "본문")
+    file_key = short_sha256(docx_path.read_bytes())
+    (tmp_path / "data").mkdir()
+    # auto classification says MOU (type_rules), path override says SHA, file_key says SPA
+    (tmp_path / "data" / "type_rules.yaml").write_text(
+        'ctype_rules:\n  - ctype: MOU\n    patterns: ["SHA_folder"]\n',
+        encoding="utf-8",
+    )
+    (tmp_path / "data" / "manual_overrides.yaml").write_text(
+        "paths:\n"
+        '  "**/SHA_folder/**":\n'
+        "    ctype: SHA\n"
+        "    lang: 국문\n"
+        "files:\n"
+        f'  "{file_key}":\n'
+        "    ctype: SPA\n",
+        encoding="utf-8",
+    )
+
+    index_contracts(root, out)
+
+    rows = read_rows(out / "catalog.sqlite", "SELECT ctype, lang FROM files")
+    # file_key override wins over path override; path override's lang still applies
+    assert rows == [("SPA", "국문")]

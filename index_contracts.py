@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import hashlib
 import json
 import random
@@ -33,6 +34,11 @@ from lib.normalize import normalize
 SUPPORTED_EXTENSIONS = {".docx", ".pdf"}
 ZIP_EXTENSIONS = {".zip"}
 TYPE_RULE_PATHS = (Path("data/type_rules.yaml"), Path(".docs/type_rules.yaml"))
+MANUAL_OVERRIDE_PATHS = (
+    Path("data/manual_overrides.yaml"),
+    Path(".docs/manual_overrides.yaml"),
+)
+ALLOWED_OVERRIDE_KEYS = ("ctype", "lang", "is_draft", "version_hint")
 DEFAULT_ROOT = Path(__file__).resolve().parent / "root"
 
 
@@ -139,6 +145,93 @@ def load_type_rules(start: Optional[Path] = None) -> TypeRules:
         executed_patterns=[str(pattern) for pattern in version_rules.get("executed_patterns", [])],
         version_capture=[str(pattern) for pattern in version_rules.get("version_capture", [])],
     )
+
+
+@dataclass
+class ManualOverrides:
+    paths: List[Tuple[str, Dict[str, object]]] = field(default_factory=list)
+    files: Dict[str, Dict[str, object]] = field(default_factory=dict)
+
+
+def _clean_override_values(raw: Optional[Dict[str, object]]) -> Dict[str, object]:
+    """Keep only ctype/lang/is_draft/version_hint; file_key/content_hash are never overridden."""
+    values: Dict[str, object] = {}
+    for key, value in (raw or {}).items():
+        if key not in ALLOWED_OVERRIDE_KEYS or value is None:
+            continue
+        if key == "is_draft":
+            values[key] = 1 if bool(value) else 0
+        else:
+            values[key] = str(value)
+    return values
+
+
+def load_manual_overrides(start: Optional[Path] = None) -> ManualOverrides:
+    base = start or Path.cwd()
+    selected = None
+    for candidate in MANUAL_OVERRIDE_PATHS:
+        path = base / candidate
+        if path.exists():
+            selected = path
+            break
+    if selected is None:
+        return ManualOverrides()
+
+    data = yaml.safe_load(selected.read_text(encoding="utf-8")) or {}
+    paths = [
+        (str(pattern), _clean_override_values(values))
+        for pattern, values in (data.get("paths") or {}).items()
+    ]
+    files = {
+        str(file_key): _clean_override_values(values)
+        for file_key, values in (data.get("files") or {}).items()
+    }
+    return ManualOverrides(paths=paths, files=files)
+
+
+def _path_pattern_matches(rel_path: str, pattern: str) -> bool:
+    # "./" prefix lets root-level entries match "**/..." style patterns too.
+    return fnmatch.fnmatch(rel_path, pattern) or fnmatch.fnmatch(f"./{rel_path}", pattern)
+
+
+def apply_manual_overrides(
+    rel_path: str,
+    file_key: str,
+    ctype: str,
+    lang: str,
+    is_draft: Optional[int],
+    version_hint: Optional[str],
+    source_signals: str,
+    overrides: ManualOverrides,
+) -> Tuple[str, str, Optional[int], Optional[str], str]:
+    """Apply overrides with priority: auto classification -> path glob -> file_key."""
+    applied: List[Dict[str, object]] = []
+    values: Dict[str, object] = {}
+    for pattern, pattern_values in overrides.paths:
+        if pattern_values and _path_pattern_matches(rel_path, pattern):
+            values.update(pattern_values)
+            applied.append({"source": "path", "pattern": pattern, "values": pattern_values})
+    file_values = overrides.files.get(file_key)
+    if file_values:
+        values.update(file_values)
+        applied.append({"source": "file_key", "values": file_values})
+    if not values:
+        return ctype, lang, is_draft, version_hint, source_signals
+
+    ctype = str(values.get("ctype", ctype))
+    lang = str(values.get("lang", lang))
+    if "is_draft" in values:
+        is_draft = int(values["is_draft"])
+    if "version_hint" in values:
+        version_hint = str(values["version_hint"])
+    try:
+        signals = json.loads(source_signals) if source_signals else {}
+    except json.JSONDecodeError:
+        signals = {}
+    if not isinstance(signals, dict):
+        signals = {}
+    signals["manual_overrides"] = applied
+    return ctype, lang, is_draft, version_hint, json.dumps(signals, ensure_ascii=False)
 
 
 def matches_any(text: str, patterns: List[str]) -> bool:
@@ -698,6 +791,7 @@ def index_contracts(
         raise ValueError(f"root must be an existing directory: {root_path}")
 
     rules = load_type_rules(Path.cwd())
+    overrides = load_manual_overrides(Path.cwd())
     candidates, is_full_scan = choose_candidates(root_path, options, rules)
     db_path = out_dir / "catalog.sqlite"
     if not options.dry_run:
@@ -771,6 +865,10 @@ def index_contracts(
                     ctype, lang, is_draft, version_hint, source_signals = classify_path(
                         rel_path, "", rules
                     )
+                    ctype, lang, is_draft, version_hint, source_signals = apply_manual_overrides(
+                        rel_path, file_key, ctype, lang, is_draft, version_hint,
+                        source_signals, overrides,
+                    )
                     record_file(
                         conn,
                         root=root_path,
@@ -822,6 +920,10 @@ def index_contracts(
             txt_path = out_dir / "txt" / f"{file_key}.txt"
             ctype, lang, is_draft, version_hint, source_signals = classify_path(
                 rel_path, text_for_hash, rules
+            )
+            ctype, lang, is_draft, version_hint, source_signals = apply_manual_overrides(
+                rel_path, file_key, ctype, lang, is_draft, version_hint,
+                source_signals, overrides,
             )
             if extracted.status == "unsupported":
                 changes.unsupported.append(rel_path)
