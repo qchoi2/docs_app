@@ -179,7 +179,18 @@ API 도구는 실행을 거부합니다.
 | 검색 결과가 기대보다 적음 | `--expand broad` 시도, 2글자 용어는 자동 LIKE 폴백(warnings 확인) |
 | `term_dict_not_found` 경고 | `data/term_dict.yaml`을 찾지 못함 — 저장소 루트에서 실행 중인지 확인 |
 
-## 10. 웹 UI
+## 10. 웹 API / 웹 UI
 
-웹 UI(검색 화면, 색인 대시보드, Agent Setup Wizard, Runtime API Settings)는 **후속 단계**입니다.
-CLI MVP 안정화 후 `.docs/UI_ROADMAP.md` 순서(UI-0 ~ UI-4)로 진행합니다.
+읽기 전용 검색 API 서버(Web Backend Step 1)가 포함되어 있습니다. 추가 의존성 없이 실행됩니다:
+
+```powershell
+python webapp.py --out C:\cs_index          # http://127.0.0.1:8765
+```
+
+엔드포인트: `GET /api/health`, `GET /api/corpus/status`, `POST /api/search`(limit/offset),
+`GET /api/files/{file_key}/context`, `GET /api/files/{file_key}/duplicates`,
+`POST /api/export/markdown`, `POST /api/export/csv`(utf-8-sig), `GET /api/search/facets`.
+기본 바인딩은 127.0.0.1이며 검색은 read-only connection, 파일 접근은 file_key 기준입니다.
+
+웹 UI 화면(검색 화면, 색인 대시보드, Agent Setup Wizard, Runtime API Settings)과
+job queue·AI 답변은 **후속 단계**입니다. `.docs/UI_ROADMAP.md` 순서(UI-0 ~ UI-4)로 진행합니다.

@@ -154,6 +154,17 @@ def reciprocal_rank(rank: int, weight: float = 1.0) -> float:
     return weight / (RRF_K + rank)
 
 
+def connect_search_db(db_path: Path, read_only: bool = False) -> sqlite3.Connection:
+    """Open the catalog. read_only=True uses a short-lived mode=ro connection
+    (BACKEND_REVIEW_PC §2.4: searches must not take a writer slot)."""
+    if read_only:
+        conn = sqlite3.connect(f"file:{db_path.as_posix()}?mode=ro", uri=True)
+    else:
+        conn = sqlite3.connect(db_path)
+    conn.execute("PRAGMA busy_timeout=5000")
+    return conn
+
+
 def search_contracts(
     out: Path,
     ctype: Optional[str] = None,
@@ -165,6 +176,7 @@ def search_contracts(
     no_expand: bool = False,
     exclude_drafts: bool = False,
     show_duplicates: bool = False,
+    read_only: bool = False,
 ) -> Tuple[Dict[str, object], int]:
     keywords = keywords or []
     db_path = out / "catalog.sqlite"
@@ -179,7 +191,7 @@ def search_contracts(
         warnings.append("term_dict_not_found")
     expanded_query: Dict[str, List[str]] = {}
 
-    with closing(sqlite3.connect(db_path)) as conn:
+    with closing(connect_search_db(db_path, read_only)) as conn:
         conn.row_factory = sqlite3.Row
         per_kw_scores = []
         per_file_details: Dict[str, Dict[str, object]] = {}
