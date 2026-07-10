@@ -4,6 +4,8 @@
 # v1 → v2: 35 → 79항목. 계약유형별 섹션, kind 필드 도입.
 # v2 → v2.1: 진술보장 하위 주제 7항목 + 정의조항·별지 추가 (총 88항목).
 #            유지보수 파이프라인(아래) 명문화. dict_version: 2.1
+# v2.1 → v2.2: 파일럿 검증(2026-07-10)에서 미수록 확인된 표기 변이 보강
+#              (배상상한: 손해배상 상한 계열 / 해제: 계약해제 계열). dict_version: 2.2
 #
 # 이 사전은 시스템 전체의 "통제 어휘"다. 다음 네 곳이 canonical
 # 태그를 조인 키로 공유한다:
@@ -80,8 +82,8 @@ terms:
 
   - canonical: 배상상한
     kind: concept
-    ko: [배상 상한, 책임의 상한, 배상책임의 한도, 손해배상 한도, 총 한도, 책임한도]
-    en: [cap, liability cap, aggregate cap, maximum liability, overall cap]
+    ko: [배상 상한, 배상상한, 배상한도, 책임의 상한, 배상책임의 한도, 손해배상 한도, 손해배상 상한, 손해배상상한, 손해배상액의 한도, 총 한도, 책임한도]
+    en: [cap, liability cap, aggregate cap, maximum liability, overall cap, limitation of liability]
 
   - canonical: 바스켓
     kind: concept
@@ -106,7 +108,7 @@ terms:
 
   - canonical: 해제
     kind: clause
-    ko: [해제, 계약의 해제, 해지, 계약해지, 해제 및 해지]
+    ko: [해제, 계약의 해제, 계약해제, 계약 해제, 해지, 계약해지, 계약의 해지, 해제 및 해지]
     en: [termination, rescission]
     note: "국문 해제(소급)/해지(장래) 구분 — 검색은 둘 다, 판독 단계에서 구분"
     expansion_strength: normal
