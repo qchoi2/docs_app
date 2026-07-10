@@ -8,6 +8,8 @@ from contextlib import closing
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence
 
+from lib.console import configure_utf8_stdio
+
 
 STATUSES = ("ok", "empty", "error", "unsupported", "excluded", "missing")
 
@@ -224,6 +226,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Optional[List[str]] = None) -> int:
+    configure_utf8_stdio()
     parser = build_parser()
     args = parser.parse_args(argv)
     try:

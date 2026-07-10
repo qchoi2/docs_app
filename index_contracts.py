@@ -8,6 +8,7 @@ import random
 import re
 import sqlite3
 import sys
+import unicodedata
 from contextlib import closing
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -28,6 +29,7 @@ from pdfminer.pdfparser import PDFSyntaxError
 import yaml
 
 from lib.catalog import CatalogError, initialize_catalog
+from lib.console import configure_utf8_stdio
 from lib.normalize import normalize
 
 
@@ -192,6 +194,8 @@ def load_manual_overrides(start: Optional[Path] = None) -> ManualOverrides:
 
 
 def _path_pattern_matches(rel_path: str, pattern: str) -> bool:
+    rel_path = unicodedata.normalize("NFC", rel_path)
+    pattern = unicodedata.normalize("NFC", pattern)
     # "./" prefix lets root-level entries match "**/..." style patterns too.
     return fnmatch.fnmatch(rel_path, pattern) or fnmatch.fnmatch(f"./{rel_path}", pattern)
 
@@ -237,8 +241,9 @@ def apply_manual_overrides(
 
 
 def matches_any(text: str, patterns: List[str]) -> bool:
-    lowered = text.lower()
-    return any(pattern.lower() in lowered for pattern in patterns)
+    # NFC-normalize both sides: macOS-origin paths can arrive as NFD (brief §4).
+    lowered = unicodedata.normalize("NFC", text).lower()
+    return any(unicodedata.normalize("NFC", pattern).lower() in lowered for pattern in patterns)
 
 
 def classify_path(rel_path: str, text: str, rules: TypeRules) -> Tuple[str, str, Optional[int], Optional[str], str]:
@@ -1036,6 +1041,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Optional[List[str]] = None) -> int:
+    configure_utf8_stdio()
     parser = build_parser()
     args = parser.parse_args(argv)
 

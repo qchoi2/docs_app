@@ -32,6 +32,7 @@ from typing import Dict, List, Optional, Sequence, Tuple
 
 import yaml
 
+from lib.console import configure_utf8_stdio
 from search_contracts import search_contracts
 
 
@@ -228,6 +229,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Optional[List[str]] = None) -> int:
+    configure_utf8_stdio()
     args = build_parser().parse_args(argv)
     tiers = [tier.strip() for tier in args.tiers.split(",") if tier.strip()]
     try:

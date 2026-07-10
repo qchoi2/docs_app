@@ -9,6 +9,7 @@ from contextlib import closing
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
+from lib.console import configure_utf8_stdio
 from lib.normalize import normalize
 
 
@@ -136,6 +137,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Optional[List[str]] = None) -> int:
+    configure_utf8_stdio()
     parser = build_parser()
     args = parser.parse_args(argv)
     try:

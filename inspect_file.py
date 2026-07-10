@@ -8,6 +8,8 @@ from contextlib import closing
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from lib.console import configure_utf8_stdio
+
 
 def connect(out: Path) -> sqlite3.Connection:
     db_path = out / "catalog.sqlite"
@@ -141,6 +143,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Optional[List[str]] = None) -> int:
+    configure_utf8_stdio()
     parser = build_parser()
     args = parser.parse_args(argv)
     try:
