@@ -109,6 +109,28 @@ files:
 보정 대상은 ctype/lang/is_draft/version_hint만이고 file_key/content_hash는 보정할 수 없습니다.
 보정 후 해당 파일이 다시 색인될 때(또는 `--full` 실행 시) 반영됩니다.
 
+## 6.5 검색어 사전(term_dict) 확장
+
+`data/term_dict.yaml`은 질의 시점에 로드되므로 **수정 후 재색인 없이 즉시 반영**됩니다.
+사용 중 검색이 빈약한 표현을 발견하면:
+
+```powershell
+# 1) 검색 로그에서 사전 미수록 검색어 후보 추출 → cs_index/pending_terms.yaml 생성
+python term_dict_tools.py --suggest --out C:\cs_index
+
+# 2) 후보 검토 후 승인분만 data/term_dict.yaml의 해당 항목 ko/en에 병합, dict_version 주석 올리기
+
+# 3) 형식 검증 + 병합 전후 eval로 회귀 확인
+python term_dict_tools.py --validate
+python eval_search.py --out C:\cs_index
+
+# (선택) 현재 코퍼스에서 한 번도 매치되지 않는 변이 점검 (오타/불필요 후보)
+python term_dict_tools.py --zero-hits --out C:\cs_index
+```
+
+검색 에이전트(Claude Code)도 검색 중 미수록 표현을 발견하면 pending_terms.yaml에
+후보를 제안하도록 지침되어 있습니다. 병합 결정은 항상 사람이 합니다.
+
 ## 7. 백업/복구
 
 - `cs_index/` 폴더 전체를 복사하면 백업이 됩니다. 이때 `catalog.sqlite-wal`,
