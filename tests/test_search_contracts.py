@@ -235,3 +235,20 @@ def test_missing_term_dict_warns_instead_of_silent_no_expansion(tmp_path, monkey
 
     assert count == 1
     assert "term_dict_not_found" in result["warnings"]
+
+
+def test_snippet_total_length_respects_240_char_budget(tmp_path):
+    out, db_path = make_search_db(tmp_path)
+    long_para = "손해배상 " + "가" * 500
+    with closing(sqlite3.connect(db_path)) as conn:
+        insert_doc(conn, "long", "long.docx", f"{long_para}\n{'나' * 300}")
+        conn.commit()
+
+    result, _ = search_contracts(out, keywords=["손해배상"], no_expand=True, context=1)
+    item = result["results"][0]
+    content_only = "".join(
+        line.split("] ", 1)[1] for line in item["snippet"].splitlines()
+    )
+
+    assert len(content_only) <= 240
+    assert item["snippet"].startswith("[¶1] 손해배상")

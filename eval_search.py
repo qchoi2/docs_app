@@ -100,10 +100,12 @@ def evaluate_query(out: Path, item: Dict[str, object], limit: int) -> Dict[str, 
     expected_files = [str(value) for value in (item.get("expected_files") or [])]
     expected_count = item.get("expected_count")
 
+    keywords = [str(value) for value in (item.get("kw") or []) if str(value).strip()]
     result, _ = search_contracts(
         out,
         ctype=scoreable.get("ctype"),
         lang=scoreable.get("lang"),
+        keywords=keywords,
         exclude_drafts=scoreable.get("is_draft") is False,
         limit=limit,
     )
@@ -141,6 +143,7 @@ def evaluate_query(out: Path, item: Dict[str, object], limit: int) -> Dict[str, 
         "id": item.get("id"),
         "tier": item.get("tier"),
         "intent": item.get("intent"),
+        "kw": keywords,
         "mode": "full" if expected_files else "partial(filter-only)",
         "scored_filter": scoreable,
         "unscored_filter_keys": unscored,

@@ -9,6 +9,8 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from lib.console import configure_utf8_stdio
+from lib.normalize import normalize
+from search_contracts import load_term_dict
 
 
 def connect(out: Path) -> sqlite3.Connection:
@@ -66,13 +68,34 @@ def doc_meta_state(conn: sqlite3.Connection, file_key: str, content_hash: Option
     return {"present": True, "stale": stale, "confidence": row["confidence"]}
 
 
+def matched_term_entries(out: Path, txt_path_value: Optional[str], file_key: str) -> List[str]:
+    """Canonical term_dict entries whose variants appear in the cached text."""
+    entries = load_term_dict()
+    if not entries:
+        return []
+    path = Path(txt_path_value) if txt_path_value else Path("txt") / f"{file_key}.txt"
+    if not path.is_absolute():
+        path = out / path
+    if not path.exists():
+        return []
+    text = normalize(path.read_text(encoding="utf-8")).casefold()
+    matched = []
+    for entry in entries:
+        for variant, _strength in entry.variants:
+            needle = normalize(variant).casefold()
+            if needle and needle in text:
+                matched.append(entry.canonical or variant)
+                break
+    return matched
+
+
 def inspect_file(out: Path, file_key: str, show_dup_group: bool = False) -> Dict[str, object]:
     with closing(connect(out)) as conn:
         row = conn.execute(
             """
             SELECT file_key, path, ctype, lang, status, error_reason,
                    source_signals, batch_label, content_hash, dup_group,
-                   is_draft, version_hint, txt_path
+                   is_draft, version_hint, txt_path, char_count
             FROM files
             WHERE file_key = ?
             """,
@@ -97,6 +120,8 @@ def inspect_file(out: Path, file_key: str, show_dup_group: bool = False) -> Dict
             "source_signals": parse_source_signals(row["source_signals"]),
             "batch_label": row["batch_label"],
             "txt_path": row["txt_path"],
+            "char_count": row["char_count"],
+            "term_matches": matched_term_entries(out, row["txt_path"], file_key),
             "dup_group": {
                 "id": dup_group,
                 "count": dup_count,
@@ -121,6 +146,8 @@ def print_text(result: Dict[str, object]) -> None:
     print(f"source_signals: {json.dumps(result['source_signals'], ensure_ascii=False, sort_keys=True)}")
     print(f"batch_label: {result['batch_label'] or ''}")
     print(f"txt_path: {result['txt_path'] or ''}")
+    print(f"char_count: {result['char_count'] if result['char_count'] is not None else ''}")
+    print(f"term_matches: {', '.join(result['term_matches'])}")
     dup_group = result["dup_group"]
     print(f"dup_group: {dup_group['id'] or ''}")
     print(f"dup_count: {dup_group['count']}")

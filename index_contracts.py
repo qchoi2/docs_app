@@ -1037,6 +1037,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--sample", type=int)
     parser.add_argument("--sample-seed", type=int, default=0)
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--quiet", action="store_true", help="Suppress the JSON summary on stdout.")
     return parser
 
 
@@ -1063,7 +1064,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
-    print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
+    if not args.quiet:
+        print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
     return 0
 
 

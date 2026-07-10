@@ -314,7 +314,7 @@ def search_contracts(
                         "exact_rank": all_exact_ranks.get(row["file_key"]),
                         "expanded_rank": all_expanded_ranks.get(row["file_key"]),
                         "rrf_score": round(score, 6),
-                        "meta_filter_match": True,
+                        "meta_filter_match": True if (ctype or lang) else None,
                     },
                     "why": why,
                     "snippet": snippet,
@@ -412,8 +412,19 @@ def build_snippet(
     ).fetchall()
     if not rows:
         return "", []
-    parts = [f"[¶{row['para']}] {row['content'][:240]}" for row in rows]
-    return "\n".join(parts), [row["para"] for row in rows]
+    # Brief §9 default: about 240 chars in total, centered on the matched paragraph.
+    budget = 240
+    ordered = sorted(rows, key=lambda row: (abs(row["para"] - para), row["para"]))
+    included = []
+    for row in ordered:
+        if budget <= 0:
+            break
+        text = row["content"][:budget]
+        included.append((row["para"], text))
+        budget -= len(text)
+    included.sort(key=lambda item: item[0])
+    parts = [f"[¶{number}] {text}" for number, text in included]
+    return "\n".join(parts), [number for number, _ in included]
 
 
 def count_unsearchable(conn: sqlite3.Connection, ctype: Optional[str], lang: Optional[str], exclude_drafts: bool) -> int:

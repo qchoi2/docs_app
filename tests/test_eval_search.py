@@ -148,3 +148,29 @@ def test_cli_json_output(tmp_path, capsys):
     assert rc == 0
     assert payload["summary"]["total"] == 3
     assert {"ts", "golden", "tiers", "summary", "queries"}.issubset(payload)
+
+
+def test_golden_kw_field_drives_keyword_search(tmp_path):
+    out = make_corpus(tmp_path)
+    golden = tmp_path / "golden_kw.yaml"
+    golden.write_text(
+        """
+queries:
+  - id: KW1
+    tier: T2
+    intent: 키워드
+    query: "손해배상 있는 SPA"
+    kw: ["손해배상"]
+    expected_filter: { ctype: SPA }
+    expected_files: [spa1]
+""",
+        encoding="utf-8",
+    )
+
+    record = run_eval(out, golden_path=golden, tiers=["T1", "T2"])
+    kw1 = {q["id"]: q for q in record["queries"]}["KW1"]
+
+    assert kw1["kw"] == ["손해배상"]
+    # spa2 (진술보장) is excluded by the keyword, so recall on spa1 passes
+    assert kw1["recall"] == 1.0
+    assert kw1["status"] == "pass"
