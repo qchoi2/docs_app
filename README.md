@@ -181,11 +181,15 @@ API 도구는 실행을 거부합니다.
 
 ## 10. 웹 API / 웹 UI
 
-읽기 전용 검색 API 서버(Web Backend Step 1)가 포함되어 있습니다. 추가 의존성 없이 실행됩니다:
+읽기 전용 검색 화면(UI-1)과 API 서버가 포함되어 있습니다. 추가 의존성 없이 실행됩니다:
 
 ```powershell
-python webapp.py --out C:\cs_index          # http://127.0.0.1:8765
+python webapp.py --out C:\cs_index          # 브라우저에서 http://127.0.0.1:8765 열기
 ```
+
+검색 화면 기능: 검색창(쉼표로 AND 조건, 한글 IME 조합 중 Enter 보호), catalog 기반 동적
+고급 필터와 필터 칩, 결과 카드(왜 검색됐나·score·¶위치·배지), warnings 배지, 문단 주변
+보기, 중복본 보기, Markdown/CSV(utf-8-sig) 내보내기, URL로 검색 상태 복원, j/k 결과 이동.
 
 엔드포인트: `GET /api/health`, `GET /api/corpus/status`, `POST /api/search`(limit/offset),
 `GET /api/files/{file_key}/context`, `GET /api/files/{file_key}/duplicates`,

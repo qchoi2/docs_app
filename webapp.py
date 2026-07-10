@@ -36,6 +36,15 @@ from search_contracts import connect_search_db, search_contracts
 
 
 FILE_KEY_RE = re.compile(r"^[0-9a-f]{16}$")
+STATIC_DIR = Path(__file__).resolve().parent / "static"
+STATIC_NAME_RE = re.compile(r"^[A-Za-z0-9_-]+\.[A-Za-z0-9]+$")
+STATIC_TYPES = {
+    ".html": "text/html; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+    ".js": "application/javascript; charset=utf-8",
+    ".svg": "image/svg+xml",
+    ".ico": "image/x-icon",
+}
 EXPAND_MODES = {"strict", "normal", "broad"}
 MAX_LIMIT = 100
 MAX_KEYWORDS = 10
@@ -311,7 +320,30 @@ def handle_export_csv(app, match, query, body):
             [("Content-Disposition", 'attachment; filename="search_export.csv"')])
 
 
+def _serve_static(name: str):
+    """Serve a bundled UI file. Single path segment only — no traversal."""
+    if not STATIC_NAME_RE.match(name) or ".." in name:
+        raise ApiError(404, "NOT_FOUND", "Unknown static file.")
+    path = STATIC_DIR / name
+    if not path.is_file():
+        raise ApiError(404, "NOT_FOUND", "Unknown static file.")
+    content_type = STATIC_TYPES.get(path.suffix.lower())
+    if content_type is None:
+        raise ApiError(404, "NOT_FOUND", "Unknown static file.")
+    return ("raw", 200, content_type, path.read_bytes(), [])
+
+
+def handle_index(app, match, query, body):
+    return _serve_static("index.html")
+
+
+def handle_static(app, match, query, body):
+    return _serve_static(match.group("name"))
+
+
 ROUTES = [
+    ("GET", re.compile(r"^/$"), handle_index),
+    ("GET", re.compile(r"^/static/(?P<name>[^/]+)$"), handle_static),
     ("GET", re.compile(r"^/api/health$"), handle_health),
     ("GET", re.compile(r"^/api/corpus/status$"), handle_corpus_status),
     ("POST", re.compile(r"^/api/search$"), handle_search),

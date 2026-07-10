@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>계약서 검색</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header class="nav-bar">
+  <span class="wordmark">계약서 검색</span>
+  <span class="mono-eyebrow">READ-ONLY SEARCH MVP</span>
+</header>
+
+<div id="corpus-banner" class="corpus-banner" hidden></div>
+
+<main class="container">
+  <section class="search-panel" aria-label="검색">
+    <div class="search-row">
+      <input id="search-input" class="text-input search-input" type="text"
+             placeholder="예: 손해배상 상한 (여러 조건은 쉼표로 구분 — AND 검색)"
+             aria-label="검색어" autocomplete="off">
+      <button id="search-button" class="button-primary-sm" type="button">검색</button>
+      <button id="toggle-filters" class="button-ghost-sm" type="button"
+              aria-expanded="false" aria-controls="advanced-filters">고급 필터</button>
+    </div>
+
+    <div id="advanced-filters" class="filters feature-card" hidden>
+      <label>계약 유형
+        <select id="filter-type" class="text-input"><option value="">전체</option></select>
+      </label>
+      <label>언어
+        <select id="filter-lang" class="text-input"><option value="">전체</option></select>
+      </label>
+      <label>검색 범위
+        <select id="filter-expand" class="text-input">
+          <option value="strict">정확하게</option>
+          <option value="normal" selected>보통</option>
+          <option value="broad">넓게</option>
+        </select>
+      </label>
+      <label class="check"><input id="filter-drafts" type="checkbox"> Draft 제외</label>
+      <label class="check"><input id="filter-dups" type="checkbox"> 중복본 펼치기</label>
+    </div>
+
+    <div id="filter-chips" class="chips" aria-label="적용된 필터"></div>
+  </section>
+
+  <div id="live" aria-live="polite" class="visually-hidden"></div>
+
+  <section aria-label="검색 결과">
+    <div id="summary-row" class="summary-row" hidden>
+      <span id="summary-text"></span>
+      <span id="warning-badges" class="warning-badges"></span>
+      <span class="spacer"></span>
+      <button id="export-md" class="button-ghost-sm" type="button" disabled>Markdown</button>
+      <button id="export-csv" class="button-ghost-sm" type="button" disabled>CSV</button>
+    </div>
+    <div id="results"></div>
+    <div class="more-row">
+      <button id="more-button" class="button-ghost-sm" type="button" hidden>더 보기</button>
+    </div>
+    <div id="empty-state" class="empty-state" hidden>
+      <p class="heading-md">결과가 없습니다</p>
+      <p class="body-muted">동의어 확장을 "넓게"로 바꾸거나, 쉼표로 나눈 조건 수를 줄여 보세요.
+      2글자 검색어는 자동으로 폴백 검색됩니다.</p>
+    </div>
+  </section>
+</main>
+
+<footer class="footer body-muted">
+  현재 색인된 문서 기준의 검색 결과입니다 · 단축키: j/k 결과 이동, Enter 검색
+</footer>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

@@ -160,3 +160,49 @@ def test_markdown_export_contains_citations(tmp_path):
     assert status == 200
     assert "text/markdown" in headers["Content-Type"]
     assert f"[{'a'*16}]" in text or f"[{'b'*16}]" in text
+
+
+def test_static_ui_is_served(tmp_path):
+    app = make_app(tmp_path)
+
+    status, headers, payload = call(app, "GET", "/")
+    assert status == 200
+    assert "text/html" in headers["Content-Type"]
+    text = payload.decode("utf-8")
+    assert 'id="search-input"' in text and 'aria-live' in text
+
+    status, headers, payload = call(app, "GET", "/static/app.js")
+    assert status == 200 and "javascript" in headers["Content-Type"]
+    status, headers, payload = call(app, "GET", "/static/app.css")
+    assert status == 200 and "text/css" in headers["Content-Type"]
+
+
+def test_static_traversal_and_unknown_files_blocked(tmp_path):
+    app = make_app(tmp_path)
+
+    for path in ["/static/..", "/static/.%2e", "/static/webapp.py.bak",
+                 "/static/no_such.js", "/static/..%2fwebapp.py"]:
+        status, data = get_json(app, "GET", path)
+        assert status == 404, path
+        assert data["error"]["code"] == "NOT_FOUND"
+
+    # 서버 소스 파일은 정적 경로로 노출되지 않아야 한다
+    status, data = get_json(app, "GET", "/static/webapp.py")
+    assert status == 404
+
+
+def test_ui_uses_no_external_resources():
+    from pathlib import Path
+    static_dir = Path(__file__).resolve().parent.parent / "static"
+    for name in ["index.html", "app.css", "app.js"]:
+        text = (static_dir / name).read_text(encoding="utf-8")
+        assert "http://" not in text and "https://" not in text, name  # 오프라인 원칙
+
+
+def test_ui_does_not_hardcode_facet_options():
+    from pathlib import Path
+    static_dir = Path(__file__).resolve().parent.parent / "static"
+    html = (static_dir / "index.html").read_text(encoding="utf-8")
+    # 계약 유형/언어 옵션은 "전체"만 정적으로 두고 나머지는 facets에서 채운다
+    for value in ["SPA", "SHA", "국문", "영문"]:
+        assert f'<option value="{value}"' not in html, value
