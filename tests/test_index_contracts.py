@@ -586,3 +586,20 @@ def test_documents_without_text_do_not_share_dup_group(tmp_path):
     assert rows[0][1] == rows[0][0]
     assert rows[1][1] == rows[1][0]
     assert rows[0][1] != rows[1][1]
+
+
+def test_lang_classification_ignores_body_language_clause(tmp_path):
+    root = tmp_path / "contracts"
+    out = tmp_path / "cs_index"
+    root.mkdir()
+    # Korean contract whose body mentions "영문" / "English" in a language clause
+    write_docx(
+        root / "국내회사_주식매매계약.docx",
+        "본 계약은 국문으로 작성되며 영문(English) 번역본과 차이가 있는 경우 국문이 우선한다.",
+        "매도인은 매수인에게 주식을 양도한다.",
+    )
+
+    index_contracts(root, out)
+
+    rows = read_rows(out / "catalog.sqlite", "SELECT lang FROM files")
+    assert rows == [("국문",)]

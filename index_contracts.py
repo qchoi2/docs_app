@@ -247,8 +247,11 @@ def matches_any(text: str, patterns: List[str]) -> bool:
 
 
 def classify_path(rel_path: str, text: str, rules: TypeRules) -> Tuple[str, str, Optional[int], Optional[str], str]:
+    # Both ctype and lang rules match on path/filename signals only. Matching
+    # lang patterns against body text misclassifies Korean contracts as 영문
+    # because language clauses routinely mention "국문과 영문", "English", etc.
+    # Body text is used only for the character-ratio fallback below.
     path_haystack = rel_path
-    lang_haystack = f"{rel_path} {text}"
     ctype = "미분류"
     lang = "미상"
     source_signals = {}
@@ -260,7 +263,7 @@ def classify_path(rel_path: str, text: str, rules: TypeRules) -> Tuple[str, str,
             break
 
     for rule in rules.lang_rules:
-        if matches_any(lang_haystack, rule.patterns):
+        if matches_any(path_haystack, rule.patterns):
             lang = rule.value
             source_signals["lang"] = {"value": lang, "patterns": rule.patterns}
             break
