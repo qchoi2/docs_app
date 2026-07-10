@@ -1,63 +1,163 @@
-# Contract Search
+# Contract Search — M&A 계약서 로컬 검색 CLI
 
-Local Windows-first indexing and search tooling for M&A contract samples.
+M&A 계약서 샘플(.docx/.pdf)을 색인해 자연어 키워드로 검색하는 **Windows PC 로컬 실행** 도구입니다.
+모든 산출물(catalog.sqlite, txt 캐시, 로그)은 `cs_index/` 한 곳에 생성됩니다.
 
-## Setup
+> **중요:** `cs_index/`는 반드시 **PC 로컬 디스크**에 두세요. SQLite를 네트워크 드라이브(NAS 등)에
+> 두면 손상될 수 있습니다. 계약서 원본은 로컬 폴더 또는 읽기 전용 네트워크 드라이브 모두 가능합니다.
 
-Use a local Python environment. Python 3.10+ is recommended, while the code keeps Python 3.9 syntax compatibility.
+## 1. 설치 (venv + requirements)
+
+Python 3.10+ 권장 (3.9 문법 호환 유지). PowerShell에서:
 
 ```powershell
+cd C:\path\to\contract-search
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
 ```
 
-Keep `cs_index/` on a local PC disk. The source contract root may be a local folder or a readable network drive, but `catalog.sqlite`, `txt/`, API cache, and logs should not live on a network filesystem.
-
-## Indexing
-
-Pilot a selected subset:
+출력이 리다이렉트될 때 한글/특수문자 깨짐을 막으려면 환경 변수를 켜두는 것을 권장합니다:
 
 ```powershell
-python index_contracts.py --root C:\path\to\contracts --out C:\path\to\cs_index --file-list pilot_files.txt --batch-label pilot_001
+$env:PYTHONUTF8 = "1"
 ```
 
-For local test runs, if `root/` exists next to `index_contracts.py`, `--root` may be omitted:
+## 2. 파일럿 색인
+
+전체 코퍼스(2,000여 건)를 한 번에 색인하기 전에, 일부만 먼저 색인해 품질과 성능을 확인합니다.
+
+방법 A — 상대경로 목록 지정(권장):
 
 ```powershell
-python index_contracts.py --out .\cs_index --sample 200 --sample-seed 42 --batch-label pilot_001
+# pilot_files.txt: --root 기준 상대경로를 한 줄에 하나씩
+python index_contracts.py --root C:\contracts --out C:\cs_index --file-list pilot_files.txt --batch-label pilot_001
 ```
 
-Expand to the full root using the same `--root` and `--out`:
+방법 B — 결정적 무작위 샘플:
 
 ```powershell
-python index_contracts.py --root C:\path\to\contracts --out C:\path\to\cs_index --batch-label full_001
+python index_contracts.py --root C:\contracts --out C:\cs_index --sample 200 --sample-seed 42 --batch-label pilot_001
 ```
 
-Force a generated index rebuild:
+`--file-list`와 `--sample`은 동시에 쓸 수 없습니다. `--dry-run`을 붙이면 DB/캐시 변경 없이
+변경 예정 리포트만 확인할 수 있습니다. 실행이 끝나면 `cs_index/report_YYYYMMDD.md`에서
+status별 건수, 중복 그룹, 실패 원인(empty/error)을 확인하세요.
+
+## 3. 전체 코퍼스 확장
+
+파일럿과 **같은 `--root`, 같은 `--out`**을 유지하면 증분 색인으로 나머지만 처리됩니다:
 
 ```powershell
-python index_contracts.py --root C:\path\to\contracts --out C:\path\to\cs_index --full --batch-label full_001
+python index_contracts.py --root C:\contracts --out C:\cs_index --batch-label full_001
 ```
 
-Use `--dry-run` to create a change report without writing the database or text cache.
+- 파일 이동/삭제/복원/내용변경은 자동 감지되어 리포트 §1에 표시됩니다.
+- 파일럿을 별도 복사 폴더에서 했다면 전체 색인은 새 `cs_index`를 만들거나 `--full`로 재색인하세요.
+- `--full`은 files/fts 색인만 재구축하며 query_log, eval_history 등 로그는 보존합니다.
+- 전체 확장 직후에는 `eval_search.py`를 다시 실행해 검색 품질 회귀를 확인하세요.
 
-## Runtime Data
-
-The YAML files in `data/` are runtime configuration. Update those files rather than changing code when term dictionaries, type rules, golden queries, API budget settings, or manual metadata overrides need adjustment.
-
-## Search
-
-Search the current index with JSON output:
+## 4. 검색
 
 ```powershell
-python search_contracts.py --out .\cs_index --kw 손해배상 --limit 10 --json
+# 키워드 검색 (term_dict 동의어 확장 기본 ON, 중복 제거 기본 ON)
+python search_contracts.py --out C:\cs_index --kw 손해배상 --limit 10 --json
+
+# AND 검색 + 유형/언어 필터 + 드래프트 제외
+python search_contracts.py --out C:\cs_index --type SPA --lang 국문 --kw earn-out --kw 손해배상 --exclude-drafts --json
+
+# 확장 강도 조절: --expand strict|normal|broad, 확장 끄기: --no-expand
+# 중복본 펼쳐 보기: --show-duplicates
 ```
 
-Repeat `--kw` for AND conditions. Term dictionary expansion is on by default; use `--expand strict`, `--expand broad`, or `--no-expand` to control it. Result sets are deduplicated by default, and `--show-duplicates` expands duplicate groups.
+JSON 결과의 `why`, `score_breakdown`, `snippet_paras`로 선정 이유와 ¶위치를 확인하고,
+특정 문단 주변은 `open_text.py`, 파일 상세는 `inspect_file.py`로 봅니다:
 
-## Current Scope
+```powershell
+python open_text.py --out C:\cs_index --file-key ab12cd34ef567890 --para 42 --context 3
+python inspect_file.py --out C:\cs_index --file-key ab12cd34ef567890 --show-dup-group
+```
 
-Implemented so far: normalization, catalog schema creation, DOCX/PDF indexing, txt cache generation, FTS population, incremental indexing, pilot/full options, index reports, and the FTS-backed search CLI.
+집계는 `stats_contracts.py`를 사용합니다 (`--by ctype,lang`, `--status`, `--errors`, `--batches`, `--dedup`).
 
-Next Phase 1A work: stats CLI, file inspection helpers, evaluation, and fuller README/FAQ coverage.
+## 5. 평가 (golden queries)
+
+```powershell
+python eval_search.py --out C:\cs_index
+```
+
+`data/golden_queries.yaml`의 T1/T2 문항을 실행해 문항별 pass/fail을 출력하고
+`cs_index/eval_history.jsonl`에 기록합니다. expected_files가 없는 문항은 부분채점(필터만)입니다.
+
+## 6. 자동 분류 수동 보정 (manual_overrides.yaml)
+
+색인 리포트에서 잘못 분류된 문서를 발견하면 코드 수정 없이 `data/manual_overrides.yaml`로 보정합니다:
+
+```yaml
+paths:
+  "**/SPA/**":
+    ctype: SPA
+files:
+  "0123abcd4567ef89":
+    ctype: SPA
+    lang: 영문
+    is_draft: false
+    version_hint: final
+```
+
+적용 우선순위는 자동 추정 → path 패턴(glob) → file_key이며, file_key 보정이 최종 우선합니다.
+보정 대상은 ctype/lang/is_draft/version_hint만이고 file_key/content_hash는 보정할 수 없습니다.
+보정 후 해당 파일이 다시 색인될 때(또는 `--full` 실행 시) 반영됩니다.
+
+## 7. 백업/복구
+
+- `cs_index/` 폴더 전체를 복사하면 백업이 됩니다. 이때 `catalog.sqlite-wal`,
+  `catalog.sqlite-shm` 파일도 **반드시 함께** 복사하세요 (WAL 모드 사용 중).
+- 안전한 시점: 색인 실행이 끝난 직후 (종료 시 wal_checkpoint 수행됨).
+- `catalog.sqlite`와 `txt/`는 재색인으로 언제든 재생성 가능하지만,
+  `query_log.jsonl`, `eval_history.jsonl` 등 로그는 재생성이 불가능하니 백업 대상입니다.
+- 복구는 백업 폴더를 원래 위치에 되돌려 놓기만 하면 됩니다.
+
+## 8. AI 코딩 에이전트 (개발 작업용)
+
+### Claude Code 설치/로그인
+
+```powershell
+irm https://claude.ai/install.ps1 | iex
+claude --version
+```
+
+설치 후 프로젝트 루트에서 `claude`를 실행하면 최초 1회 브라우저에서 구독 계정으로 로그인합니다.
+세션 중 재인증이 필요하면 `/login`을 입력합니다. 상세 절차와 문제 해결은
+`.docs/AGENT_SETUP_AND_MODEL_OPTIONS.md`를 참고하세요.
+
+### Codex 선택 활용
+
+Claude Code 사용량 한도에 도달했거나 작은 패치 작업에는 Codex CLI/VS Code 확장을
+보조 작업자로 쓸 수 있습니다 (`npm install -g @openai/codex` 후 ChatGPT 계정 로그인).
+**Codex는 ChatGPT 구독계정 로그인 기반으로만 사용하며, OpenAI API key를 입력받거나
+저장하지 않습니다.**
+
+### ANTHROPIC_API_KEY (런타임 AI 답변 경로)
+
+`answer_quick.py` 등 Haiku API 호출 기능(Phase 1B, 미구현)은 Claude Code 로그인과 **별개**로
+사용자 제공 `ANTHROPIC_API_KEY`와 `data/api_budget.yaml`의 per_call/per_run 상한이 모두
+설정되어야 활성화됩니다. 키 입력은 추후 웹 UI의 **Runtime API Settings 화면**에서 받는 것이
+표준 경로이며, `.env` 직접 설정은 고급/수동 백업 경로로만 사용합니다. 예산 상한이 null이면
+API 도구는 실행을 거부합니다.
+
+## 9. 오류 FAQ
+
+| 증상 | 원인/조치 |
+|---|---|
+| `SQLite FTS5 trigram tokenizer is required` | SQLite < 3.34. Python 3.10+ 사용 또는 `pysqlite3-binary` 설치 |
+| 리포트에 empty 문서 다수 | 스캔 PDF (본문 텍스트 없음). OCR은 Phase 1 범위 밖 — 건수 확인 후 소유자가 결정 |
+| `pdf_extract_failed` / `corrupt_docx` | 손상/암호화 파일. 해당 파일만 실패하고 배치는 계속됨 |
+| 파이프/리다이렉트 시 UnicodeEncodeError | `$env:PYTHONUTF8="1"` 설정 |
+| 검색 결과가 기대보다 적음 | `--expand broad` 시도, 2글자 용어는 자동 LIKE 폴백(warnings 확인) |
+| `term_dict_not_found` 경고 | `data/term_dict.yaml`을 찾지 못함 — 저장소 루트에서 실행 중인지 확인 |
+
+## 10. 웹 UI
+
+웹 UI(검색 화면, 색인 대시보드, Agent Setup Wizard, Runtime API Settings)는 **후속 단계**입니다.
+CLI MVP 안정화 후 `.docs/UI_ROADMAP.md` 순서(UI-0 ~ UI-4)로 진행합니다.
