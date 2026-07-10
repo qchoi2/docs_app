@@ -44,11 +44,12 @@ def resolve_golden(path: Optional[Path], base: Optional[Path] = None) -> Path:
         if not path.exists():
             raise FileNotFoundError(f"golden queries not found: {path}")
         return path
-    base = base or Path.cwd()
-    for candidate in GOLDEN_PATHS:
-        full = base / candidate
-        if full.exists():
-            return full
+    bases = [base] if base is not None else [Path.cwd(), Path(__file__).resolve().parent]
+    for base_dir in bases:
+        for candidate in GOLDEN_PATHS:
+            full = base_dir / candidate
+            if full.exists():
+                return full
     raise FileNotFoundError("golden_queries.yaml not found in data/ or .docs/")
 
 

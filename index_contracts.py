@@ -109,14 +109,22 @@ def hash_text(text: str) -> str:
     return sha256_short(text.encode("utf-8"))
 
 
+def _find_runtime_file(candidates: Tuple[Path, ...], start: Optional[Path] = None) -> Optional[Path]:
+    """Look under cwd (or explicit start) first, then next to this script."""
+    bases = []
+    if start is not None:
+        bases.append(start)
+    bases.extend([Path.cwd(), Path(__file__).resolve().parent])
+    for base in bases:
+        for candidate in candidates:
+            path = base / candidate
+            if path.exists():
+                return path
+    return None
+
+
 def load_type_rules(start: Optional[Path] = None) -> TypeRules:
-    base = start or Path.cwd()
-    selected = None
-    for candidate in TYPE_RULE_PATHS:
-        path = base / candidate
-        if path.exists():
-            selected = path
-            break
+    selected = _find_runtime_file(TYPE_RULE_PATHS, start)
     if selected is None:
         return TypeRules()
 
@@ -167,13 +175,7 @@ def _clean_override_values(raw: Optional[Dict[str, object]]) -> Dict[str, object
 
 
 def load_manual_overrides(start: Optional[Path] = None) -> ManualOverrides:
-    base = start or Path.cwd()
-    selected = None
-    for candidate in MANUAL_OVERRIDE_PATHS:
-        path = base / candidate
-        if path.exists():
-            selected = path
-            break
+    selected = _find_runtime_file(MANUAL_OVERRIDE_PATHS, start)
     if selected is None:
         return ManualOverrides()
 
@@ -800,8 +802,8 @@ def index_contracts(
     if not root_path.exists() or not root_path.is_dir():
         raise ValueError(f"root must be an existing directory: {root_path}")
 
-    rules = load_type_rules(Path.cwd())
-    overrides = load_manual_overrides(Path.cwd())
+    rules = load_type_rules()
+    overrides = load_manual_overrides()
     candidates, is_full_scan = choose_candidates(root_path, options, rules)
     db_path = out_dir / "catalog.sqlite"
     if not options.dry_run:

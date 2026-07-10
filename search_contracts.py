@@ -16,6 +16,7 @@ from lib.normalize import normalize
 
 
 TERM_DICT_PATHS = (Path("data/term_dict.yaml"), Path(".docs/term_dict.yaml"))
+SCRIPT_DIR = Path(__file__).resolve().parent
 RRF_K = 60
 
 
@@ -27,16 +28,25 @@ class TermEntry:
     avoid: List[str] = None
 
 
-def load_term_dict(start: Optional[Path] = None) -> List[TermEntry]:
-    base = start or Path.cwd()
-    selected = None
-    for candidate in TERM_DICT_PATHS:
-        path = base / candidate
-        if path.exists():
-            selected = path
-            break
+def find_term_dict(start: Optional[Path] = None) -> Optional[Path]:
+    """Look for term_dict.yaml under cwd first, then next to this script."""
+    bases = []
+    if start is not None:
+        bases.append(start)
+    bases.extend([Path.cwd(), SCRIPT_DIR])
+    for base in bases:
+        for candidate in TERM_DICT_PATHS:
+            path = base / candidate
+            if path.exists():
+                return path
+    return None
+
+
+def load_term_dict(start: Optional[Path] = None) -> Optional[List[TermEntry]]:
+    """Return term entries, or None when no term_dict.yaml could be found."""
+    selected = find_term_dict(start)
     if selected is None:
-        return []
+        return None
 
     data = yaml.safe_load(selected.read_text(encoding="utf-8")) or {}
     entries = []
@@ -160,8 +170,12 @@ def search_contracts(
     if not db_path.exists():
         raise FileNotFoundError(f"catalog.sqlite not found: {db_path}")
 
-    entries = load_term_dict(Path.cwd())
+    entries = load_term_dict()
     warnings: List[str] = []
+    if entries is None:
+        # Silent no-expansion would degrade recall without any signal (see brief §3.7).
+        entries = []
+        warnings.append("term_dict_not_found")
     expanded_query: Dict[str, List[str]] = {}
 
     with closing(sqlite3.connect(db_path)) as conn:

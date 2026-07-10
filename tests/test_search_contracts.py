@@ -1,6 +1,7 @@
 import json
 import sqlite3
 from contextlib import closing
+from pathlib import Path
 
 from lib.catalog import initialize_catalog
 from search_contracts import escape_fts_phrase, main, search_contracts
@@ -219,3 +220,18 @@ def test_no_results_is_not_error(tmp_path, capsys):
     assert rc == 0
     assert payload["total"] == 0
     assert payload["results"] == []
+
+
+def test_missing_term_dict_warns_instead_of_silent_no_expansion(tmp_path, monkeypatch):
+    import search_contracts as sc
+
+    out, db_path = make_search_db(tmp_path)
+    with closing(sqlite3.connect(db_path)) as conn:
+        insert_doc(conn, "doc", "doc.docx", "손해배상")
+        conn.commit()
+    monkeypatch.setattr(sc, "TERM_DICT_PATHS", (Path("no_such_term_dict.yaml"),))
+
+    result, count = sc.search_contracts(out, keywords=["손해배상"])
+
+    assert count == 1
+    assert "term_dict_not_found" in result["warnings"]
