@@ -2,7 +2,7 @@ import json
 import sqlite3
 from contextlib import closing
 
-from enrich_contracts import enrich_contracts, select_candidates
+from enrich_contracts import enrich_contracts, load_txt_cache, select_candidates
 from lib.catalog import initialize_catalog
 
 
@@ -16,7 +16,7 @@ def insert_doc(conn, out, file_key, path, content, *, ctype="SPA", dup_group=Non
           txt_path, char_count, status, error_reason, source_signals,
           batch_label, content_hash, dup_group, is_draft, version_hint, indexed_at
         )
-        VALUES (?, ?, '', ?, ?, '援?Ц', '.docx', 1, 1, ?, ?, ?, NULL, '{}',
+        VALUES (?, ?, '', ?, ?, '국문', '.docx', 1, 1, ?, ?, ?, NULL, '{}',
           'test', ?, ?, 0, 'final', '2026-07-11T00:00:00+00:00')
         """,
         (file_key, path, path, ctype, txt_path, len(content), status, file_key, dup_group),
@@ -26,7 +26,7 @@ def insert_doc(conn, out, file_key, path, content, *, ctype="SPA", dup_group=Non
     if status == "ok":
         txt_file.write_text(
             "\n".join(
-                "[쨋%d]\t%s" % (index, paragraph)
+                "[\u00b6%d]\t%s" % (index, paragraph)
                 for index, paragraph in enumerate(content.split("\n"), start=1)
             ) + "\n",
             encoding="utf-8",
@@ -39,6 +39,20 @@ def make_out(tmp_path):
     return out, db_path
 
 
+def test_load_txt_cache_reads_paragraph_markers(tmp_path):
+    out = tmp_path / "cs_index"
+    txt_dir = out / "txt"
+    txt_dir.mkdir(parents=True)
+    (txt_dir / "sample.txt").write_text("[\u00b61]\tone\n[\u00b62]\t손해배상\n", encoding="utf-8")
+
+    paragraphs = load_txt_cache(out, "txt/sample.txt")
+
+    assert paragraphs == [
+        {"para": 1, "text": "one"},
+        {"para": 2, "text": "손해배상"},
+    ]
+
+
 def valid_result(file_key):
     return {
         "file_key": file_key,
@@ -47,7 +61,7 @@ def valid_result(file_key):
         "deal_type_detail": "sample",
         "consideration_json": {},
         "clause_map_json": {
-            "?먰빐諛곗긽": {
+            "손해배상": {
                 "present": True,
                 "loc_start": 2,
                 "loc_end": 3,
@@ -101,9 +115,9 @@ def test_enrich_writes_input_and_records_result(tmp_path):
         ).fetchall()
     assert rows[0][0:4] == ("a" * 16, 1, "a" * 16, "med")
     clause_map = json.loads(rows[0][4])
-    assert clause_map["?먰빐諛곗긽"]["loc_start"] == 2
+    assert clause_map["손해배상"]["loc_start"] == 2
     stored = json.loads(rows[0][5])
-    assert stored["clause_map_json"]["?먰빐諛곗긽"]["loc_start"] == 2
+    assert stored["clause_map_json"]["손해배상"]["loc_start"] == 2
 
 
 def test_enrich_pending_then_incremental_skip_after_result(tmp_path):

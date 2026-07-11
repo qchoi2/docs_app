@@ -24,8 +24,8 @@ DEFAULT_PRIORITY = (
     "CB",
     "BW",
     "EB",
-    "二쇱떇援먰솚",
-    "遺꾪븷?⑸퀝",
+    "\uc8fc\uc2dd\uad50\ud658",
+    "\ubd84\ud560\ud569\ubcd1",
 )
 REQUIRED_RESULT_KEYS = (
     "file_key",
@@ -70,11 +70,12 @@ def load_txt_cache(out_dir: Path, txt_path: str) -> List[Dict[str, object]]:
         raise EnrichError("txt cache not found: %s" % txt_path)
     paragraphs: List[Dict[str, object]] = []
     for line in path.read_text(encoding="utf-8").splitlines():
-        if not line.startswith("[쨋") or "]\t" not in line:
+        if not line.startswith("[") or "]\t" not in line:
             continue
         marker, text = line.split("]\t", 1)
+        marker_digits = "".join(char for char in marker if char.isdigit())
         try:
-            para = int(marker[2:])
+            para = int(marker_digits)
         except ValueError:
             continue
         paragraphs.append({"para": para, "text": text})
