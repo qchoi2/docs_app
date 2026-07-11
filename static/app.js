@@ -37,6 +37,16 @@ function itemTerms(item) {
   return (item.matched_terms || []).map((t) => t.term).concat(state.kw);
 }
 
+/* 표준 오류 코드(BACKEND_REVIEW §2.9) → 사용자 메시지. raw 코드/트레이스 비노출. */
+const ERROR_MESSAGES = {
+  VALIDATION_ERROR: "요청 값이 올바르지 않습니다",
+  FILE_NOT_FOUND_IN_CATALOG: "카탈로그에서 문서를 찾지 못했습니다",
+  SQLITE_BUSY: "데이터베이스가 잠시 사용 중입니다 — 다시 시도하세요",
+  INTERNAL_ERROR: "서버 오류가 발생했습니다",
+  NOT_FOUND: "요청한 경로가 없습니다",
+};
+const errMsg = (code) => ERROR_MESSAGES[code] || `오류 (${code})`;
+
 /* ---------- init ---------- */
 document.addEventListener("DOMContentLoaded", () => {
   loadCorpusStatus();
@@ -69,6 +79,9 @@ async function loadCorpusStatus() {
     banner.textContent = `${scope} · 문서 ${total}건 (검색 가능 ${status.statuses.ok || 0}건, ` +
       `본문 추출 불가 ${status.unsearchable_docs}건) · 마지막 색인 ${status.last_indexed_at || "-"}`;
     banner.classList.toggle("pilot", status.pilot_corpus);
+    if (total === 0) {
+      banner.innerHTML = '색인된 문서가 없습니다 — <a class="nav-link" href="/setup">색인/설정</a>에서 최초 색인을 실행하세요.';
+    }
     banner.hidden = false;
   } catch (e) { /* 배너는 보조 정보 — 실패해도 검색은 가능 */ }
 }
@@ -191,8 +204,8 @@ async function runSearch(append, skipUrl) {
     announce(`검색 완료: 대표 ${data.total}건, 전체 파일 ${data.total_files}건`);
     if (!append) loadRecentSearches();
   } catch (error) {
-    announce("검색 실패: " + error.message);
-    $("summary-text").textContent = "검색 중 오류가 발생했습니다 (" + error.message + ")";
+    announce("검색 실패: " + errMsg(error.message));
+    $("summary-text").textContent = "검색 실패: " + errMsg(error.message);
     $("summary-row").hidden = false;
   }
 }
@@ -298,18 +311,39 @@ function resultCard(item) {
 
 async function toggleContext(item, panel) {
   if (!panel.hidden && panel.dataset.mode === "context") { panel.hidden = true; return; }
+  await renderContext(item, panel, 3);
+}
+
+async function renderContext(item, panel, context) {
   const para = (item.snippet_paras || [])[0];
   if (para == null) { announce("표시할 매칭 문단이 없습니다"); return; }
   try {
     const data = await (await api(
-      `/api/files/${item.file_key}/context?para=${para}&context=3`)).json();
+      `/api/files/${item.file_key}/context?para=${para}&context=${context}`)).json();
     const terms = itemTerms(item);
     panel.innerHTML = data.paragraphs.map((paragraph) =>
       `<div class="snippet${paragraph.para === para ? " current" : ""}">[¶${paragraph.para}] ${highlightHtml(paragraph.text, terms)}</div>`
-    ).join("");
+    ).join("") +
+      `<div class="card-actions">` +
+      (context < 10 ? `<button type="button" class="button-ghost-sm act-wider">앞뒤 더 보기</button>` : "") +
+      `<button type="button" class="button-ghost-sm act-copy-para">¶번호 복사</button>` +
+      `<button type="button" class="button-ghost-sm act-copy-path">원본 경로 복사</button></div>`;
+    const wider = panel.querySelector(".act-wider");
+    if (wider) wider.addEventListener("click", () => renderContext(item, panel, Math.min(context + 3, 10)));
+    panel.querySelector(".act-copy-para").addEventListener("click",
+      () => copyText(`[${item.file_key}] ¶${para}`));
+    panel.querySelector(".act-copy-path").addEventListener("click",
+      () => copyText(item.path));
     panel.dataset.mode = "context";
     panel.hidden = false;
-  } catch (error) { announce("문단을 불러오지 못했습니다: " + error.message); }
+  } catch (error) { announce("문단을 불러오지 못했습니다: " + errMsg(error.message)); }
+}
+
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    announce("복사됨: " + text);
+  } catch (e) { announce("복사하지 못했습니다 — 브라우저 권한을 확인하세요"); }
 }
 
 async function toggleDuplicates(item, panel) {
@@ -324,7 +358,7 @@ async function toggleDuplicates(item, panel) {
         `</div>`).join("");
     panel.dataset.mode = "dups";
     panel.hidden = false;
-  } catch (error) { announce("중복본을 불러오지 못했습니다: " + error.message); }
+  } catch (error) { announce("중복본을 불러오지 못했습니다: " + errMsg(error.message)); }
 }
 
 /* ---------- export ---------- */
@@ -343,7 +377,7 @@ async function exportResults(kind, filename) {
     anchor.click();
     URL.revokeObjectURL(url);
     announce("내보내기 완료: " + filename);
-  } catch (error) { announce("내보내기 실패: " + error.message); }
+  } catch (error) { announce("내보내기 실패: " + errMsg(error.message)); }
 }
 
 /* ---------- 최근 검색 (ui_state.sqlite 영속 — query_log와 별개) ---------- */

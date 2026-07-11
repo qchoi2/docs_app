@@ -34,6 +34,13 @@ function announce(message) { $("live").textContent = message; }
 
 document.addEventListener("DOMContentLoaded", () => {
   $("save-key").addEventListener("click", saveKey);
+  $("api-key").addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      if (event.isComposing || event.keyCode === 229) return;
+      event.preventDefault();
+      saveKey();
+    }
+  });
   $("test-key").addEventListener("click", testKey);
   $("delete-key").addEventListener("click", deleteKey);
   $("save-budget").addEventListener("click", saveBudget);

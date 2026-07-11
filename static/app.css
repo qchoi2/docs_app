@@ -125,3 +125,4 @@ mark { background: var(--color-warning-soft); color: inherit; border-radius: 2px
 .mono { font-family: var(--font-mono); }
 .nav-bar .spacer { flex: 1; }
 .budget-label { display: flex; flex-direction: column; gap: var(--sp-xxs); font-size: 13px; color: var(--color-body); }
+.empty-hints { text-align: left; display: inline-block; margin: var(--sp-xs) 0; }
