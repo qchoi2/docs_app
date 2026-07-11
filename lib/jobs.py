@@ -265,13 +265,18 @@ class JobQueue:
     # ---------- 상태 기록 ----------
 
     def _mark_running(self, job_id: str) -> None:
+        # 상태 갱신과 lifecycle 로그는 한 트랜잭션으로 — 상태만 보이고 로그가
+        # 없는 순간이 생기지 않게 한다.
         with closing(connect_jobs(self.out)) as conn:
             conn.execute(
                 "UPDATE jobs SET status='running', started_at=? WHERE id=?",
                 (_now(), job_id),
             )
+            conn.execute(
+                "INSERT INTO job_logs (job_id, ts, line) VALUES (?, ?, ?)",
+                (job_id, _now(), "started"),
+            )
             conn.commit()
-        self.append_log(job_id, "started")
 
     def _update_progress(self, job_id: str, done: int, total: int, current_item: str) -> None:
         with closing(connect_jobs(self.out)) as conn:
@@ -284,18 +289,23 @@ class JobQueue:
 
     def _set_terminal(self, job_id: str, status: str, error_code: Optional[str] = None,
                       message: Optional[str] = None) -> None:
-        with closing(connect_jobs(self.out)) as conn:
-            conn.execute(
-                "UPDATE jobs SET status=?, error_code=?, message=?, finished_at=? WHERE id=?",
-                (status, error_code, message, _now(), job_id),
-            )
-            conn.commit()
         summary = f"{status}"
         if error_code:
             summary += f": {error_code}"
         if message:
             summary += f": {message}"
-        self.append_log(job_id, summary)
+        # terminal 상태와 종료 로그를 한 트랜잭션으로 커밋한다. 그래야 폴링
+        # 클라이언트가 completed를 본 시점에 로그도 반드시 존재한다.
+        with closing(connect_jobs(self.out)) as conn:
+            conn.execute(
+                "UPDATE jobs SET status=?, error_code=?, message=?, finished_at=? WHERE id=?",
+                (status, error_code, message, _now(), job_id),
+            )
+            conn.execute(
+                "INSERT INTO job_logs (job_id, ts, line) VALUES (?, ?, ?)",
+                (job_id, _now(), summary),
+            )
+            conn.commit()
         self._cancel_flags.pop(job_id, None)
 
     def recover_interrupted(self) -> int:
