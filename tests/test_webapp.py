@@ -149,6 +149,11 @@ def test_csv_export_is_utf8_sig_and_parseable(tmp_path):
     assert "text/csv" in headers["Content-Type"]
     rows = list(csv.DictReader(io.StringIO(payload.decode("utf-8-sig"))))
     assert rows and rows[0]["file_key"] and "손해배상" in rows[0]["snippet"]
+    # UI_PRODUCT_SPEC §13 필수 컬럼
+    for column in ("query", "filters", "export_created_at", "filename", "para", "why"):
+        assert column in rows[0]
+    assert rows[0]["query"] == "손해배상"
+    assert rows[0]["filename"]
 
 
 def test_markdown_export_contains_citations(tmp_path):

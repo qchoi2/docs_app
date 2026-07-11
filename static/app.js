@@ -13,6 +13,30 @@ const esc = (value) => String(value == null ? "" : value)
   .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
   .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 
+/* 매칭어 하이라이트 — 검색은 normalize() 텍스트 기준이고 화면은 원문 표면형이라
+   표면형 매칭이 실패할 수 있다. 실패는 오류가 아니며, 하이라이트 없이 원문을
+   그대로 표시한다(하이라이트를 위해 원문을 변형하지 않는다). */
+const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function highlightHtml(text, terms) {
+  const raw = String(text == null ? "" : text);
+  const list = [...new Set((terms || []).filter((t) => t && t.length >= 2))]
+    .sort((a, b) => b.length - a.length);
+  if (!list.length || !raw) return esc(raw);
+  let re;
+  try { re = new RegExp(list.map(escRe).join("|"), "gi"); } catch (e) { return esc(raw); }
+  let out = "", last = 0, m;
+  while ((m = re.exec(raw)) !== null) {
+    if (!m[0]) { re.lastIndex += 1; continue; }
+    out += esc(raw.slice(last, m.index)) + "<mark>" + esc(m[0]) + "</mark>";
+    last = m.index + m[0].length;
+  }
+  return out + esc(raw.slice(last));
+}
+
+function itemTerms(item) {
+  return (item.matched_terms || []).map((t) => t.term).concat(state.kw);
+}
+
 /* ---------- init ---------- */
 document.addEventListener("DOMContentLoaded", () => {
   loadCorpusStatus();
@@ -258,7 +282,7 @@ function resultCard(item) {
     `<div class="result-meta">${badges.join(" ")}</div>` +
     (whyItems ? `<div class="body-muted">왜 검색됐나</div><ul class="why">${whyItems}</ul>` : "") +
     `<div class="score">${esc(scoreText)} · 매칭 문단: ${esc(paras) || "—"}</div>` +
-    (item.snippet ? `<div class="snippet">${esc(item.snippet)}</div>` : "") +
+    (item.snippet ? `<div class="snippet">${highlightHtml(item.snippet, itemTerms(item))}</div>` : "") +
     `<div class="card-actions">` +
     `<button type="button" class="button-ghost-sm act-context">문단 주변 보기</button>` +
     (item.dup_count > 1 ? `<button type="button" class="button-ghost-sm act-dups">중복본 보기</button>` : "") +
@@ -279,8 +303,9 @@ async function toggleContext(item, panel) {
   try {
     const data = await (await api(
       `/api/files/${item.file_key}/context?para=${para}&context=3`)).json();
+    const terms = itemTerms(item);
     panel.innerHTML = data.paragraphs.map((paragraph) =>
-      `<div class="snippet${paragraph.para === para ? " current" : ""}">[¶${paragraph.para}] ${esc(paragraph.text)}</div>`
+      `<div class="snippet${paragraph.para === para ? " current" : ""}">[¶${paragraph.para}] ${highlightHtml(paragraph.text, terms)}</div>`
     ).join("");
     panel.dataset.mode = "context";
     panel.hidden = false;

@@ -459,19 +459,43 @@ def handle_facets(app, match, query, body):
                      "batch_label": facet("batch_label")}
 
 
-def _export_rows(result: Dict[str, object]) -> List[Dict[str, object]]:
+def _export_filters_text(params: Dict[str, object]) -> str:
+    parts = []
+    if params["ctype"]:
+        parts.append(f"type={params['ctype']}")
+    if params["lang"]:
+        parts.append(f"lang={params['lang']}")
+    parts.append(f"expand={params['expand']}")
+    if params["exclude_drafts"]:
+        parts.append("exclude_drafts")
+    if params["show_duplicates"]:
+        parts.append("show_duplicates")
+    return " ".join(parts)
+
+
+def _export_rows(result: Dict[str, object], params: Dict[str, object]) -> List[Dict[str, object]]:
+    # UI_PRODUCT_SPEC §13: query, filters, export_created_at, file_key, filename,
+    # ctype, lang, para, snippet, why를 포함한다.
+    query = ", ".join(params["keywords"])
+    filters_text = _export_filters_text(params)
+    created_at = time.strftime("%Y-%m-%dT%H:%M:%S")
     rows = []
     for item in result["results"]:
         rows.append({
+            "query": query,
+            "filters": filters_text,
+            "export_created_at": created_at,
             "file_key": item["file_key"],
+            "filename": os.path.basename(item["path"]),
             "path": item["path"],
             "ctype": item["ctype"],
             "lang": item["lang"],
             "is_draft": item["is_draft"],
             "version_hint": item["version_hint"] or "",
             "dup_count": item["dup_count"],
-            "snippet_paras": " ".join(str(p) for p in item["snippet_paras"]),
+            "para": " ".join(str(p) for p in item["snippet_paras"]),
             "snippet": item["snippet"].replace("\n", " / "),
+            "why": " / ".join(item.get("why") or []),
         })
     return rows
 
@@ -490,6 +514,8 @@ def handle_export_markdown(app, match, query, body):
         paras = ",".join(str(p) for p in item["snippet_paras"])
         lines.append(f"## [{item['file_key']}] {item['path']}")
         lines.append(f"- ctype: {item['ctype']} / lang: {item['lang']} / draft: {item['is_draft']} / 중복 {item['dup_count']}건 / ¶{paras}")
+        for reason in item.get("why") or []:
+            lines.append(f"- 검색 사유: {reason}")
         lines.append("")
         lines.append("```")
         lines.append(item["snippet"])
@@ -503,10 +529,11 @@ def handle_export_markdown(app, match, query, body):
 def handle_export_csv(app, match, query, body):
     params = validated_search_params(body)
     result = run_search(app.out, params)
-    rows = _export_rows(result)
+    rows = _export_rows(result, params)
     buffer = io.StringIO()
-    fieldnames = ["file_key", "path", "ctype", "lang", "is_draft", "version_hint",
-                  "dup_count", "snippet_paras", "snippet"]
+    fieldnames = ["query", "filters", "export_created_at", "file_key", "filename", "path",
+                  "ctype", "lang", "is_draft", "version_hint", "dup_count", "para",
+                  "snippet", "why"]
     writer = csv.DictWriter(buffer, fieldnames=fieldnames, lineterminator="\r\n")
     writer.writeheader()
     writer.writerows(rows)
