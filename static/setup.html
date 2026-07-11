@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>색인 설정 — 계약서 검색</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header class="nav-bar">
+  <span class="wordmark">계약서 검색</span>
+  <span class="mono-eyebrow">SETUP &amp; INDEXING</span>
+  <span class="spacer"></span>
+  <a class="nav-link" href="/">검색 화면으로</a>
+</header>
+
+<main class="container">
+  <div id="live" aria-live="polite" class="visually-hidden"></div>
+
+  <!-- 1단계: 원본 폴더 (브라우저 폴더 피커를 쓰지 않는다 — 경로 입력 + 백엔드 검증) -->
+  <section class="feature-card setup-card" aria-label="원본 폴더">
+    <h2 class="heading-md">1. 원본 계약서 폴더</h2>
+    <p class="body-muted">원본 폴더의 경로를 직접 입력하세요. 예: <span class="mono">D:\Contracts\M&amp;A Samples</span><br>
+    원본 폴더는 <strong>읽기 전용</strong>으로만 접근하며, 파일을 수정하지 않습니다.</p>
+    <div class="search-row">
+      <input id="root-path" class="text-input search-input" type="text"
+             placeholder="예: D:\Contracts\M&amp;A Samples" aria-label="원본 폴더 경로" autocomplete="off" spellcheck="false">
+      <button id="validate-button" class="button-primary-sm" type="button">경로 확인</button>
+    </div>
+    <div id="validate-result" class="validate-result" hidden></div>
+  </section>
+
+  <!-- 2단계: 인덱스 위치 + 최초 색인 -->
+  <section class="feature-card setup-card" aria-label="색인 실행">
+    <h2 class="heading-md">2. 색인 실행</h2>
+    <p class="body-muted">색인 산출물(<span class="mono" id="index-dir">cs_index</span>)은
+    <strong>PC 로컬 디스크</strong>에 있어야 합니다. 네트워크 드라이브(NAS·공유 폴더)에 두면 안 됩니다.</p>
+    <div class="search-row">
+      <input id="batch-label" class="text-input" type="text" placeholder="배치 라벨 (예: full_001, 선택)"
+             aria-label="배치 라벨" autocomplete="off" spellcheck="false">
+      <button id="start-button" class="button-primary-sm" type="button" disabled>색인 시작</button>
+    </div>
+    <p class="body-muted">경로 확인을 통과해야 색인을 시작할 수 있습니다. 색인 중에도 검색은 계속 사용할 수 있습니다.</p>
+  </section>
+
+  <!-- 3단계: 진행률 (1.5초 폴링) -->
+  <section id="job-section" class="feature-card setup-card" aria-label="작업 진행률" hidden>
+    <h2 class="heading-md">3. 작업 진행률</h2>
+    <div id="job-status" class="job-status"></div>
+    <div class="progress-track" aria-hidden="true"><div id="progress-fill" class="progress-fill"></div></div>
+    <div id="job-current" class="body-muted mono"></div>
+    <div class="card-actions">
+      <button id="cancel-button" class="button-ghost-sm" type="button" hidden>취소</button>
+      <button id="log-button" class="button-ghost-sm" type="button" hidden>로그 보기</button>
+    </div>
+    <div id="job-log" class="snippet" hidden></div>
+  </section>
+
+  <section class="feature-card setup-card" aria-label="최근 작업">
+    <h2 class="heading-md">최근 작업</h2>
+    <div id="jobs-list" class="body-muted">불러오는 중…</div>
+  </section>
+</main>
+
+<footer class="footer body-muted">
+  이 앱은 127.0.0.1(내 PC)에서만 접속하는 로컬 도구입니다 · 원본 폴더는 읽기 전용으로 다룹니다
+</footer>
+
+<script src="/static/setup.js"></script>
+</body>
+</html>

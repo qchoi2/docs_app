@@ -269,3 +269,29 @@ def test_export_does_not_add_history_rows(tmp_path):
     with closing(sqlite3.connect(out / "ui_state.sqlite")) as conn:
         count = conn.execute("SELECT COUNT(*) FROM search_history").fetchone()[0]
     assert count == 0
+
+def test_setup_page_served_with_onboarding_contract(tmp_path):
+    app = make_app(tmp_path)
+
+    status, headers, payload = call(app, "GET", "/setup")
+    assert status == 200 and "text/html" in headers["Content-Type"]
+    text = payload.decode("utf-8")
+    # 온보딩 계약: 경로 텍스트 입력 + aria-live, 폴더 피커 사용 금지
+    assert 'id="root-path"' in text and "aria-live" in text
+    assert "webkitdirectory" not in text and 'type="file"' not in text
+    # cs_index 로컬 디스크 경고 문구
+    assert "로컬 디스크" in text
+
+    status, headers, payload = call(app, "GET", "/static/setup.js")
+    assert status == 200 and "javascript" in headers["Content-Type"]
+    js = payload.decode("utf-8")
+    # 진행률은 1~2초 폴링, raw traceback 대신 표준 오류 메시지 매핑
+    assert "POLL_MS = 1500" in js and "ERROR_MESSAGES" in js
+
+
+def test_setup_assets_use_no_external_resources():
+    from pathlib import Path
+    static_dir = Path(__file__).resolve().parent.parent / "static"
+    for name in ["setup.html", "setup.js"]:
+        text = (static_dir / name).read_text(encoding="utf-8")
+        assert "http://" not in text and "https://" not in text, name

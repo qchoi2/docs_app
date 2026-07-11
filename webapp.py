@@ -559,12 +559,17 @@ def handle_index(app, match, query, body):
     return _serve_static("index.html")
 
 
+def handle_setup(app, match, query, body):
+    return _serve_static("setup.html")
+
+
 def handle_static(app, match, query, body):
     return _serve_static(match.group("name"))
 
 
 ROUTES = [
     ("GET", re.compile(r"^/$"), handle_index),
+    ("GET", re.compile(r"^/setup$"), handle_setup),
     ("GET", re.compile(r"^/static/(?P<name>[^/]+)$"), handle_static),
     ("GET", re.compile(r"^/api/health$"), handle_health),
     ("GET", re.compile(r"^/api/corpus/status$"), handle_corpus_status),

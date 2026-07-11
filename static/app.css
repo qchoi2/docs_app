@@ -103,3 +103,24 @@ mark { background: var(--color-warning-soft); color: inherit; border-radius: 2px
 .visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px;
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 @media (max-width: 640px) { .search-row { flex-wrap: wrap; } .filters { flex-direction: column; } }
+
+/* ---- setup / job progress (UI-0.2, UI-0.3) ---- */
+.nav-link { color: var(--color-link); text-decoration: none; font-size: 13px; }
+.nav-link:hover { color: var(--color-link-deep); text-decoration: underline; }
+.setup-card { margin-bottom: var(--sp-lg); }
+.setup-card h2 { margin-top: 0; }
+.validate-result { margin-top: var(--sp-sm); font-size: 13px; }
+.validate-head { font-weight: 600; margin-bottom: var(--sp-xs); }
+.validate-head.ok { color: #0a7d33; }
+.validate-head.bad { color: var(--color-error); }
+.kv { display: flex; gap: var(--sp-sm); padding: 2px 0; }
+.kv .k { color: var(--color-mute); min-width: 110px; }
+.progress-track { height: 8px; background: var(--color-hairline-soft);
+  border-radius: var(--rounded-pill); overflow: hidden; margin: var(--sp-sm) 0; }
+.progress-fill { height: 100%; width: 0; background: var(--color-link);
+  border-radius: var(--rounded-pill); transition: width 0.4s ease; }
+.job-status { font-weight: 500; }
+.job-row { display: flex; align-items: center; gap: var(--sp-xs); padding: var(--sp-xxs) 0;
+  font-size: 13px; flex-wrap: wrap; }
+.mono { font-family: var(--font-mono); }
+.nav-bar .spacer { flex: 1; }
