@@ -182,8 +182,8 @@ run_webapp.bat
 - **`lib/jobs.py`** — `jobs.sqlite` 영속 job 큐. 표준 `queue.Queue` + worker thread 1개(one-writer),
   상태 전이 queued→running→completed|failed|cancelled, 파일 단위 협조적 취소, 앱 시작 시
   running/queued 잔여 job을 `failed(error_code=interrupted)`로 정리(크래시 복구),
-  progress write throttle(0.3s). jobs는 사용자 상태(ui_state)도 색인 산출물(catalog)도 아니므로
-  별도 DB에 둔다.
+  progress write throttle(0.3s), `job_logs` 테이블 + `GET /api/jobs/{id}/log` lifecycle 로그.
+  jobs는 사용자 상태(ui_state)도 색인 산출물(catalog)도 아니므로 별도 DB에 둔다.
 - **`index_contracts.py`** — `IndexOptions`에 선택 훅 `progress_callback(done,total,current_item)`,
   `cancel_check()`를 추가. 메인 루프가 파일마다 진행률을 보고하고 취소를 확인한다. 취소 시
   이미 커밋된 파일은 유지하고, 스캔되지 않은 파일을 missing으로 표기하지 않는다(부분 증분).
@@ -195,7 +195,18 @@ run_webapp.bat
   표준 오류 코드 유지, raw 예외 비노출.
 - 테스트: `tests/test_jobs.py`(성공/진행률/협조적 취소/표준 error_code/미등록 타입/크래시 복구 6건),
   `tests/test_webapp_jobs.py`(root-path 검증·색인 job end-to-end 진행률·ROOT_NOT_FOUND·job 검증/404·
-  jobs가 catalog에 없음 5건). 전체 **85 passed**.
+  jobs가 catalog에 없음·job 로그 lifecycle 6건). 전체 **86 passed**.
 
 미완료(다음 순서): UI-0.2 온보딩 화면 + UI-0.3 진행률 폴링 UI(step 4) → UI-2 운영 대시보드(step 5)
 → UI-3 리서치 UI(compare_lists/compare_items/research_sessions, 북마크/메모, 선택 문단 export)(step 6).
+
+
+### 커밋 기록
+
+- `9bba691 web-2: add persistent job queue` — 6 files(+872/-8): lib/jobs.py, webapp.py,
+  index_contracts.py, tests/test_jobs.py, tests/test_webapp_jobs.py, progress.md.
+- **git 상태 주의**: 리포의 `.git/index`가 이전부터 손상돼 있어(HEAD에 존재하는 webapp.py·static/·
+  lib/ui_state.py 등이 "삭제됨"으로 표시) HEAD로부터 깨끗한 임시 인덱스를 만들어 의도한 6개
+  파일만 스테이징해 커밋했고, `.git/index`를 그 트리로 복구했다. 샌드박스가 잠금 파일을 unlink할 수
+  없어 0바이트 `.git/index.lock`, `.git/HEAD.lock`가 남아 있으니 PC에서 두 파일을 삭제해야 다음
+  커밋이 가능하다. `UI_GAP_ANALYSIS.md`, `run_webapp.bat`은 job queue 범위가 아니라 untracked로 남김.
