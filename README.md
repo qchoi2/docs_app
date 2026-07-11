@@ -94,10 +94,13 @@ python inspect_file.py --out C:\cs_index --file-key ab12cd34ef567890 --show-dup-
 
 ```powershell
 python eval_search.py --out C:\cs_index
+python eval_search.py --out C:\cs_index --tiers T1,T2,T3
 ```
 
-`data/golden_queries.yaml`의 T1/T2 문항을 실행해 문항별 pass/fail을 출력하고
+`data/golden_queries.yaml`의 문항을 실행해 문항별 pass/fail을 출력하고
 `cs_index/eval_history.jsonl`에 기록합니다. expected_files가 없는 문항은 부분채점(필터만)입니다.
+T3 문항은 `expected_filter.clause`가 있으면 `search_contracts.py --clause` 경로로 채점하고,
+아직 사람이 채우지 않은 placeholder처럼 채점 가능한 clause 조건이 없으면 skipped로 기록합니다.
 
 ## 5.5 T3 enrich 하네스
 

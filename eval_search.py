@@ -1,7 +1,7 @@
 """Golden-query evaluation harness for the contract search backend.
 
-Loads ``golden_queries.yaml``, runs only the T1/T2 tier queries (Phase 1
-scope), and applies partial scoring:
+Loads ``golden_queries.yaml``, runs the requested tier queries, and applies
+partial scoring:
 
 - precision   : fraction of returned results satisfying ``expected_filter``
 - recall      : fraction of ``expected_files`` present in the results
@@ -38,6 +38,24 @@ from search_contracts import search_contracts
 
 GOLDEN_PATHS = (Path("data/golden_queries.yaml"), Path(".docs/golden_queries.yaml"))
 DEFAULT_TIERS = ("T1", "T2")
+T3_NUMERIC_FILTER_KEYS = {
+    "cap_lte",
+    "cap_gte",
+    "cap_eq",
+    "cap_percent_lte",
+    "cap_percent_gte",
+    "survival_months_lte",
+    "survival_months_gte",
+}
+T3_SUPPORTED_FILTER_KEYS = {
+    "ctype",
+    "lang",
+    "is_draft",
+    "clause",
+    "present",
+    "clause_present",
+    "absent",
+} | T3_NUMERIC_FILTER_KEYS
 
 
 def resolve_golden(path: Optional[Path], base: Optional[Path] = None) -> Path:
@@ -95,7 +113,139 @@ def result_matches_filter(item: Dict[str, object], scoreable: Dict[str, object])
     return True
 
 
+def expected_clause_present(expected_filter: Dict[str, object]) -> bool:
+    if "present" in expected_filter:
+        return bool(expected_filter["present"])
+    if "clause_present" in expected_filter:
+        return bool(expected_filter["clause_present"])
+    if "absent" in expected_filter:
+        return not bool(expected_filter["absent"])
+    return True
+
+
+def t3_unsupported_filter_keys(expected_filter: Dict[str, object]) -> List[str]:
+    return [key for key in expected_filter if key not in T3_SUPPORTED_FILTER_KEYS]
+
+
+def result_matches_t3_clause(item: Dict[str, object], scoreable: Dict[str, object], expected_present: bool) -> bool:
+    if not result_matches_filter(item, scoreable):
+        return False
+    clause = item.get("clause")
+    if not isinstance(clause, dict):
+        return False
+    if clause.get("present") is not expected_present:
+        return False
+    if not expected_present and clause.get("confidence") == "low":
+        return False
+    return True
+
+
+def skipped_query(item: Dict[str, object], reason: str, unscored: Optional[List[str]] = None) -> Dict[str, object]:
+    return {
+        "id": item.get("id"),
+        "tier": item.get("tier"),
+        "intent": item.get("intent"),
+        "kw": [str(value) for value in (item.get("kw") or []) if str(value).strip()],
+        "mode": "skipped",
+        "scored_filter": {},
+        "unscored_filter_keys": unscored or [],
+        "precision": None,
+        "recall": None,
+        "expected_count": item.get("expected_count"),
+        "actual_count": None,
+        "count_ok": None,
+        "returned": 0,
+        "status": "skipped",
+        "skip_reason": reason,
+    }
+
+
+def evaluate_t3_query(out: Path, item: Dict[str, object], limit: int) -> Dict[str, object]:
+    expected_filter = item.get("expected_filter") or {}
+    if not isinstance(expected_filter, dict):
+        return skipped_query(item, "expected_filter_not_object")
+
+    clause = expected_filter.get("clause")
+    if not clause:
+        return skipped_query(item, "t3_clause_filter_missing", sorted(expected_filter.keys()))
+
+    scoreable, base_unscored = split_filter(expected_filter)
+    unsupported = t3_unsupported_filter_keys(expected_filter)
+    numeric_filters = [key for key in expected_filter if key in T3_NUMERIC_FILTER_KEYS]
+    unscored = sorted(
+        set([key for key in base_unscored if key not in T3_SUPPORTED_FILTER_KEYS] + unsupported + numeric_filters)
+    )
+    expected_present = expected_clause_present(expected_filter)
+    expected_files = [str(value) for value in (item.get("expected_files") or [])]
+    expected_count = item.get("expected_count")
+
+    keywords = [str(value) for value in (item.get("kw") or []) if str(value).strip()]
+    result, _ = search_contracts(
+        out,
+        ctype=scoreable.get("ctype"),
+        lang=scoreable.get("lang"),
+        keywords=keywords,
+        exclude_drafts=scoreable.get("is_draft") is False,
+        limit=limit,
+        clause=str(clause),
+        clause_present=expected_present,
+        clause_absent=not expected_present,
+    )
+    results = result["results"]
+    returned_keys = [row["file_key"] for row in results]
+
+    checks: Dict[str, bool] = {}
+    precision: Optional[float] = None
+    if results:
+        matched = sum(1 for row in results if result_matches_t3_clause(row, scoreable, expected_present))
+        precision = matched / len(results)
+        checks["precision"] = precision >= 1.0
+
+    recall: Optional[float] = None
+    if expected_files:
+        present = sum(1 for key in expected_files if key in returned_keys)
+        recall = present / len(expected_files)
+        checks["recall"] = recall >= 1.0
+
+    actual_count = result["total"]
+    count_ok: Optional[bool] = None
+    if expected_count is not None:
+        count_ok = actual_count >= int(expected_count)
+        checks["count"] = count_ok
+
+    if not checks and unscored:
+        status = "skipped"
+    elif not checks:
+        status = "unscored"
+    elif all(checks.values()):
+        status = "pass"
+    else:
+        status = "fail"
+
+    mode = "full" if expected_files else "partial(t3-clause)"
+    return {
+        "id": item.get("id"),
+        "tier": item.get("tier"),
+        "intent": item.get("intent"),
+        "kw": keywords,
+        "mode": mode,
+        "scored_filter": dict(scoreable, clause=str(clause), present=expected_present),
+        "unscored_filter_keys": unscored,
+        "precision": precision,
+        "recall": recall,
+        "expected_count": expected_count,
+        "actual_count": actual_count,
+        "count_ok": count_ok,
+        "returned": len(results),
+        "status": status,
+        "clause_needs_review": (result.get("query", {}).get("clause") or {}).get("needs_review", []),
+    }
+
+
 def evaluate_query(out: Path, item: Dict[str, object], limit: int) -> Dict[str, object]:
+    if str(item.get("tier")) == "T3":
+        return evaluate_t3_query(out, item, limit)
+
     scoreable, unscored = split_filter(item.get("expected_filter"))
     expected_files = [str(value) for value in (item.get("expected_files") or [])]
     expected_count = item.get("expected_count")
@@ -158,9 +308,12 @@ def evaluate_query(out: Path, item: Dict[str, object], limit: int) -> Dict[str, 
 
 
 def summarize(per_query: Sequence[Dict[str, object]]) -> Dict[str, int]:
-    counts = {"total": len(per_query), "pass": 0, "fail": 0, "unscored": 0, "partial": 0}
+    counts = {"total": len(per_query), "pass": 0, "fail": 0, "unscored": 0, "skipped": 0, "partial": 0}
     for query in per_query:
-        counts[str(query["status"])] += 1
+        status = str(query["status"])
+        if status not in counts:
+            counts[status] = 0
+        counts[status] += 1
         if str(query["mode"]).startswith("partial"):
             counts["partial"] += 1
     return counts
@@ -203,6 +356,8 @@ def print_report(record: Dict[str, object]) -> None:
         recall = "—" if query["recall"] is None else f"{query['recall']:.2f}"
         if query["expected_count"] is None:
             count = "—"
+        elif query["actual_count"] is None:
+            count = f"{query['expected_count']}/—"
         else:
             count = f"{query['expected_count']}/{query['actual_count']}"
         print("\t".join([
@@ -217,7 +372,8 @@ def print_report(record: Dict[str, object]) -> None:
     summary = record["summary"]
     print(
         f"\nsummary: total={summary['total']} pass={summary['pass']} "
-        f"fail={summary['fail']} unscored={summary['unscored']} partial={summary['partial']}"
+        f"fail={summary['fail']} unscored={summary['unscored']} "
+        f"skipped={summary['skipped']} partial={summary['partial']}"
     )
 
 

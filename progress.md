@@ -328,3 +328,23 @@ clause_map에서 해당 태그가 생략된 문서는 `미평가`로 `query.clau
 - `python search_contracts.py --out cs_index --clause 손해배상 --present --limit 3 --json` → A-2 샘플 손해배상 present 문서와 clause 근거 출력
 - `python search_contracts.py --out cs_index --clause 경업금지 --absent --limit 3 --json` → 평가 후 부재 문서만 결과, 미평가 문서는 needs_review
 - `python -m pytest -q tests/test_search_contracts.py` → 16 passed
+
+### 2026-07-12 세션 7 — A-5 T3 골든 문항 + eval 연결
+
+`eval_search.py`가 `--tiers T1,T2,T3`로 실행될 수 있도록 T3 채점 경로를 연결했다.
+T1/T2 평가는 기존 메타 필터·키워드·부분채점 흐름을 유지한다. T3 문항은
+`expected_filter.clause`가 있을 때 `search_contracts.py`의 `--clause` 경로로 실행하고,
+`present`, `clause_present`, `absent` 필드로 존재/부재 채점을 지원한다. clause 조건이 없는
+T3 placeholder는 실패가 아니라 `skipped`로 기록한다.
+
+수치 조건용 자리로 `cap_lte`, `cap_gte`, `cap_eq`, `cap_percent_lte`,
+`cap_percent_gte`, `survival_months_lte`, `survival_months_gte` 필드를 예약했다.
+현재 구조화 수치 필드가 채워지기 전에는 해당 필드를 `unscored_filter_keys`에 남겨
+임의 판정하지 않는다. `data/golden_queries.yaml` 데이터는 수정하지 않았다.
+
+`eval_history.jsonl` 누적 로깅은 그대로 유지했고, summary에 `skipped` 카운트를 추가했다.
+README에 `--tiers T1,T2,T3` 사용법과 T3 skipped 동작을 문서화했다.
+
+검증:
+- `python -m pytest -q tests/test_eval_search.py` → 11 passed
+- `python eval_search.py --out cs_index --tiers T1,T2,T3` → 오류 없이 실행, 문항별 pass/fail/skipped 출력 및 `eval_history.jsonl` 누적
