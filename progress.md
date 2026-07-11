@@ -307,3 +307,24 @@ stale 표기를 결정적으로 검증한다.
 - `python read_contract.py --out cs_index --file-key c97356967ef00c57 --section 손해배상 --context 0 --json` → 손해배상 ¶151-177만 출력
 - `python read_contract.py --out cs_index --file-key e6db8b55a58a1a3a --section 경업금지 --json` → `평가 후 부재`
 - `python -m pytest -q tests/test_read_contract.py` → 3 passed
+
+### 2026-07-12 세션 6 — A-4 search_contracts.py T3 clause 필터 활성화
+
+`search_contracts.py`에 예약돼 있던 T3 clause_map 필터를 활성화했다. 새 CLI는
+`--clause 태그 [--present | --absent]`이며, 태그는 `data/term_dict.yaml` canonical/동의어로
+정규화한다. `--present` 또는 기본 모드는 `doc_meta.clause_map_json`에서 해당 태그의
+`present=true` 문서만 후보로 좁히고, `--absent`는 `present=false` 문서만 반환한다.
+
+clause_map에서 해당 태그가 생략된 문서는 `미평가`로 `query.clause.needs_review`에 분리하고,
+`present=false`와 혼동하지 않도록 했다. `--absent`에서 `confidence=low` 문서도 결과에서
+제외하고 확인 필요로 분리한다. `--json` 결과의 각 문서에는 `clause` 근거(`tag`, `present`,
+`loc_start`, `loc_end`, `summary`, `confidence`)를 포함한다. 기존 T1/T2 후보 생성, FTS5,
+용어사전 확장, RRF 랭킹, dedup 함수는 유지했다.
+
+테스트는 `tests/test_search_contracts.py`에 추가했다. `--clause` present/absent 필터,
+미평가와 부재 구분, keyword 검색과 clause 필터 합성을 검증한다.
+
+검증:
+- `python search_contracts.py --out cs_index --clause 손해배상 --present --limit 3 --json` → A-2 샘플 손해배상 present 문서와 clause 근거 출력
+- `python search_contracts.py --out cs_index --clause 경업금지 --absent --limit 3 --json` → 평가 후 부재 문서만 결과, 미평가 문서는 needs_review
+- `python -m pytest -q tests/test_search_contracts.py` → 16 passed

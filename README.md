@@ -68,10 +68,20 @@ python search_contracts.py --out C:\cs_index --type SPA --lang 국문 --kw earn-
 
 # 확장 강도 조절: --expand strict|normal|broad, 확장 끄기: --no-expand
 # 중복본 펼쳐 보기: --show-duplicates
+
+# T3 clause_map 필터
+python search_contracts.py --out C:\cs_index --clause 손해배상 --present --json
+python search_contracts.py --out C:\cs_index --clause 경업금지 --absent --json
 ```
 
 JSON 결과의 `why`, `score_breakdown`, `snippet_paras`로 선정 이유와 ¶위치를 확인하고,
+`--clause` 사용 시 `clause` 근거에서 present/absent, 문단 위치, confidence를 확인합니다.
 특정 문단 주변은 `open_text.py`, 파일 상세는 `inspect_file.py`로 봅니다:
+
+`--clause`는 `data/term_dict.yaml`의 canonical 태그와 동의어로 정규화합니다. 태그가
+`clause_map_json`에 없으면 미평가로 `query.clause.needs_review`에 분리하고,
+`present=false`와 혼동하지 않습니다. `--absent`는 `present=false`만 결과로 반환하며,
+미평가 및 `confidence=low` 문서는 확인 필요로 분리합니다.
 
 ```powershell
 python open_text.py --out C:\cs_index --file-key ab12cd34ef567890 --para 42 --context 3

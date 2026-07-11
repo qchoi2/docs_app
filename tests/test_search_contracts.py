@@ -57,6 +57,24 @@ def make_search_db(tmp_path):
     return out, db_path
 
 
+def insert_doc_meta(conn, file_key, clause_map, confidence="high", txt_hash=None):
+    conn.execute(
+        """
+        INSERT INTO doc_meta (
+          file_key, meta_schema_version, txt_hash, extracted_at,
+          clause_map_json, json, confidence
+        )
+        VALUES (?, 1, ?, '2026-07-12T00:00:00+00:00', ?, '{}', ?)
+        """,
+        (
+            file_key,
+            txt_hash or file_key,
+            json.dumps(clause_map, ensure_ascii=False, sort_keys=True),
+            confidence,
+        ),
+    )
+
+
 def test_exact_search_ranks_above_expanded_search(tmp_path):
     out, db_path = make_search_db(tmp_path)
     with closing(sqlite3.connect(db_path)) as conn:
@@ -252,3 +270,75 @@ def test_snippet_total_length_respects_240_char_budget(tmp_path):
 
     assert len(content_only) <= 240
     assert item["snippet"].startswith("[¶1] 손해배상")
+
+
+def test_clause_present_filter_adds_clause_evidence(tmp_path):
+    out, db_path = make_search_db(tmp_path)
+    with closing(sqlite3.connect(db_path)) as conn:
+        insert_doc(conn, "present", "present.docx", "alpha")
+        insert_doc(conn, "absent", "absent.docx", "alpha")
+        insert_doc_meta(
+            conn,
+            "present",
+            {
+                "손해배상": {
+                    "present": True,
+                    "loc_start": 2,
+                    "loc_end": 4,
+                    "summary": "sample",
+                }
+            },
+        )
+        insert_doc_meta(conn, "absent", {"손해배상": {"present": False, "summary": "none"}})
+        conn.commit()
+
+    result, count = search_contracts(out, clause="indemnity", clause_present=True)
+
+    assert count == 1
+    assert result["query"]["clause"]["tag"] == "손해배상"
+    assert result["results"][0]["file_key"] == "present"
+    assert result["results"][0]["clause"]["present"] is True
+    assert result["results"][0]["clause"]["loc_start"] == 2
+    assert result["results"][0]["clause"]["confidence"] == "high"
+
+
+def test_clause_absent_filter_separates_unevaluated_and_low_confidence(tmp_path):
+    out, db_path = make_search_db(tmp_path)
+    with closing(sqlite3.connect(db_path)) as conn:
+        insert_doc(conn, "absent", "absent.docx", "alpha")
+        insert_doc(conn, "low_absent", "low.docx", "alpha")
+        insert_doc(conn, "unevaluated", "unevaluated.docx", "alpha")
+        insert_doc(conn, "present", "present.docx", "alpha")
+        insert_doc_meta(conn, "absent", {"손해배상": {"present": False, "summary": "none"}})
+        insert_doc_meta(conn, "low_absent", {"손해배상": {"present": False, "summary": "none"}}, confidence="low")
+        insert_doc_meta(conn, "unevaluated", {"진술보장": {"present": True, "loc_start": 1, "loc_end": 1}})
+        insert_doc_meta(conn, "present", {"손해배상": {"present": True, "loc_start": 1, "loc_end": 1}})
+        conn.commit()
+
+    result, count = search_contracts(out, clause="손해배상", clause_absent=True, show_duplicates=True)
+
+    assert count == 1
+    assert result["results"][0]["file_key"] == "absent"
+    assert result["results"][0]["clause"]["present"] is False
+    assert {item["file_key"]: item["reason"] for item in result["query"]["clause"]["needs_review"]} == {
+        "low_absent": "confidence=low",
+        "unevaluated": "미평가",
+    }
+
+
+def test_clause_filter_composes_with_existing_keyword_search(tmp_path):
+    out, db_path = make_search_db(tmp_path)
+    with closing(sqlite3.connect(db_path)) as conn:
+        insert_doc(conn, "both", "both.docx", "earn-out\n손해배상")
+        insert_doc(conn, "kw_only", "kw.docx", "earn-out")
+        insert_doc(conn, "clause_only", "clause.docx", "other")
+        insert_doc_meta(conn, "both", {"손해배상": {"present": True, "loc_start": 2, "loc_end": 2}})
+        insert_doc_meta(conn, "kw_only", {"진술보장": {"present": True, "loc_start": 1, "loc_end": 1}})
+        insert_doc_meta(conn, "clause_only", {"손해배상": {"present": True, "loc_start": 1, "loc_end": 1}})
+        conn.commit()
+
+    result, count = search_contracts(out, keywords=["earn-out"], no_expand=True, clause="손해배상")
+
+    assert count == 1
+    assert result["results"][0]["file_key"] == "both"
+    assert result["results"][0]["score_breakdown"]["exact_rank"] == 1

@@ -84,6 +84,14 @@ def find_term_entry(keyword: str, entries: Sequence[TermEntry]) -> Optional[Term
     return None
 
 
+def resolve_clause_tag(tag: str, entries: Sequence[TermEntry]) -> str:
+    lowered = normalize(tag).casefold()
+    for entry in entries:
+        if any(lowered == normalize(variant).casefold() for variant, _ in entry.variants):
+            return entry.canonical
+    return normalize(tag)
+
+
 def expand_keyword(keyword: str, entries: Sequence[TermEntry], mode: str, no_expand: bool) -> List[Dict[str, str]]:
     original = normalize(keyword)
     matched_entry = find_term_entry(original, entries)
@@ -177,6 +185,9 @@ def search_contracts(
     exclude_drafts: bool = False,
     show_duplicates: bool = False,
     read_only: bool = False,
+    clause: Optional[str] = None,
+    clause_present: bool = False,
+    clause_absent: bool = False,
 ) -> Tuple[Dict[str, object], int]:
     keywords = keywords or []
     db_path = out / "catalog.sqlite"
@@ -189,7 +200,12 @@ def search_contracts(
         # Silent no-expansion would degrade recall without any signal (see brief §3.7).
         entries = []
         warnings.append("term_dict_not_found")
+    if clause_present and clause_absent:
+        raise ValueError("--present and --absent cannot be used together")
     expanded_query: Dict[str, List[str]] = {}
+    clause_tag = resolve_clause_tag(clause, entries) if clause else None
+    clause_mode = "absent" if clause_tag and clause_absent else "present" if clause_tag else None
+    clause_filter_info: Optional[Dict[str, object]] = None
 
     with closing(connect_search_db(db_path, read_only)) as conn:
         conn.row_factory = sqlite3.Row
@@ -252,6 +268,10 @@ def search_contracts(
             rows = conn.execute("SELECT file_key FROM files WHERE status = 'ok'").fetchall()
             candidate_keys = {row["file_key"] for row in rows}
 
+        clause_filter_info = build_clause_filter_info(conn, candidate_keys, clause_tag, clause_mode)
+        if clause_filter_info is not None:
+            candidate_keys &= set(clause_filter_info["matched_file_keys"])
+
         if not candidate_keys:
             unsearchable = count_unsearchable(conn, ctype, lang, exclude_drafts)
             if unsearchable:
@@ -261,6 +281,7 @@ def search_contracts(
                 lang,
                 keywords,
                 expanded_query,
+                clause_filter_info,
                 [],
                 0,
                 0,
@@ -296,6 +317,7 @@ def search_contracts(
         selected_rows = selected_rows[:limit]
 
         dup_counts = duplicate_counts(conn)
+        clause_evidence = load_clause_evidence(conn, [row["file_key"] for _score, row in selected_rows], clause_tag)
         results = []
         for score, row in selected_rows:
             details = per_file_details.get(row["file_key"], {"matched_terms": [], "snippet_candidates": []})
@@ -309,36 +331,39 @@ def search_contracts(
                 why.append(f"{ctype} 유형 필터 일치")
             if lang and row["lang"] == lang:
                 why.append(f"{lang} 언어 필터 일치")
+            if clause_tag:
+                why.append(f"{clause_tag} 조항 {clause_mode}")
 
-            results.append(
-                {
-                    "file_key": row["file_key"],
-                    "path": row["path"],
-                    "ctype": row["ctype"],
-                    "lang": row["lang"],
-                    "is_draft": row["is_draft"],
-                    "version_hint": row["version_hint"],
-                    "dup_group": row["dup_group"],
-                    "dup_count": dup_counts.get(row["dup_group"], 1),
-                    "dup_representative_reason": representative_reason(row),
-                    "matched_terms": unique_matched_terms(details["matched_terms"]),
-                    "score_breakdown": {
-                        "exact_rank": all_exact_ranks.get(row["file_key"]),
-                        "expanded_rank": all_expanded_ranks.get(row["file_key"]),
-                        "rrf_score": round(score, 6),
-                        "meta_filter_match": True if (ctype or lang) else None,
-                    },
-                    "why": why,
-                    "snippet": snippet,
-                    "snippet_paras": snippet_paras,
-                }
-            )
+            result_item = {
+                "file_key": row["file_key"],
+                "path": row["path"],
+                "ctype": row["ctype"],
+                "lang": row["lang"],
+                "is_draft": row["is_draft"],
+                "version_hint": row["version_hint"],
+                "dup_group": row["dup_group"],
+                "dup_count": dup_counts.get(row["dup_group"], 1),
+                "dup_representative_reason": representative_reason(row),
+                "matched_terms": unique_matched_terms(details["matched_terms"]),
+                "score_breakdown": {
+                    "exact_rank": all_exact_ranks.get(row["file_key"]),
+                    "expanded_rank": all_expanded_ranks.get(row["file_key"]),
+                    "rrf_score": round(score, 6),
+                    "meta_filter_match": True if (ctype or lang) else None,
+                },
+                "why": why,
+                "snippet": snippet,
+                "snippet_paras": snippet_paras,
+            }
+            if clause_tag:
+                result_item["clause"] = clause_evidence.get(row["file_key"], {})
+            results.append(result_item)
 
         unsearchable = count_unsearchable(conn, ctype, lang, exclude_drafts)
         if unsearchable:
             warnings.append(f"unsearchable_docs:{unsearchable}")
 
-    result = build_result(ctype, lang, keywords, expanded_query, results, total, total_files, warnings)
+    result = build_result(ctype, lang, keywords, expanded_query, clause_filter_info, results, total, total_files, warnings)
     log_query(out, result, expand, warnings)
     return result, len(results)
 
@@ -375,6 +400,111 @@ def apply_dedup(scored_rows: List[Tuple[float, sqlite3.Row]], show_duplicates: b
     for items in grouped.values():
         representatives.append(sorted(items, key=lambda item: (-item[0], representative_sort_key(item[1])))[0])
     return sorted(representatives, key=lambda item: (-item[0], representative_sort_key(item[1])))
+
+
+def rows_for_clause(
+    conn: sqlite3.Connection,
+    candidate_keys: Sequence[str],
+    clause_tag: str,
+    present: Optional[bool] = None,
+) -> List[sqlite3.Row]:
+    if not candidate_keys:
+        return []
+    placeholders = ",".join("?" for _ in candidate_keys)
+    params: List[object] = list(candidate_keys)
+    filters = [
+        "dm.file_key IN (%s)" % placeholders,
+        "je.key = ?",
+    ]
+    params.append(clause_tag)
+    if present is not None:
+        filters.append("json_extract(je.value, '$.present') = ?")
+        params.append(1 if present else 0)
+    return conn.execute(
+        """
+        SELECT dm.file_key, dm.confidence, je.key AS tag, je.value AS clause_json
+        FROM doc_meta dm, json_each(dm.clause_map_json) AS je
+        WHERE %s
+        """ % " AND ".join(filters),
+        params,
+    ).fetchall()
+
+
+def _clause_evidence_from_row(row: sqlite3.Row, status: str) -> Dict[str, object]:
+    value = json.loads(row["clause_json"])
+    if not isinstance(value, dict):
+        value = {}
+    return {
+        "tag": row["tag"],
+        "status": status,
+        "present": value.get("present"),
+        "loc_start": value.get("loc_start"),
+        "loc_end": value.get("loc_end"),
+        "summary": value.get("summary"),
+        "confidence": row["confidence"],
+    }
+
+
+def build_clause_filter_info(
+    conn: sqlite3.Connection,
+    candidate_keys: Sequence[str],
+    clause_tag: Optional[str],
+    clause_mode: Optional[str],
+) -> Optional[Dict[str, object]]:
+    if not clause_tag or not clause_mode:
+        return None
+
+    candidate_set = set(candidate_keys)
+    evaluated_rows = rows_for_clause(conn, sorted(candidate_set), clause_tag, None)
+    evaluated_keys = {row["file_key"] for row in evaluated_rows}
+    unevaluated = sorted(candidate_set - evaluated_keys)
+
+    if clause_mode == "present":
+        present_rows = rows_for_clause(conn, sorted(candidate_set), clause_tag, True)
+        matched = sorted({row["file_key"] for row in present_rows})
+        return {
+            "tag": clause_tag,
+            "mode": clause_mode,
+            "matched_file_keys": matched,
+            "needs_review": [
+                {"file_key": key, "reason": "미평가"}
+                for key in unevaluated
+            ],
+        }
+
+    absent_rows = rows_for_clause(conn, sorted(candidate_set), clause_tag, False)
+    matched = sorted({row["file_key"] for row in absent_rows if row["confidence"] != "low"})
+    needs_review = [
+        {"file_key": row["file_key"], "reason": "confidence=low"}
+        for row in absent_rows
+        if row["confidence"] == "low"
+    ]
+    needs_review.extend({"file_key": key, "reason": "미평가"} for key in unevaluated)
+    needs_review.sort(key=lambda item: (str(item["reason"]), str(item["file_key"])))
+    return {
+        "tag": clause_tag,
+        "mode": clause_mode,
+        "matched_file_keys": matched,
+        "needs_review": needs_review,
+    }
+
+
+def load_clause_evidence(
+    conn: sqlite3.Connection,
+    file_keys: Sequence[str],
+    clause_tag: Optional[str],
+) -> Dict[str, Dict[str, object]]:
+    if not clause_tag or not file_keys:
+        return {}
+    rows = rows_for_clause(conn, file_keys, clause_tag, None)
+    evidence = {}
+    for row in rows:
+        value = json.loads(row["clause_json"])
+        if not isinstance(value, dict):
+            value = {}
+        status = "present" if value.get("present") is True else "absent" if value.get("present") is False else "unknown"
+        evidence[row["file_key"]] = _clause_evidence_from_row(row, status)
+    return evidence
 
 
 def duplicate_counts(conn: sqlite3.Connection) -> Dict[str, int]:
@@ -458,13 +588,20 @@ def build_result(
     lang: Optional[str],
     keywords: List[str],
     expanded_query: Dict[str, List[str]],
+    clause_filter: Optional[Dict[str, object]],
     results: List[Dict[str, object]],
     total: int,
     total_files: int,
     warnings: List[str],
 ) -> Dict[str, object]:
     return {
-        "query": {"type": ctype, "lang": lang, "kw": keywords, "expanded": expanded_query},
+        "query": {
+            "type": ctype,
+            "lang": lang,
+            "kw": keywords,
+            "expanded": expanded_query,
+            "clause": clause_filter,
+        },
         "total": total,
         "total_files": total_files,
         "results": results,
@@ -499,6 +636,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--exclude-drafts", action="store_true")
     parser.add_argument("--exclude-draft", action="store_true")
     parser.add_argument("--show-duplicates", action="store_true")
+    parser.add_argument("--clause")
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--present", action="store_true")
+    group.add_argument("--absent", action="store_true")
     parser.add_argument("--json", action="store_true")
     return parser
 
@@ -519,6 +660,9 @@ def main(argv: Optional[List[str]] = None) -> int:
             no_expand=args.no_expand,
             exclude_drafts=args.exclude_drafts or args.exclude_draft,
             show_duplicates=args.show_duplicates,
+            clause=args.clause,
+            clause_present=args.present,
+            clause_absent=args.absent,
         )
     except Exception as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
