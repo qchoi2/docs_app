@@ -20,6 +20,7 @@ import argparse
 import csv
 import io
 import json
+import os
 import re
 import sqlite3
 import sys
@@ -31,13 +32,18 @@ from typing import Dict, List, Optional, Tuple
 from urllib.parse import parse_qs
 from wsgiref.simple_server import make_server
 
+from index_contracts import IndexOptions, index_contracts
 from lib.console import configure_utf8_stdio
+from lib.jobs import JobError, JobQueue
 from lib.ui_state import ensure_ui_state, recent_searches, record_search
 from open_text import open_text
 from search_contracts import connect_search_db, search_contracts
 
 
 FILE_KEY_RE = re.compile(r"^[0-9a-f]{16}$")
+JOB_ID_RE = re.compile(r"^[0-9a-f]{32}$")
+ROOT_SCAN_CAP = 20000  # root-path 검증 시 스캔 상한(대형 코퍼스에서 폭주 방지)
+SUPPORTED_INDEX_EXTS = {".docx", ".pdf"}
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 STATIC_NAME_RE = re.compile(r"^[A-Za-z0-9_-]+\.[A-Za-z0-9]+$")
 STATIC_TYPES = {
@@ -171,6 +177,162 @@ def require_file_key(raw: str) -> str:
     if not FILE_KEY_RE.match(raw or ""):
         raise ApiError(400, "VALIDATION_ERROR", "file_key must be 16 lowercase hex characters.")
     return raw
+
+
+# ---------------- job / indexing write layer ----------------
+
+def index_job_handler(queue, job_id, params, progress, cancel_check):
+    """색인 job worker. one-writer 원칙에 따라 이 경로에서만 catalog를 쓴다."""
+    root = params.get("root")
+    if not isinstance(root, str) or not root.strip():
+        raise JobError("VALIDATION_ERROR", "index job requires a 'root' path.")
+    options = IndexOptions(
+        full=bool(params.get("full", False)),
+        include_misc=bool(params.get("include_misc", False)),
+        batch_label=params.get("batch_label") or None,
+        sample=params.get("sample"),
+        sample_seed=int(params.get("sample_seed", 0) or 0),
+        progress_callback=progress,
+        cancel_check=cancel_check,
+    )
+    try:
+        result = index_contracts(root, queue.out, options)
+    except ValueError as exc:
+        raise JobError("ROOT_NOT_FOUND", str(exc))
+    return {
+        "indexed": result["indexed"],
+        "skipped": result["skipped"],
+        "statuses": result["statuses"],
+        "cancelled": result["cancelled"],
+        "report": result.get("report"),
+    }
+
+
+def _scan_root(path: Path) -> Dict[str, object]:
+    """root 폴더를 상한까지 훑어 대략적 파일 수/지원 확장자 수를 센다."""
+    total = 0
+    supported = 0
+    truncated = False
+    try:
+        for entry in path.rglob("*"):
+            if not entry.is_file():
+                continue
+            total += 1
+            if entry.suffix.lower() in SUPPORTED_INDEX_EXTS:
+                supported += 1
+            if total >= ROOT_SCAN_CAP:
+                truncated = True
+                break
+    except OSError:
+        pass
+    return {"file_count": total, "supported_file_count": supported, "scan_truncated": truncated}
+
+
+def handle_root_path_validate(app, match, query, body):
+    raw = body.get("path")
+    if not isinstance(raw, str) or not raw.strip():
+        raise ApiError(400, "VALIDATION_ERROR", "'path' is required.")
+    raw = raw.strip()
+    network_drive = raw.startswith("\\\\") or raw.startswith("//")
+    path = Path(raw)
+    exists = path.exists()
+    is_dir = path.is_dir()
+    readable = bool(is_dir and os.access(path, os.R_OK))
+    info: Dict[str, object] = {
+        "path": raw,
+        "exists": exists,
+        "is_dir": is_dir,
+        "readable": readable,
+        "network_drive": network_drive,
+        "index_dir": str(app.out),
+        "read_only_notice": "원본 폴더는 읽기 전용으로만 접근합니다.",
+        "file_count": 0,
+        "supported_file_count": 0,
+        "scan_truncated": False,
+    }
+    if readable:
+        info.update(_scan_root(path))
+    if not exists:
+        info["message"] = "경로가 존재하지 않습니다."
+    elif not is_dir:
+        info["message"] = "폴더가 아닙니다."
+    elif not readable:
+        info["message"] = "읽기 권한이 없습니다."
+    elif network_drive:
+        info["message"] = "네트워크 드라이브로 보입니다. 로컬 디스크를 권장합니다."
+    else:
+        info["message"] = "사용 가능한 경로입니다."
+    return 200, info
+
+
+def _job_int(body, name, low, high):
+    value = body.get(name)
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ApiError(400, "VALIDATION_ERROR", f"'{name}' must be an integer.")
+    if not (low <= value <= high):
+        raise ApiError(400, "VALIDATION_ERROR", f"'{name}' must be between {low} and {high}.")
+    return value
+
+
+def handle_jobs_index(app, match, query, body):
+    root = body.get("root")
+    if not isinstance(root, str) or not root.strip():
+        raise ApiError(400, "VALIDATION_ERROR", "'root' is required.")
+    for flag in ("full", "include_misc"):
+        if flag in body and not isinstance(body[flag], bool):
+            raise ApiError(400, "VALIDATION_ERROR", f"'{flag}' must be a boolean.")
+    batch_label = body.get("batch_label")
+    if batch_label is not None and not isinstance(batch_label, str):
+        raise ApiError(400, "VALIDATION_ERROR", "'batch_label' must be a string.")
+    params = {
+        "root": root.strip(),
+        "full": bool(body.get("full", False)),
+        "include_misc": bool(body.get("include_misc", False)),
+        "batch_label": batch_label,
+        "sample": _job_int(body, "sample", 1, 1000000),
+        "sample_seed": _job_int(body, "sample_seed", 0, 2**31) or 0,
+    }
+    job_id = app.jobs.enqueue("index", params)
+    return 202, {"job_id": job_id, "status": "queued"}
+
+
+def handle_jobs_list(app, match, query, body):
+    try:
+        limit = max(1, min(int(query.get("limit", "20")), 100))
+    except ValueError:
+        raise ApiError(400, "VALIDATION_ERROR", "'limit' must be an integer.")
+    return 200, {"jobs": app.jobs.list_jobs(limit)}
+
+
+def handle_job_get(app, match, query, body):
+    job_id = match.group("job_id")
+    if not JOB_ID_RE.match(job_id):
+        raise ApiError(400, "VALIDATION_ERROR", "job_id must be 32 lowercase hex characters.")
+    job = app.jobs.get(job_id)
+    if job is None:
+        raise ApiError(404, "JOB_NOT_FOUND", "Unknown job_id.")
+    return 200, job
+
+
+def handle_job_cancel(app, match, query, body):
+    job_id = match.group("job_id")
+    if not JOB_ID_RE.match(job_id):
+        raise ApiError(400, "VALIDATION_ERROR", "job_id must be 32 lowercase hex characters.")
+    ok = app.jobs.cancel(job_id)
+    if not ok and app.jobs.get(job_id) is None:
+        raise ApiError(404, "JOB_NOT_FOUND", "Unknown job_id.")
+    return 200, {"job_id": job_id, "cancel_requested": ok}
+
+
+def handle_job_log(app, match, query, body):
+    job_id = match.group("job_id")
+    if not JOB_ID_RE.match(job_id):
+        raise ApiError(400, "VALIDATION_ERROR", "job_id must be 32 lowercase hex characters.")
+    if app.jobs.get(job_id) is None:
+        raise ApiError(404, "JOB_NOT_FOUND", "Unknown job_id.")
+    return 200, {"job_id": job_id, "entries": app.jobs.get_logs(job_id)}
 
 
 # ---------------- handlers ----------------
@@ -354,7 +516,7 @@ def handle_export_csv(app, match, query, body):
 
 
 def _serve_static(name: str):
-    """Serve a bundled UI file. Single path segment only — no traversal."""
+    """Serve a bundled UI file. Single path segment only - no traversal."""
     if not STATIC_NAME_RE.match(name) or ".." in name:
         raise ApiError(404, "NOT_FOUND", "Unknown static file.")
     path = STATIC_DIR / name
@@ -387,6 +549,12 @@ ROUTES = [
     ("POST", re.compile(r"^/api/export/csv$"), handle_export_csv),
     ("GET", re.compile(r"^/api/search/facets$"), handle_facets),
     ("GET", re.compile(r"^/api/catalog/facets$"), handle_facets),  # documented alias
+    ("POST", re.compile(r"^/api/settings/root-path/validate$"), handle_root_path_validate),
+    ("POST", re.compile(r"^/api/jobs/index$"), handle_jobs_index),
+    ("GET", re.compile(r"^/api/jobs$"), handle_jobs_list),
+    ("GET", re.compile(r"^/api/jobs/(?P<job_id>[^/]+)/log$"), handle_job_log),
+    ("POST", re.compile(r"^/api/jobs/(?P<job_id>[^/]+)/cancel$"), handle_job_cancel),
+    ("GET", re.compile(r"^/api/jobs/(?P<job_id>[^/]+)$"), handle_job_get),
 ]
 
 
@@ -394,6 +562,13 @@ class App:
     def __init__(self, out: Path):
         self.out = ensure_local_cs_index(Path(out))
         ensure_ui_state(self.out)
+        # 색인 등 write 작업은 별도 job 계층(one-writer)으로 처리한다.
+        self.jobs = JobQueue(self.out)
+        self.jobs.register("index", index_job_handler)
+        self.jobs.start()
+
+    def shutdown(self) -> None:
+        self.jobs.shutdown()
 
     def __call__(self, environ, start_response):
         status, content_type, payload, extra = self.dispatch(environ)
@@ -435,7 +610,7 @@ class App:
             return 503, "application/json; charset=utf-8", _json_bytes(
                 {"error": {"code": code, "message": "Database is temporarily unavailable."}}), []
         except Exception:
-            # Raw exceptions must never reach the client (BACKEND_REVIEW_PC §2.9).
+            # Raw exceptions must never reach the client (BACKEND_REVIEW_PC 2.9).
             traceback.print_exc(file=sys.stderr)
             return 500, "application/json; charset=utf-8", _json_bytes(
                 {"error": {"code": "INTERNAL_ERROR",
@@ -447,8 +622,9 @@ def _json_bytes(data) -> bytes:
 
 
 def _reason(status: int) -> str:
-    return {200: "OK", 400: "Bad Request", 404: "Not Found", 405: "Method Not Allowed",
-            500: "Internal Server Error", 503: "Service Unavailable"}.get(status, "OK")
+    return {200: "OK", 202: "Accepted", 400: "Bad Request", 404: "Not Found",
+            405: "Method Not Allowed", 500: "Internal Server Error",
+            503: "Service Unavailable"}.get(status, "OK")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -476,6 +652,8 @@ def main(argv: Optional[List[str]] = None) -> int:
             server.serve_forever()
         except KeyboardInterrupt:
             print("shutting down")
+        finally:
+            app.shutdown()
     return 0
 
 

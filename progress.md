@@ -156,3 +156,46 @@ Review and hardening of the CLI MVP, the real-sample pilot, and the first web la
 
 Current state: Phase 1A CLI MVP complete and pilot-validated; web read-only search (UI-1) and recent searches (UI-3 subset) shipped.
 Remaining (in roadmap order): real-corpus pilot on D:\Contracts re-run by the owner, UI-0.4 job queue / backend foundation, UI-2 operations dashboard, rest of UI-3 (bookmarks/sessions/compare), Phase 1B (budget.py, answer_quick.py) after search-quality sign-off, then UI-4 AI answers.
+
+### 웹앱 실행 방법 (재확인)
+
+`webapp.py`는 프로젝트 폴더(`docs_app`) 안에서 실행해야 하고, `--out`은 실제 색인 폴더를
+가리켜야 한다. README의 `C:\cs_index`는 예시 경로이며, 현재 리포지토리에 포함된 파일럿 색인은
+`docs_app\cs_index`에 있다.
+
+```
+cd C:\Users\qchoi\Desktop\cowork\docs_app
+python webapp.py --out cs_index
+# 또는 (경로/폴더 자동 처리):
+run_webapp.bat
+```
+
+`run_webapp.bat`는 어느 폴더에서 실행해도 프로젝트 폴더로 이동한 뒤 로컬 `cs_index`를
+대상으로 웹앱을 띄운다. 다른 색인은 `run_webapp.bat C:\my_index`.
+
+### UI-0.2/0.3 백엔드 착수 — job/indexing write 계층 (steps 1-3)
+
+문서상 "현재 단계=UI-3"과 실제 구현(UI-1 + 최근검색 slice) 사이의 격차를 `UI_GAP_ANALYSIS.md`에
+정리했다. UI-0.2(온보딩)·UI-0.3(진행률)은 색인 실행이라는 write 작업을 전제로 하므로,
+화면보다 **job/indexing write 백엔드**를 먼저 구현했다. 검색 read 경로에는 영향이 없다.
+
+- **`lib/jobs.py`** — `jobs.sqlite` 영속 job 큐. 표준 `queue.Queue` + worker thread 1개(one-writer),
+  상태 전이 queued→running→completed|failed|cancelled, 파일 단위 협조적 취소, 앱 시작 시
+  running/queued 잔여 job을 `failed(error_code=interrupted)`로 정리(크래시 복구),
+  progress write throttle(0.3s). jobs는 사용자 상태(ui_state)도 색인 산출물(catalog)도 아니므로
+  별도 DB에 둔다.
+- **`index_contracts.py`** — `IndexOptions`에 선택 훅 `progress_callback(done,total,current_item)`,
+  `cancel_check()`를 추가. 메인 루프가 파일마다 진행률을 보고하고 취소를 확인한다. 취소 시
+  이미 커밋된 파일은 유지하고, 스캔되지 않은 파일을 missing으로 표기하지 않는다(부분 증분).
+  결과 dict에 `cancelled` 추가. CLI 경로는 훅이 None이라 동작 불변.
+- **`webapp.py`** — write 엔드포인트 추가: `POST /api/settings/root-path/validate`(존재·읽기권한·
+  예상 파일 수·지원 확장자 수·네트워크 드라이브 여부, 스캔 상한 20000),
+  `POST /api/jobs/index`(202+job_id), `GET /api/jobs`, `GET /api/jobs/{id}`,
+  `POST /api/jobs/{id}/cancel`, `GET /api/jobs/{id}/log`(job 로그). `App`이 `JobQueue`를 생성·기동하고 index 핸들러를 등록한다.
+  표준 오류 코드 유지, raw 예외 비노출.
+- 테스트: `tests/test_jobs.py`(성공/진행률/협조적 취소/표준 error_code/미등록 타입/크래시 복구 6건),
+  `tests/test_webapp_jobs.py`(root-path 검증·색인 job end-to-end 진행률·ROOT_NOT_FOUND·job 검증/404·
+  jobs가 catalog에 없음 5건). 전체 **85 passed**.
+
+미완료(다음 순서): UI-0.2 온보딩 화면 + UI-0.3 진행률 폴링 UI(step 4) → UI-2 운영 대시보드(step 5)
+→ UI-3 리서치 UI(compare_lists/compare_items/research_sessions, 북마크/메모, 선택 문단 export)(step 6).

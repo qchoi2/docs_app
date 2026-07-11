@@ -13,7 +13,7 @@ from contextlib import closing
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Callable, Dict, List, Optional, Tuple, Union
 from zipfile import BadZipFile
 
 from docx import Document
@@ -72,6 +72,11 @@ class IndexOptions:
     sample: Optional[int] = None
     sample_seed: int = 0
     dry_run: bool = False
+    # 웹 job 계층 연동용 훅(선택). CLI 경로에서는 None으로 남는다.
+    #   progress_callback(done, total, current_item) — 파일마다 호출.
+    #   cancel_check() -> bool — True면 협조적으로 중단하고 부분 결과를 유지한다.
+    progress_callback: Optional[Callable[[int, int, str], None]] = None
+    cancel_check: Optional[Callable[[], bool]] = None
 
 
 @dataclass
@@ -846,7 +851,18 @@ def index_contracts(
         seen_paths = set()
         seen_keys = set()
 
-        for path in candidates:
+        total_candidates = len(candidates)
+        cancelled = False
+        processed = 0
+        for processed, path in enumerate(candidates):
+            if options.cancel_check is not None and options.cancel_check():
+                cancelled = True
+                break
+            if options.progress_callback is not None:
+                options.progress_callback(
+                    processed, total_candidates,
+                    path.relative_to(root_path).as_posix(),
+                )
             rel_path = path.relative_to(root_path).as_posix()
             if path.suffix.lower() in ZIP_EXTENSIONS:
                 changes.excluded.append(rel_path)
@@ -973,7 +989,12 @@ def index_contracts(
                 key = warning.split(":", 1)[0]
                 warnings[key] = warnings.get(key, 0) + 1
 
-        if is_full_scan:
+        if options.progress_callback is not None:
+            done = processed if cancelled else total_candidates
+            options.progress_callback(done, total_candidates, "")
+
+        # 취소된 부분 실행에서는 스캔되지 않은 파일을 missing으로 표기하지 않는다.
+        if is_full_scan and not cancelled:
             current_supported_paths = set(seen_paths)
             for record in existing_records:
                 if (
@@ -1004,6 +1025,7 @@ def index_contracts(
         "skipped": skipped,
         "dry_run": options.dry_run,
         "full": options.full,
+        "cancelled": cancelled,
         "batch_label": options.batch_label,
         "statuses": statuses,
         "warnings": warnings,
@@ -1022,7 +1044,6 @@ def index_contracts(
     report_path = write_report(out_dir, result, changes, db_summary)
     result["report"] = str(report_path)
     return result
-
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Index DOCX/PDF contracts.")
