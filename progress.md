@@ -251,3 +251,16 @@ facets 동적 로드, IME Enter 가드, URL 상태 복원, ui_state 분리, one-
 (색인 상태/실패 파일/batch 통계/saved searches/피드백/보정 후보 export), UI-3 나머지
 (비교 목록·북마크·리서치 세션·선택 문단 export), Phase 1B(lib/budget.py, answer_quick.py —
 검색 품질 사인오프 후), UI-4 AI 답변 화면.
+
+### 2026-07-11 세션 3 — A-1 enrich_contracts.py 하네스
+
+NEXT_STEPS.md 부록 A의 A-1 범위를 구현했다. `enrich_contracts.py`는 실제 AI/API 호출 없이 T3 보강 배치의 하네스만 담당한다: `status='ok'` 문서 중 dup 대표만 고르고, 기본 우선순위(SPA → SHA → SSA → MOU → ATA/BTA → JVA → CB/BW/EB → 주식교환 → 분할합병 → 기타) 또는 `--priority` 순서로 정렬하며, `--file-key`, `--limit`, `--dry-run`을 지원한다. 입력 JSON은 `cs_index/enrich_inputs/<file_key>.json`, 에이전트 결과 JSON은 `cs_index/enrich_results/<file_key>.json`, 진행/재개 상태는 `cs_index/enrich_progress.json`에 둔다.
+
+`doc_meta`는 기존 통합 `json` 컬럼을 유지하면서 A-1 요구 필드(`parties_json`, `deal_type_detail`, `consideration_json`, `clause_map_json`, `special_notes`, `definitions_json`)를 분리 컬럼으로도 저장하도록 확장했다. 기존 카탈로그는 `enrich_contracts.py` 실행 시 누락 컬럼을 `ALTER TABLE`로 보강한다. 결과 JSON은 필수 키, `meta_schema_version`, `confidence`, `clause_map_json`의 `present`/문단 범위 타입을 검증하고, 실패 시 `doc_meta`에 커밋하지 않는다.
+
+README에 파일 기반 에이전트-스크립트 인터페이스와 재개/증분 동작을 문서화했다. 테스트는 `tests/test_enrich_contracts.py`에 추가했으며 재개, 증분 skip, 우선순위 정렬, dup 대표 처리, 스키마 검증 실패를 mock 결과 JSON으로 검증한다.
+
+검증:
+- `python -m pytest -q tests/test_enrich_contracts.py tests/test_scaffold.py` → 6 passed
+- Python 3.9 `ast.parse(..., feature_version=(3, 9))` → ok
+- `python -m pytest -q` → 100 passed

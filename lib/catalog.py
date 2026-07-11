@@ -44,7 +44,15 @@ CREATE VIRTUAL TABLE IF NOT EXISTS fts USING fts5(
 CREATE TABLE IF NOT EXISTS doc_meta (
   file_key TEXT PRIMARY KEY REFERENCES files(file_key),
   meta_schema_version INTEGER, txt_hash TEXT,   -- 추출 당시 content_hash
-  extracted_at TEXT, json TEXT, confidence TEXT
+  extracted_at TEXT,
+  parties_json TEXT,
+  deal_type_detail TEXT,
+  consideration_json TEXT,
+  clause_map_json TEXT,
+  special_notes TEXT,
+  definitions_json TEXT,
+  json TEXT,
+  confidence TEXT
 );
 CREATE TABLE IF NOT EXISTS clause_index (
   file_key TEXT, tag TEXT, present INTEGER,

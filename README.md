@@ -89,6 +89,29 @@ python eval_search.py --out C:\cs_index
 `data/golden_queries.yaml`의 T1/T2 문항을 실행해 문항별 pass/fail을 출력하고
 `cs_index/eval_history.jsonl`에 기록합니다. expected_files가 없는 문항은 부분채점(필터만)입니다.
 
+## 5.5 T3 enrich 하네스
+
+`enrich_contracts.py`는 실제 AI API를 호출하지 않는 T3 보강 배치 하네스입니다. 역할은 다음 처리 대상 선정, txt 캐시를 읽은 입력 JSON 생성, 에이전트가 작성한 결과 JSON 검증, `doc_meta` 저장, 재개 상태 기록까지만입니다.
+
+```powershell
+python enrich_contracts.py --out C:\cs_index --limit 10
+```
+
+파일 기반 인터페이스:
+
+- 입력: `C:\cs_index\enrich_inputs\<file_key>.json`
+- 결과: `C:\cs_index\enrich_results\<file_key>.json`
+- 진행률/재개: `C:\cs_index\enrich_progress.json`
+
+작업 흐름:
+
+1. 스크립트를 실행하면 `status='ok'`이고 dup 대표인 문서만 우선순위(SPA → SHA → SSA → MOU → ATA/BTA → JVA → CB/BW/EB → 주식교환 → 분할합병 → 기타)에 따라 입력 JSON으로 생성합니다.
+2. 코딩 에이전트 세션이 입력 JSON의 문단을 읽고, 같은 `file_key` 이름으로 결과 JSON을 `enrich_results`에 작성합니다.
+3. 스크립트를 다시 실행하면 결과 JSON을 검증해 `doc_meta`의 `parties_json`, `consideration_json`, `clause_map_json`, `definitions_json`, `confidence` 등에 저장합니다.
+4. 이미 같은 `meta_schema_version`과 `txt_hash`로 저장된 문서는 skip합니다. 재추출이 필요하면 schema version을 올리는 방식으로 처리합니다.
+
+결과 JSON 필수 키: `file_key`, `meta_schema_version`, `parties_json`, `deal_type_detail`, `consideration_json`, `clause_map_json`, `special_notes`, `definitions_json`, `confidence`. `clause_map_json`의 각 조항은 `present`, `loc_start`, `loc_end`, `summary`를 담아 이후 `read_contract.py`가 문단 좌표로 부분 정독할 수 있게 합니다.
+
 ## 6. 자동 분류 수동 보정 (manual_overrides.yaml)
 
 색인 리포트에서 잘못 분류된 문서를 발견하면 코드 수정 없이 `data/manual_overrides.yaml`로 보정합니다:
