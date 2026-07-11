@@ -58,6 +58,7 @@ STATIC_TYPES = {
 EXPAND_MODES = {"strict", "normal", "broad"}
 MAX_LIMIT = 100
 MAX_KEYWORDS = 10
+MAX_BODY_BYTES = 1_000_000  # 로컬 앱 기준 요청 본문 상한 (실수/폭주 방지)
 
 
 class ApiError(Exception):
@@ -93,6 +94,8 @@ def parse_body(environ) -> Dict[str, object]:
         length = int(environ.get("CONTENT_LENGTH") or 0)
     except ValueError:
         length = 0
+    if length > MAX_BODY_BYTES:
+        raise ApiError(413, "VALIDATION_ERROR", "Request body too large.")
     raw = environ["wsgi.input"].read(length) if length else b""
     if not raw:
         return {}
@@ -296,6 +299,10 @@ def handle_jobs_index(app, match, query, body):
         "sample": _job_int(body, "sample", 1, 1000000),
         "sample_seed": _job_int(body, "sample_seed", 0, 2**31) or 0,
     }
+    # one-writer 원칙 + 사용자 혼란 방지: 색인 job은 동시에 하나만 허용한다.
+    if app.jobs.has_active("index"):
+        raise ApiError(409, "INDEX_JOB_ALREADY_RUNNING",
+                       "이미 대기/실행 중인 색인 작업이 있습니다. 완료나 취소 후 다시 시도하세요.")
     job_id = app.jobs.enqueue("index", params)
     return 202, {"job_id": job_id, "status": "queued"}
 
@@ -739,8 +746,8 @@ def _json_bytes(data) -> bytes:
 
 def _reason(status: int) -> str:
     return {200: "OK", 202: "Accepted", 400: "Bad Request", 404: "Not Found",
-            405: "Method Not Allowed", 500: "Internal Server Error",
-            503: "Service Unavailable"}.get(status, "OK")
+            405: "Method Not Allowed", 409: "Conflict", 413: "Payload Too Large",
+            500: "Internal Server Error", 503: "Service Unavailable"}.get(status, "OK")
 
 
 def build_parser() -> argparse.ArgumentParser:

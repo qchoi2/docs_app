@@ -177,6 +177,15 @@ class JobQueue:
             ).fetchall()
         return [_row_to_dict(row) for row in rows]
 
+    def has_active(self, job_type: str) -> bool:
+        """해당 타입의 queued/running job 존재 여부 (중복 색인 방지용)."""
+        with closing(connect_jobs(self.out)) as conn:
+            row = conn.execute(
+                "SELECT 1 FROM jobs WHERE type=? AND status IN ('queued','running') LIMIT 1",
+                (job_type,),
+            ).fetchone()
+        return row is not None
+
     def cancel(self, job_id: str) -> bool:
         """취소 요청. queued면 즉시 cancelled로, running이면 협조적 취소 플래그를 세운다."""
         with closing(connect_jobs(self.out)) as conn:

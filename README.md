@@ -133,8 +133,11 @@ python term_dict_tools.py --zero-hits --out C:\cs_index
 
 ## 7. 백업/복구
 
-- `cs_index/` 폴더 전체를 복사하면 백업이 됩니다. 이때 `catalog.sqlite-wal`,
-  `catalog.sqlite-shm` 파일도 **반드시 함께** 복사하세요 (WAL 모드 사용 중).
+- 권장: `python backup_index.py --out C:\cs_index --dest D:\backup`
+  SQLite 파일(catalog/ui_state/jobs)은 `Connection.backup()`으로 온라인 백업되어
+  WAL 미체크포인트 내용 누락이 없습니다. txt 캐시와 jsonl 로그도 함께 복사됩니다.
+- 수동으로 폴더를 복사하는 경우에는 `catalog.sqlite-wal`, `catalog.sqlite-shm`
+  파일도 **반드시 함께** 복사하세요 (WAL 모드 사용 중).
 - 안전한 시점: 색인 실행이 끝난 직후 (종료 시 wal_checkpoint 수행됨).
 - `catalog.sqlite`와 `txt/`는 재색인으로 언제든 재생성 가능하지만,
   `query_log.jsonl`, `eval_history.jsonl` 등 로그는 재생성이 불가능하니 백업 대상입니다.
