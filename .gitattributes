@@ -6,3 +6,7 @@
 *.pdf binary
 *.docx binary
 *.sqlite binary
+
+# 배치 파일: cp949 + CRLF 그대로 보존 (한국어 Windows cmd 더블클릭 실행용).
+# 개행/인코딩 변환이 일어나면 더블클릭 실행이 깨진다.
+*.bat -text
