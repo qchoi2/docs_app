@@ -387,3 +387,26 @@ README에 `--tiers T1,T2,T3` 사용법과 T3 skipped 동작을 문서화했다.
 - `python -m pytest -q tests/test_enrich_contracts.py` → 10 passed
 - `python -m pytest -q tests/test_read_contract.py tests/test_search_contracts.py tests/test_eval_search.py` → 30 passed
 - `python -m pytest -q` → 116 passed (pytest cache warning 1건, 테스트 실패 아님)
+
+### 2026-07-12 세션 10 — contract_docs 전체 full 재색인 + T1/T2/T3 eval (Codex)
+
+- **전체 재색인 실행**: `contract_docs`를 `cs_index`로 full 재색인했다.
+  실행 명령은 `python index_contracts.py --root contract_docs --out cs_index --full --batch-label full_001`.
+  첫 2회는 제한시간(2분, 15분)에 걸려 중단됐고, 동일 명령을 재실행해 완료했다.
+- **색인 결과**: 실행 로그 기준 2,244개 파일을 스캔했고, 현재 `catalog.sqlite` 기준 레코드는
+  2,106건이다. 상태별 현재 레코드는 `ok=1,519`, `empty=48`, `error=1`, `unsupported=538`.
+  언어별로는 `국문=1,345`, `영문=742`, `국영문=19`.
+- **검색 불가/제외 유형**:
+  - `unsupported=538`: `.doc` 502건, `.jpg` 34건, `.xlsx` 1건, `.eml` 1건
+  - `empty=48`: 모두 PDF이며 `pdf_text_empty`(스캔 PDF 등 본문 텍스트 없음)
+  - `error=1`: DOCX 추출 실패 1건(`docx_extract_failed`), MOU 파일 1건
+- **평가 실행**: `python eval_search.py --out cs_index --tiers T1,T2,T3` 실행 완료.
+  결과는 `total=33`, `pass=6`, `fail=2`, `unscored=16`, `skipped=9`, `partial=25`.
+  T1/T2 일부 필터 문항은 통과했으나, full 재색인으로 `doc_meta`가 비어 T3 조항 문항은 대부분
+  미평가/skipped 상태이며 기대 파일이 있는 T3 문항 2개는 현재 0건 반환으로 fail 처리됐다.
+- **다음 의미**: 전체 색인은 끝났고, 다음 단계는 `enrich_contracts.py` v2로 전체 `doc_meta`
+  조항맵을 채우는 배치다. 그 후 T3 eval을 다시 실행해야 조항 검색 품질이 실제로 측정된다.
+
+검증/산출물:
+- 색인 리포트: `cs_index/report_20260712.md`
+- 평가 로그: `cs_index/eval_history.jsonl`에 누적
