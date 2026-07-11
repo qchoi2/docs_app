@@ -35,6 +35,8 @@ from wsgiref.simple_server import make_server
 from index_contracts import IndexOptions, index_contracts
 from lib.console import configure_utf8_stdio
 from lib.jobs import JobError, JobQueue
+from lib.settings_store import (ai_status, api_key_status, delete_api_key,
+                                save_api_key, save_budget)
 from lib.ui_state import ensure_ui_state, recent_searches, record_search
 from open_text import open_text
 from search_contracts import connect_search_db, search_contracts
@@ -335,6 +337,78 @@ def handle_job_log(app, match, query, body):
     return 200, {"job_id": job_id, "entries": app.jobs.get_logs(job_id)}
 
 
+# ---------------- Runtime API Settings (UI_PRODUCT_SPEC §15.1) ----------------
+# 원칙: 키 전문은 응답·로그에 싣지 않는다. 마지막 4자리만 표시한다.
+# Codex용 OpenAI API key 입력은 만들지 않는다.
+
+API_KEY_RE = re.compile(r"^sk-ant-[A-Za-z0-9_\-]{10,250}$")
+
+
+def handle_runtime_api_settings(app, match, query, body):
+    status = api_key_status()
+    ai = ai_status()
+    return 200, {
+        "anthropic": {"api_key_set": status["api_key_set"],
+                      "api_key_last4": status["api_key_last4"],
+                      "storage": status["storage"]},
+        "budget": ai["budget"],
+        "ai": {"enabled": ai["enabled"], "disabled_reason": ai["disabled_reason"]},
+    }
+
+
+def handle_anthropic_key_save(app, match, query, body):
+    api_key = body.get("api_key")
+    if not isinstance(api_key, str) or not api_key.strip():
+        raise ApiError(400, "VALIDATION_ERROR", "'api_key' is required.")
+    api_key = api_key.strip()
+    if not API_KEY_RE.match(api_key):
+        raise ApiError(400, "VALIDATION_ERROR",
+                       "API key must look like sk-ant-... (format check only).")
+    saved = save_api_key(api_key)
+    ai = ai_status()
+    return 200, {"api_key_set": True, "api_key_last4": saved["api_key_last4"],
+                 "storage": saved["storage"],
+                 "ai": {"enabled": ai["enabled"], "disabled_reason": ai["disabled_reason"]}}
+
+
+def handle_anthropic_key_delete(app, match, query, body):
+    removed = delete_api_key()
+    ai = ai_status()
+    return 200, {"api_key_set": False, "removed": removed,
+                 "ai": {"enabled": ai["enabled"], "disabled_reason": ai["disabled_reason"]}}
+
+
+def handle_anthropic_key_test(app, match, query, body):
+    # 실제 Anthropic API는 호출하지 않는다 (대량 호출 금지 단계).
+    # 저장된 키의 존재·형식만 확인하는 mock 연결 테스트다.
+    status = api_key_status()
+    if not status["api_key_set"]:
+        return 200, {"tested": False, "mode": "format_only",
+                     "message": "저장된 API key가 없습니다."}
+    return 200, {"tested": True, "mode": "format_only",
+                 "message": "키 형식 확인 완료. 실제 호출 테스트는 AI 기능 단계에서 제공됩니다."}
+
+
+def _budget_value(body, name):
+    value = body.get(name)
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ApiError(400, "VALIDATION_ERROR", f"'{name}' must be a number or null.")
+    if not (0 < float(value) <= 1000):
+        raise ApiError(400, "VALIDATION_ERROR", f"'{name}' must be between 0 and 1000 USD.")
+    return float(value)
+
+
+def handle_budget_save(app, match, query, body):
+    per_call = _budget_value(body, "per_call_limit_usd")
+    per_run = _budget_value(body, "per_run_limit_usd")
+    budget = save_budget(per_call, per_run)
+    ai = ai_status()
+    return 200, {"budget": budget,
+                 "ai": {"enabled": ai["enabled"], "disabled_reason": ai["disabled_reason"]}}
+
+
 # ---------------- handlers ----------------
 
 def handle_health(app, match, query, body):
@@ -563,6 +637,10 @@ def handle_setup(app, match, query, body):
     return _serve_static("setup.html")
 
 
+def handle_settings_page(app, match, query, body):
+    return _serve_static("settings.html")
+
+
 def handle_static(app, match, query, body):
     return _serve_static(match.group("name"))
 
@@ -570,6 +648,12 @@ def handle_static(app, match, query, body):
 ROUTES = [
     ("GET", re.compile(r"^/$"), handle_index),
     ("GET", re.compile(r"^/setup$"), handle_setup),
+    ("GET", re.compile(r"^/settings$"), handle_settings_page),
+    ("GET", re.compile(r"^/api/settings/runtime-api$"), handle_runtime_api_settings),
+    ("POST", re.compile(r"^/api/settings/anthropic-key$"), handle_anthropic_key_save),
+    ("DELETE", re.compile(r"^/api/settings/anthropic-key$"), handle_anthropic_key_delete),
+    ("POST", re.compile(r"^/api/settings/anthropic-key/test$"), handle_anthropic_key_test),
+    ("POST", re.compile(r"^/api/settings/budget$"), handle_budget_save),
     ("GET", re.compile(r"^/static/(?P<name>[^/]+)$"), handle_static),
     ("GET", re.compile(r"^/api/health$"), handle_health),
     ("GET", re.compile(r"^/api/corpus/status$"), handle_corpus_status),
