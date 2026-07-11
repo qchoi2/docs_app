@@ -210,3 +210,44 @@ run_webapp.bat
   파일만 스테이징해 커밋했고, `.git/index`를 그 트리로 복구했다. 샌드박스가 잠금 파일을 unlink할 수
   없어 0바이트 `.git/index.lock`, `.git/HEAD.lock`가 남아 있으니 PC에서 두 파일을 삭제해야 다음
   커밋이 가능하다. `UI_GAP_ANALYSIS.md`, `run_webapp.bat`은 job queue 범위가 아니라 untracked로 남김.
+
+### 2026-07-11 세션 2 — 리뷰 반영 + 온보딩/진행률 UI + Runtime API Settings (7 commits)
+
+Web Backend Step 1과 UI-0/UI-1/UI-3 구현을 계획 문서(BACKEND_REVIEW_PC, UI_PRODUCT_SPEC,
+UI_ROADMAP, 2026-07-09 hardening checklist)와 대조 검증했다. 핵심 계약(127.0.0.1 기본 바인딩,
+file_key 전용 파일 접근, 표준 오류 코드, utf-8-sig CSV, limit/offset+total/total_files,
+facets 동적 로드, IME Enter 가드, URL 상태 복원, ui_state 분리, one-writer job 큐)은 모두
+계획대로 구현돼 있음을 확인했고, 아래 편차를 수정했다. 전체 테스트: **96 passed**.
+
+- 리뷰 수정 (`f03c1f4`): CSV export에 스펙 §13 필수 컬럼(query, filters, export_created_at,
+  filename, para, why) 추가; Markdown export에 검색 사유(why) 병기; UI-1 필수였던
+  매칭어 하이라이트를 구현 — matched_terms+검색어를 원문 표면형에서 찾아 <mark> 처리하고,
+  전각/하이픈 차이로 실패하면 하이라이트 없이 원문 그대로 표시(스펙 §5 안전 규칙).
+- 문서 커밋 (`99a0417`): 이전 세션의 progress/UI_GAP_ANALYSIS/run_webapp.bat 추적 시작.
+- UI-0.2/0.3 화면 (`7130c43`, 커밋명 ui-4): `/setup` 온보딩+진행률 페이지.
+  경로 텍스트 입력 + POST /api/settings/root-path/validate(폴더 피커 미사용),
+  cs_index 로컬 디스크 경고, 색인 시작 버튼, GET /api/jobs/{id} 1.5초 폴링
+  (progress bar·현재 파일·취소·로그 보기·최근 작업 목록), 표준 오류 코드→한국어 메시지
+  매핑(raw traceback 비노출), aria-live는 상태 전이 시에만 알림. 테스트 2건 추가.
+- Runtime API Settings (`c0ce2b9`): `/settings` 화면 + lib/settings_store.py.
+  ANTHROPIC_API_KEY 저장/삭제/교체 — Windows DPAPI(ctypes) 암호화, 비 Windows 폴백은
+  0600 사용자 전용 권한; 저장 위치는 %APPDATA%/contract-search/secrets.json
+  (CONTRACT_SEARCH_CONFIG_DIR로 재지정 가능). 저장 후 마지막 4자리만 표시, 키 전문은
+  응답·로그에 비노출, 프론트엔드 저장소 사용 금지(테스트로 강제). 예산은
+  data/api_budget.yaml의 per_call/per_run 두 줄만 주석 보존 갱신. disabled_reason:
+  missing_api_key / missing_budget / missing_api_key_and_budget. 연결 테스트는
+  format_only mock — 실제 API 호출 없음. OpenAI key 입력란 없음. 테스트 5건 추가.
+- 백엔드 하드닝 (`edd7a10`): 색인 job 동시 실행 금지(409 INDEX_JOB_ALREADY_RUNNING),
+  요청 본문 1MB 상한(413), `backup_index.py` — SQLite 3종을 Connection.backup()으로
+  WAL-safe 온라인 백업하고 txt/·jsonl을 복사(README §7 갱신). 테스트 3건 추가.
+- 프론트엔드 개선 (`435059d`): 오류 코드→한국어 메시지 매핑을 검색 화면에도 적용,
+  색인 0건이면 배너에서 /setup 안내, 문단 주변 보기에 앞뒤 더 보기(context 최대 10)·
+  ¶번호 복사·원본 경로 복사 추가(스펙 §5), 빈 결과 화면에 스펙 §12 제안 목록,
+  settings 키 입력창 Enter 저장(IME 가드).
+- git 정비: 이전 세션의 0바이트 `.git/index.lock`·`HEAD.lock`을 삭제 권한 승인 후 제거 —
+  PC에서 수동 삭제 불필요해짐. repo-local user.name/email 설정.
+
+남은 것(로드맵 순): 실제 코퍼스(D:\Contracts) 파일럿 재실행(소유자), UI-2 운영 대시보드
+(색인 상태/실패 파일/batch 통계/saved searches/피드백/보정 후보 export), UI-3 나머지
+(비교 목록·북마크·리서치 세션·선택 문단 export), Phase 1B(lib/budget.py, answer_quick.py —
+검색 품질 사인오프 후), UI-4 AI 답변 화면.
