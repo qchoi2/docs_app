@@ -112,6 +112,17 @@ python enrich_contracts.py --out C:\cs_index --limit 10
 
 결과 JSON 필수 키: `file_key`, `meta_schema_version`, `parties_json`, `deal_type_detail`, `consideration_json`, `clause_map_json`, `special_notes`, `definitions_json`, `confidence`. `clause_map_json`의 각 조항은 `present`, `loc_start`, `loc_end`, `summary`를 담아 이후 `read_contract.py`가 문단 좌표로 부분 정독할 수 있게 합니다.
 
+## 5.6 T3 조항 단위 부분 읽기
+
+`read_contract.py`는 `doc_meta.clause_map_json`에 저장된 문단 범위를 좌표로 사용해 txt 캐시에서 해당 조항만 출력합니다.
+
+```powershell
+python read_contract.py --out cs_index --file-key c97356967ef00c57 --section 손해배상
+python read_contract.py --out cs_index --file-key c97356967ef00c57 --section indemnity --context 1 --json
+```
+
+`--section`은 `data/term_dict.yaml`의 canonical 태그와 동의어로 정규화합니다. `doc_meta`에 해당 태그가 없으면 `미평가`, 태그는 있지만 `present=false`이면 `평가 후 부재`로 구분합니다. `doc_meta.txt_hash`가 현재 `files.content_hash`와 다르면 `재추출 전`을 표시합니다.
+
 ## 6. 자동 분류 수동 보정 (manual_overrides.yaml)
 
 색인 리포트에서 잘못 분류된 문서를 발견하면 코드 수정 없이 `data/manual_overrides.yaml`로 보정합니다:
