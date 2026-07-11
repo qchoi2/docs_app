@@ -13,7 +13,14 @@ from typing import Dict, List, Optional, Sequence, Tuple
 from lib.console import configure_utf8_stdio
 
 
-META_SCHEMA_VERSION = 1
+META_SCHEMA_VERSION = 2
+INDEMNITY_TAG = "\uc190\ud574\ubc30\uc0c1"
+INDEMNITY_REQUIRED_FIELDS = (
+    "cap_verbatim",
+    "basket_verbatim",
+    "de_minimis_verbatim",
+    "survival_verbatim",
+)
 DEFAULT_PRIORITY = (
     "SPA",
     "SHA",
@@ -192,9 +199,11 @@ def _validate_clause_map(value: object) -> None:
             raise EnrichError("clause_map_json keys must be strings")
         if not isinstance(item, dict):
             raise EnrichError("clause_map_json[%s] must be an object" % tag)
+        if "present" not in item:
+            raise EnrichError("clause_map_json[%s].present is required" % tag)
         present = item.get("present")
-        if present is not None and not isinstance(present, bool):
-            raise EnrichError("clause_map_json[%s].present must be boolean/null" % tag)
+        if not isinstance(present, bool):
+            raise EnrichError("clause_map_json[%s].present must be boolean" % tag)
         loc_start = item.get("loc_start")
         loc_end = item.get("loc_end")
         for key, value_at_key in (("loc_start", loc_start), ("loc_end", loc_end)):
@@ -203,6 +212,15 @@ def _validate_clause_map(value: object) -> None:
                     raise EnrichError("clause_map_json[%s].%s must be positive integer/null" % (tag, key))
         if loc_start is not None and loc_end is not None and loc_start > loc_end:
             raise EnrichError("clause_map_json[%s] location range is reversed" % tag)
+        if tag == INDEMNITY_TAG and present:
+            for field in INDEMNITY_REQUIRED_FIELDS:
+                if field not in item:
+                    raise EnrichError("clause_map_json[%s].%s is required" % (tag, field))
+                field_value = item[field]
+                if not isinstance(field_value, str) or not field_value.strip():
+                    raise EnrichError(
+                        "clause_map_json[%s].%s must be a non-empty string" % (tag, field)
+                    )
 
 
 def validate_result(data: Dict[str, object], candidate: Candidate) -> Dict[str, object]:

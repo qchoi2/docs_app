@@ -2,7 +2,7 @@ import json
 import sqlite3
 from contextlib import closing
 
-from enrich_contracts import enrich_contracts, load_txt_cache, select_candidates
+from enrich_contracts import META_SCHEMA_VERSION, enrich_contracts, load_txt_cache, select_candidates
 from lib.catalog import initialize_catalog
 
 
@@ -56,7 +56,7 @@ def test_load_txt_cache_reads_paragraph_markers(tmp_path):
 def valid_result(file_key):
     return {
         "file_key": file_key,
-        "meta_schema_version": 1,
+        "meta_schema_version": META_SCHEMA_VERSION,
         "parties_json": [],
         "deal_type_detail": "sample",
         "consideration_json": {},
@@ -66,6 +66,10 @@ def valid_result(file_key):
                 "loc_start": 2,
                 "loc_end": 3,
                 "summary": "sample",
+                "cap_verbatim": "not confirmed",
+                "basket_verbatim": "not confirmed",
+                "de_minimis_verbatim": "not confirmed",
+                "survival_verbatim": "not confirmed",
             }
         },
         "special_notes": "",
@@ -113,7 +117,7 @@ def test_enrich_writes_input_and_records_result(tmp_path):
             FROM doc_meta
             """
         ).fetchall()
-    assert rows[0][0:4] == ("a" * 16, 1, "a" * 16, "med")
+    assert rows[0][0:4] == ("a" * 16, META_SCHEMA_VERSION, "a" * 16, "med")
     clause_map = json.loads(rows[0][4])
     assert clause_map["손해배상"]["loc_start"] == 2
     stored = json.loads(rows[0][5])
@@ -141,6 +145,25 @@ def test_enrich_pending_then_incremental_skip_after_result(tmp_path):
     assert third["candidate_count"] == 0
 
 
+def test_v1_doc_meta_is_selected_for_reextraction(tmp_path):
+    out, db_path = make_out(tmp_path)
+    with closing(sqlite3.connect(db_path)) as conn:
+        insert_doc(conn, out, "v" * 16, "spa.docx", "one", ctype="SPA")
+        conn.execute(
+            """
+            INSERT INTO doc_meta(
+              file_key, meta_schema_version, txt_hash, extracted_at, json, confidence
+            )
+            VALUES (?, 1, ?, '2026-07-11T00:00:00+00:00', '{}', 'med')
+            """,
+            ("v" * 16, "v" * 16),
+        )
+        conn.commit()
+        candidates = select_candidates(conn)
+
+    assert [item.file_key for item in candidates] == ["v" * 16]
+
+
 def test_invalid_result_is_reported_without_commit(tmp_path):
     out, db_path = make_out(tmp_path)
     with closing(sqlite3.connect(db_path)) as conn:
@@ -161,3 +184,80 @@ def test_invalid_result_is_reported_without_commit(tmp_path):
     with closing(sqlite3.connect(db_path)) as conn:
         count = conn.execute("SELECT COUNT(*) FROM doc_meta").fetchone()[0]
     assert count == 0
+
+
+def test_present_must_be_boolean(tmp_path):
+    out, db_path = make_out(tmp_path)
+    with closing(sqlite3.connect(db_path)) as conn:
+        insert_doc(conn, out, "d" * 16, "spa.docx", "one", ctype="SPA")
+        conn.commit()
+    result_dir = out / "enrich_results"
+    result_dir.mkdir()
+    bad = valid_result("d" * 16)
+    bad["clause_map_json"]["손해배상"]["present"] = None
+    (result_dir / ("%s.json" % ("d" * 16))).write_text(
+        json.dumps(bad, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+    result = enrich_contracts(out)
+
+    assert result["error_count"] == 1
+    assert "present must be boolean" in result["errors"][0]["error"]
+
+
+def test_missing_present_is_rejected(tmp_path):
+    out, db_path = make_out(tmp_path)
+    with closing(sqlite3.connect(db_path)) as conn:
+        insert_doc(conn, out, "e" * 16, "spa.docx", "one", ctype="SPA")
+        conn.commit()
+    result_dir = out / "enrich_results"
+    result_dir.mkdir()
+    bad = valid_result("e" * 16)
+    del bad["clause_map_json"]["손해배상"]["present"]
+    (result_dir / ("%s.json" % ("e" * 16))).write_text(
+        json.dumps(bad, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+    result = enrich_contracts(out)
+
+    assert result["error_count"] == 1
+    assert "present is required" in result["errors"][0]["error"]
+
+
+def test_indemnity_requires_v2_subfields(tmp_path):
+    out, db_path = make_out(tmp_path)
+    with closing(sqlite3.connect(db_path)) as conn:
+        insert_doc(conn, out, "f" * 16, "spa.docx", "one", ctype="SPA")
+        conn.commit()
+    result_dir = out / "enrich_results"
+    result_dir.mkdir()
+    bad = valid_result("f" * 16)
+    del bad["clause_map_json"]["손해배상"]["basket_verbatim"]
+    (result_dir / ("%s.json" % ("f" * 16))).write_text(
+        json.dumps(bad, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+    result = enrich_contracts(out)
+
+    assert result["error_count"] == 1
+    assert "basket_verbatim is required" in result["errors"][0]["error"]
+
+
+def test_indemnity_accepts_not_confirmed_subfields(tmp_path):
+    out, db_path = make_out(tmp_path)
+    with closing(sqlite3.connect(db_path)) as conn:
+        insert_doc(conn, out, "g" * 16, "spa.docx", "one\nindemnity", ctype="SPA")
+        conn.commit()
+    result_dir = out / "enrich_results"
+    result_dir.mkdir()
+    (result_dir / ("%s.json" % ("g" * 16))).write_text(
+        json.dumps(valid_result("g" * 16), ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+    result = enrich_contracts(out)
+
+    assert result["processed"] == ["g" * 16]

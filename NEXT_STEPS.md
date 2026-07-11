@@ -297,3 +297,298 @@ A-1~A-5가 파일럿에서 전부 통과하면, 본문 0단계로 가서 전체 
 `python index_contracts.py --root <원본폴더> --out cs_index --full` 실행)하고 eval를 재측정한
 뒤, 검증된 전체 카탈로그 위에서 `enrich_contracts.py` 추출 배치를 우선순위 큐대로 완주합니다.
 이때 Claude Code 또는 Codex 세션 한도에 걸리면 재개형 배치라 다시 실행해 이어가면 됩니다.
+
+---
+
+# 부록 B — .doc 파일 변환 (`convert_doc.py`, MS Word 사용)
+
+구형 `.doc`(바이너리 OLE 포맷)는 `python-docx`가 못 읽어 현재 `unsupported`로만 기록됩니다.
+코퍼스에 `.doc`가 많으면, 이를 `.docx`로 변환한 **복사본을 스테이징 폴더에 만들어** 색인
+대상으로 삼습니다. 원본은 손대지 않습니다.
+
+## 설계 요지
+
+- **원본 불변 · 스테이징 저장:** 원본 폴더(읽기 전용 상정)에는 아무것도 쓰지 않는다. 변환된
+  `.docx`는 색인 폴더 안 `cs_index/converted/`에 둔다. 원본 `.doc` 옆에 파일이 생기지 않는다.
+- **변환기 = MS Word (PowerShell COM):** 변환은 Windows 내장 PowerShell로 `Word.Application`
+  COM을 구동해 수행한다. `convert_doc.py`는 표준 라이브러리 `subprocess`로 PowerShell을 호출할
+  뿐이라 **새 파이썬 패키지가 필요 없다**(의존성 화이트리스트 유지). 전제: 해당 PC에 Word가
+  설치·라이선스돼 있어야 한다. Word가 없는 환경에서는 이 유틸리티를 쓸 수 없다(그런 경우
+  대안은 LibreOffice 헤드리스지만, 본 계획은 Word 기준으로 확정).
+- **변환 매니페스트:** `cs_index/converted/manifest.json`에
+  `{원본_상대경로, 원본_sha256, 변환된_docx_이름, 변환시각, converter_version}`을 기록한다.
+  원본 바이트 sha256이 "이 원본이 이미 변환됐는지"의 식별자다.
+- **색인 연동:** `index_contracts.py`가 매니페스트를 읽어, 원본 `.doc`에 변환본이 있으면
+  **변환된 `.docx`를 색인하되 카탈로그에는 원본 경로로 기록**한다(분류는 원본 파일명 기반이라
+  ctype/lang/draft 판정이 정확히 유지되고, 인용도 실제 계약서 경로를 가리킨다).
+  `source_signals`에 `source_format=doc_converted`와 `converter_version`을 남긴다. 변환본이
+  없는 `.doc`(실패·미실행)은 지금처럼 `unsupported`로 남아 조용히 사라지지 않는다.
+- **dedup:** 변환된 docx의 content_hash로 정상 동작한다. 같은 계약의 `.doc`/`.docx`가 함께 있으면
+  같은 dup_group으로 묶인다.
+
+## 나중에 추가되는 .doc 대처 (증분)
+
+`convert_doc.py`와 `index_contracts.py` 둘 다 증분·재실행 가능하므로, 업데이트는 두 줄의 체인이다.
+새 계약서가 들어올 때마다 이것만 돌리면 새/변경된 `.doc`가 자동 감지·변환·색인된다.
+
+```
+python convert_doc.py    --root D:\Contracts --out cs_index   # 새/변경된 .doc만 변환
+python index_contracts.py --root D:\Contracts --out cs_index   # 변환본 포함 증분 색인
+```
+
+- 매니페스트에 이미 있는 원본 해시는 skip. 새 `.doc`나 바이트가 바뀐 `.doc`만 (재)변환한다.
+- "자동"의 의미: 파일 생성 순간 튀는 게 아니라, **위 명령을 돌릴 때 자동 감지·변환**한다.
+  무인 반영을 원하면 이 두 줄을 예약 작업(주기 실행)으로 걸 수 있다.
+
+## 처리해야 할 예외
+
+- 확장자만 `.doc`이고 실제로는 RTF/이미 docx인 파일 → 매직바이트(OLE2 `D0 CF 11 E0`,
+  RTF `{\rtf`, zip `PK`)로 판별해 라우팅하거나 실제 포맷을 기록.
+- 암호 걸린 `.doc` → 변환 실패로 사유와 함께 기록하고 배치를 멈추지 않는다.
+- Word가 불량 파일/대화상자에서 멈춤 → 파일(또는 청크) 단위 subprocess에 타임아웃을 걸고,
+  걸린 파일은 격리(quarantine)하고 계속한다. Word는 `DisplayAlerts=wdAlertsNone`,
+  `AutomationSecurity=ForceDisable`(매크로 차단), `Documents.Open(..., ReadOnly:=True,
+  ConfirmConversions:=False, AddToRecentFiles:=False)`, 더미 암호 인자로 프롬프트를 억제한다.
+- Word 버전 업그레이드로 변환 결과가 달라질 수 있음 → 매니페스트의 `converter_version`으로
+  재변환 대상을 식별.
+- **속도/견고성 트레이드오프:** 파일마다 Word를 새로 띄우면 견고하지만 느리다(수천 건이면
+  Word 기동 시간만 수 시간). 한 Word 인스턴스로 여러 건을 처리하면 빠르지만 한 건이 죽으면
+  같이 죽는다. 권장 절충: **소규모 청크(예: 25건)를 한 인스턴스로 처리 + 청크 단위 타임아웃 +
+  파일 단위 매니페스트 커밋**. 청크가 죽으면 마지막 시도 파일을 격리하고 나머지는 이어서.
+
+## Codex에 붙여 쓸 프롬프트
+
+부록 A의 **공통 규칙**을 이 프롬프트들에도 첫 줄에 붙이세요.
+
+### B-1 · convert_doc.py + PowerShell 변환 스크립트
+
+```
+convert_doc.py를 구현해줘. 목적: 원본 폴더의 구형 .doc를 MS Word로 .docx로 변환해
+cs_index/converted/ 스테이징에 복사본을 만들고, 변환 매니페스트를 유지한다.
+
+핵심 설계 (반드시 지킬 것):
+- 원본 폴더에는 절대 쓰지 마라(읽기 전용 상정). 모든 산출물은 cs_index/converted/ 아래.
+- 변환기는 Windows 내장 PowerShell로 Word.Application COM을 구동한다. 파이썬 쪽은 표준
+  라이브러리 subprocess로만 PowerShell을 호출해라 — 새 파이썬 패키지(pywin32 등) 추가 금지.
+  PowerShell 변환 스크립트(.ps1)도 이 저장소에 함께 만들어라. Word가 설치돼 있지 않으면
+  명확한 오류 메시지로 중단한다(자동으로 다른 변환기로 폴백하지 마라).
+- Word 설정: DisplayAlerts=wdAlertsNone, AutomationSecurity=ForceDisable(매크로 차단),
+  Documents.Open(ReadOnly:=True, ConfirmConversions:=False, AddToRecentFiles:=False),
+  SaveAs2 FileFormat=16(wdFormatDocumentDefault, .docx). 변환 후 Document.Close, 배치 끝에 Quit.
+  암호 프롬프트는 더미 PasswordDocument 인자로 억제하고, 실패 시 사유 기록 후 다음 파일로.
+- 스캔: index_contracts.py와 동일하게 root.rglob로 재귀 스캔하고, 같은 misc 제외 규칙과
+  --include-misc를 따른다. 대상은 .doc(대소문자 무시). 매직바이트로 실제 OLE2인지 확인하고,
+  RTF/zip(docx)로 오인된 확장자는 그 사실을 기록한다.
+- 매니페스트 cs_index/converted/manifest.json:
+  {원본_상대경로, 원본_sha256(파일 바이트), 변환된_docx_이름, 변환시각, converter_version}.
+  변환된 docx 이름은 충돌 방지를 위해 원본 sha256 기반으로. converter_version은 Word 버전
+  문자열을 기록.
+- 증분/재개: 매니페스트에 있는 원본 sha256이면 skip(변환본이 실제 존재할 때만). 새/변경 원본만
+  (재)변환. 파일 단위로 매니페스트를 커밋해 중단돼도 이어가게 한다.
+- 견고성: 소규모 청크(기본 25건)를 한 Word 인스턴스로 처리하고 청크 단위 subprocess 타임아웃을
+  건다. 청크가 타임아웃/비정상 종료하면 마지막 시도 파일을 격리 목록에 넣고 나머지를 계속한다.
+- CLI: --root <원본> --out cs_index [--include-misc] [--chunk-size N] [--timeout SEC] [--dry-run].
+- 리포트/요약: 변환 N, skip M, 실패 K(사유별), 격리 목록.
+테스트:
+- 통합 테스트(실제 변환): 검증 환경에서 샘플 .doc 1~2건을 실제로 .docx로 변환하는 왕복
+  테스트를 넣어라 — 변환본이 cs_index/converted/에 생기고, 열어서 본문 텍스트가 추출되며,
+  매니페스트에 원본 sha256·converter_version이 기록되는지 확인. 이 테스트는 Word가 있는
+  환경(Windows + MS Word)에서만 유효하므로, Word/PowerShell 사용 가능 여부를 감지해
+  없으면 자동 skip(xfail/skip)되게 하라 — 실패로 처리하지 마라.
+- 단위 테스트(환경 독립, 결정적): 매니페스트 증분 skip, 새 원본 변환 표시, 실패 기록·배치
+  미중단, 매직바이트 오인 파일 처리, 격리 로직. PowerShell 호출 경계는 mock으로 대체해
+  어느 환경에서도 돌게 하라.
+샘플 .doc가 저장소에 없으면 통합 테스트용 최소 .doc 픽스처를 만들거나(가능하면), 파일럿
+코퍼스의 실제 .doc 경로를 옵션 인자로 받아 검증하게 하라.
+```
+
+### B-2 · index_contracts.py 변환본 연동
+
+```
+index_contracts.py가 convert_doc.py의 변환 매니페스트(cs_index/converted/manifest.json)를
+읽도록 확장해줘. 원본 .doc에 변환본이 있으면 변환된 .docx를 추출·색인하되, 카탈로그에는
+원본 .doc의 경로로 기록한다(분류는 원본 파일명 기반으로 유지 — ctype/lang/is_draft/version).
+source_signals에 source_format=doc_converted와 converter_version을 남긴다. 변환본이 없는
+.doc는 기존대로 status=unsupported로 기록한다(동작 변경 없음). content_hash/dup_group은 변환된
+docx 본문 기준으로 계산한다. 증분 색인과 report 섹션이 변환본을 올바르게 반영하는지 확인한다.
+기존 .docx/.pdf 경로의 동작은 바꾸지 마라.
+테스트(결정적): 변환본 있는 .doc가 원본 경로로 1건 색인됨(unsupported 아님), 변환본 없는 .doc는
+unsupported 유지, source_format/converter_version 기록, dup_group 정상, 기존 경로 회귀 없음.
+```
+
+## 실행 순서 요약 (.doc 포함)
+
+```
+1. python convert_doc.py    --root <원본> --out cs_index   ← .doc → cs_index/converted/*.docx
+2. python index_contracts.py --root <원본> --out cs_index --full   ← 변환본 포함 전체 색인
+(이후 추가분은 --full 없이 같은 두 줄을 재실행 = 증분)
+```
+
+이 유틸리티는 Windows + MS Word 전용이고 새 파이썬 의존성이 없다는 점을 `NOTES_FOR_OWNER.md`에
+소유자 승인 이탈사항으로 기록해 두는 것을 권장한다(화이트리스트는 유지되지만 외부 프로그램
+Word와 PowerShell에 의존).
+
+---
+
+# 부록 C — A-2 게이트 반영: 추출 프롬프트 v2 + 하네스 강화 (전 제안 수용)
+
+2026-07-11 A-2 품질 게이트(`A2_SAMPLE_QUALITY_20260711.md`)의 오탐 위험·프롬프트 제안 #1~#7을
+**전부 수용**해 반영한다. 프롬프트는 이미 `.docs/extract_prompt_v2.md`(meta_schema_version 2)로
+작성됨. 남은 일은 (0) 데이터 무결성 확인, (1) 하네스를 v2에 맞춰 강화, (2) 샘플 10건 재추출 후
+before/after 비교다.
+
+## C-0 · 선행: 데이터 무결성 확인 (필수)
+
+A-2에서 PowerShell heredoc 한글 손실로 clause_map 키가 `?`로 깨졌다가 재처리한 이력이 있다.
+튜닝 전에 현재 doc_meta가 깨끗한지 확인한다.
+
+```
+sqlite3 cs_index/catalog.sqlite "SELECT file_key, substr(clause_map_json,1,80) FROM doc_meta LIMIT 10"
+```
+
+키가 `진술보장`·`손해배상` 등 한글로 온전하면 진행. `?`나 깨진 문자가 있으면 그 문서는
+재추출 대상으로 표시하고, C-2 재추출로 덮어쓴다.
+
+## C-1 · 하네스를 meta_schema_version 2로 강화 (Codex)
+
+```
+enrich_contracts.py를 extract_prompt_v2.md(meta_schema_version 2)에 맞춰 강화해줘.
+공통 규칙(부록 A) 적용.
+
+- META_SCHEMA_VERSION을 2로 올린다. v1로 추출된 doc_meta는 select_candidates에서 재추출
+  대상이 되도록(현재 dm.meta_schema_version = ? 조건이 이를 처리하는지 확인).
+- clause_map 검증 강화(_validate_clause_map):
+  - 평가된 각 태그는 present가 반드시 boolean이어야 한다(null 불가). 태그를 평가하지 않았으면
+    clause_map에서 생략한다(생략 = 미평가). 즉 "키가 존재하면 present는 true/false 필수".
+  - loc_start/loc_end는 양의 정수 또는 null, loc_start<=loc_end (기존 유지).
+  - 손해배상 태그가 present:true이면 cap_verbatim, basket_verbatim, de_minimis_verbatim,
+    survival_verbatim 4개 필드가 반드시 존재해야 한다. 원문 미확인 값은 null이 아니라 문자열
+    "not confirmed"로 온다 — 이를 허용하고, 네 필드 중 누락이 있으면 EnrichError.
+- 목차 오용 방지 소프트 가드(선택, 가능하면): 문서에 목차 영역이 식별되면 loc_start가 그
+  범위 안이면서 본문 조항 밖인 경우 경고 로그. 강제는 하지 말고 경고만.
+- 기존 T1/T2/색인 경로와 무관. enrich 경로만 변경.
+테스트(결정적): v1 doc_meta가 재추출 대상으로 잡힘, present=null 거부, 손해배상 present:true인데
+하위필드 누락 시 거부, "not confirmed" 문자열 허용, loc 역전 거부. tests/test_enrich_contracts.py
+갱신하고 전체 스위트 통과 확인.
+```
+
+## C-2 · 샘플 10건 재추출 + before/after 비교 (Codex)
+
+```
+extract_prompt_v2.md와 강화된 enrich_contracts.py(schema v2)로 A-2와 동일한 SPA 10건을
+재추출해줘(schema 버전이 올라 자동으로 재추출 대상이 된다). 그런 다음 A2_SAMPLE_QUALITY의
+v1 결과와 비교해 다음을 표로 낸 A2_SAMPLE_QUALITY_v2 보고서를 작성해라:
+- 경업금지 present:true 건수 (v1 → v2, 감소 기대)
+- MAC이 "정의 조항만"으로 분류된 건수 vs 실제 작동으로 분류된 건수
+- location "재확인 필요"였던 항목이 v2에서 해소됐는지 (목차번호 오용 제거 효과)
+- 손해배상 하위필드가 "not confirmed"로 명시된 비율
+- draft/markup 문서의 top-level confidence가 med 이하인지
+extract_prompt_v2.md와 term_dict.yaml은 수정하지 마라(이미 승인된 v2 사용). 개선이 확인되면
+이 프롬프트를 전량 배치용으로 락인하고, 회귀(오히려 누락 증가 등)가 보이면 사유를 보고해라.
+```
+
+## 반영 순서 요약
+
+```
+C-0 데이터 무결성 확인 (한글 키 온전?)
+   ↓
+C-1 하네스 schema v2 강화 (present 필수·손해배상 하위필드·not confirmed)
+   ↓
+C-2 샘플 10건 재추출 → A2 v2 보고서로 오탐 감소 확인
+   ↓ 개선 확인되면
+프롬프트 v2 락인 → 전량 배치(0단계 이후)
+```
+
+참고: `.docs/extract_prompt_v1.md`는 이력 보존을 위해 남겨두고, 이후 배치는 v2를 기준으로 한다.
+
+---
+
+# 부록 D — 초보자용: 지금부터 순서대로 할 일
+
+_2026-07-12 기준. "지금 어디까지 됐고, 다음에 뭘 하면 되는지"를 쉬운 말로 정리했다._
+
+## 지금까지 (자동으로 다 된 것)
+
+파일럿(계약서 271건 샘플) 위에서 **T3 검색 기능이 코드로 다 만들어졌다.** 조항맵을 채우는
+도구(enrich), 조항만 골라 읽는 도구(read_contract), 조항 유무로 검색하는 기능(`--clause`),
+평가 도구까지 전부 테스트와 함께 완성됐다. 여기까지는 손댈 게 없다.
+
+딱 하나 남은 게 있다. 샘플 10건을 시험 추출해보니 **오탐(잘못 잡는 경우)** 이 좀 있었고
+(예: 경업금지·MAC 조항을 실제로 없는데 있다고 표시), 이를 고치는 **개선안 7가지를 당신이
+전부 승인**했다. 개선된 지시문은 `.docs/extract_prompt_v2.md`로 이미 써놨다. 그런데
+**프로그램(하네스)이 아직 옛 버전**이라, 이 개선을 프로그램에도 반영해야 한다. 그게 다음 3단계다.
+
+## 다음에 할 일 (순서대로 — 복붙용 프롬프트 포함)
+
+### 1단계 · 데이터가 깨졌는지 먼저 확인 (당신이 터미널에서)
+
+예전에 한글이 `?`로 깨진 적이 있어서, 지금 데이터가 멀쩡한지부터 본다. 프로젝트 폴더에서:
+
+```
+cd C:\Users\qchoi\Desktop\cowork\docs_app
+sqlite3 cs_index/catalog.sqlite "SELECT file_key, substr(clause_map_json,1,80) FROM doc_meta LIMIT 10"
+```
+
+출력에 `진술보장`·`손해배상` 같은 한글이 제대로 보이면 정상 → 2단계로. `?`나 깨진 글자가
+보이면 그 사실을 Codex에 알려주고 2단계에서 재추출로 덮어쓰면 된다.
+
+### 2단계 · 프로그램을 v2로 업그레이드 (Codex에게 아래를 복붙)
+
+> 저장소의 IMPLEMENTATION_BRIEF.md, CODING_SEQUENCE.md, CODING_AGENT_RULES.md,
+> docs_progress_v2.md, CLAUDE.md를 기준으로 따르고, Python 3.9 호환 문법만 사용,
+> 의존성 화이트리스트 밖 패키지 추가 금지, 결정적 동작, 개발 중 유료 API 호출 금지,
+> 요청한 것만 구현. 완료 기준은 테스트 통과다.
+>
+> enrich_contracts.py를 .docs/extract_prompt_v2.md(meta_schema_version 2)에 맞춰 강화해줘.
+> - META_SCHEMA_VERSION을 2로 올린다. v1으로 추출된 doc_meta는 재추출 대상이 되게 한다.
+> - clause_map 검증 강화: (a) 평가된 각 태그는 present가 반드시 boolean(null 불가) — 키가
+>   있으면 true/false 필수, 미평가면 키를 생략. (b) 손해배상이 present:true면 cap_verbatim,
+>   basket_verbatim, de_minimis_verbatim, survival_verbatim 4필드 필수이고, 미확인 값은
+>   null이 아니라 문자열 "not confirmed"로 온다 — 이를 허용하고 누락 시 EnrichError.
+> - loc_start/loc_end 정수·역전 검증은 기존 유지.
+> - 색인/검색(T1/T2) 경로는 건드리지 마라. tests/test_enrich_contracts.py를 갱신하고
+>   전체 테스트 스위트를 통과시켜라.
+
+### 3단계 · 샘플 다시 뽑아서 좋아졌는지 확인 (Codex에게 복붙)
+
+> (위와 같은 공통 규칙 적용)
+> extract_prompt_v2.md와 강화된 enrich_contracts.py(schema v2)로 A-2와 동일한 SPA 10건을
+> 재추출하고, A2_SAMPLE_QUALITY_20260711.md(v1)와 비교한 A2_SAMPLE_QUALITY_v2 보고서를
+> 만들어줘. 비교 항목: 경업금지 present:true 건수(감소 기대), MAC "정의 조항만" 분류,
+> location "재확인 필요" 해소 여부, 손해배상 하위필드 "not confirmed" 비율, draft/markup
+> 문서 confidence가 med 이하인지. extract_prompt_v2.md와 term_dict.yaml은 수정하지 마라.
+> 개선이 확인되면 프롬프트 v2를 전량 배치용으로 락인, 회귀가 보이면 사유를 보고해라.
+
+3단계 보고서에서 오탐이 줄었으면 **여기서 T3 개발이 끝난다.**
+
+### 4단계 · 이제 본문 0단계 (전체 색인) — 당신이 터미널에서
+
+지금까지는 샘플 271건이었다. 이제 진짜 전체 계약서를 색인한다. 원본 폴더 경로를 실제 위치로
+바꿔서:
+
+```
+python index_contracts.py --root D:\Contracts --out cs_index --full --batch-label full_001
+python eval_search.py --out cs_index --tiers T1,T2,T3
+```
+
+첫 줄이 전체 색인(수 시간 가능, 중단돼도 재실행하면 이어감), 둘째 줄이 품질 측정이다.
+자세한 확인 항목은 이 문서 맨 앞 "0단계"를 보라.
+
+### 5단계 · 전체에 조항맵 채우기 (전량 추출 배치)
+
+전체 색인이 끝나면, 검증된 v2 프롬프트로 전체 계약서의 조항맵을 채운다(Codex 세션, 재개형).
+`python enrich_contracts.py --out cs_index` 를 한도 걸릴 때마다 재실행해 완주한다.
+
+## 곁다리로 챙기면 좋은 것 (급하지 않음)
+
+- **T3 채점 정답 채우기**: `data/golden_queries.yaml`의 T3 문항에 정답 file_key
+  (`expected_files`)를 채우면 검색 품질이 숫자로 측정된다. 지금은 비어 있어 부분 점수만 나온다.
+- **.doc 파일 변환**: 코퍼스에 `.doc`(구형)가 많으면 부록 B의 `convert_doc.py`로 변환해
+  색인에 포함시킨다. 4단계 색인 리포트의 unsupported 목록에서 .doc 수를 먼저 확인하고 판단.
+
+## 한 줄 요약
+
+```
+1. (당신) 데이터 깨짐 확인  →  2. (Codex) 프로그램 v2 강화  →  3. (Codex) 샘플 재추출로 개선 확인
+   →  4. (당신) 전체 색인 + 품질측정  →  5. (Codex) 전체 조항맵 채우기
+```

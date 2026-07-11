@@ -123,7 +123,7 @@ python enrich_contracts.py --out C:\cs_index --limit 10
 3. 스크립트를 다시 실행하면 결과 JSON을 검증해 `doc_meta`의 `parties_json`, `consideration_json`, `clause_map_json`, `definitions_json`, `confidence` 등에 저장합니다.
 4. 이미 같은 `meta_schema_version`과 `txt_hash`로 저장된 문서는 skip합니다. 재추출이 필요하면 schema version을 올리는 방식으로 처리합니다.
 
-결과 JSON 필수 키: `file_key`, `meta_schema_version`, `parties_json`, `deal_type_detail`, `consideration_json`, `clause_map_json`, `special_notes`, `definitions_json`, `confidence`. `clause_map_json`의 각 조항은 `present`, `loc_start`, `loc_end`, `summary`를 담아 이후 `read_contract.py`가 문단 좌표로 부분 정독할 수 있게 합니다.
+결과 JSON 필수 키: `file_key`, `meta_schema_version`, `parties_json`, `deal_type_detail`, `consideration_json`, `clause_map_json`, `special_notes`, `definitions_json`, `confidence`. 현재 하네스 스키마는 `meta_schema_version=2`입니다. `clause_map_json`의 각 평가 조항은 `present`를 반드시 true/false로 담고, `loc_start`, `loc_end`, `summary`를 담아 이후 `read_contract.py`가 문단 좌표로 부분 정독할 수 있게 합니다. `손해배상`이 `present=true`이면 `cap_verbatim`, `basket_verbatim`, `de_minimis_verbatim`, `survival_verbatim`도 필수이며, 원문에서 확인하지 못한 값은 null 대신 `"not confirmed"`로 씁니다.
 
 ## 5.6 T3 조항 단위 부분 읽기
 

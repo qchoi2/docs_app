@@ -348,3 +348,42 @@ README에 `--tiers T1,T2,T3` 사용법과 T3 skipped 동작을 문서화했다.
 검증:
 - `python -m pytest -q tests/test_eval_search.py` → 11 passed
 - `python eval_search.py --out cs_index --tiers T1,T2,T3` → 오류 없이 실행, 문항별 pass/fail/skipped 출력 및 `eval_history.jsonl` 누적
+
+### 2026-07-12 세션 8 — 부록 A 완료 검증 + A-2 반영(v2) 정리 (Claude, 파일 도구만)
+
+- **부록 A(A-1~A-5) 완료 검증**: 코드·테스트·progress 로그를 대조해 0단계 전 T3 개발이 전부
+  반영됐음을 확인. A-1 enrich_contracts.py 하네스(세션3), A-2 샘플 게이트(세션4),
+  A-3 read_contract.py(세션5), A-4 search_contracts T3 clause 필터(세션6),
+  A-5 eval `--tiers T1,T2,T3`(세션7). 각 항목 테스트 포함, 부록 A 자체에는 미반영 없음.
+- **0단계 전 남은 항목 식별(부록 C)**: A-2 게이트에서 소유자가 전량 수용한 프롬프트 개선
+  #1~#7이 하네스/데이터에 아직 활성화되지 않음. 프롬프트는 `.docs/extract_prompt_v2.md`
+  (meta_schema_version 2)로 작성돼 있으나, `enrich_contracts.py`는 `META_SCHEMA_VERSION=1`이고
+  손해배상 하위필드 강제·`present` 필수 검증이 없음. 이 반영은 `NEXT_STEPS.md` 부록 C
+  (C-0 데이터 무결성 확인, C-1 하네스 v2 강화, C-2 샘플 재추출)에 Codex 프롬프트로 스테이징함.
+  코드 변경+테스트 실행이 필요해 이 세션(파일 도구만 가용, 샌드박스 시작 실패)에서는 직접
+  구현하지 않고 프롬프트로 남김.
+- **문서 반영**: `NOTES_FOR_OWNER.md`에 A-2 전량 수용 결정과 v2 상태·미반영 항목 기록.
+  `NEXT_STEPS.md`에 초보자용 "지금부터 할 일"(부록 D) 추가.
+- **git**: 이 세션은 커밋 실행 불가(샌드박스 시작 실패). 아래 커밋 명령을 소유자 실행용으로 남김.
+  - `git add .docs/extract_prompt_v2.md NEXT_STEPS.md NOTES_FOR_OWNER.md progress.md`
+  - `git commit -m "docs: verify Appendix A complete; stage A-2 v2 reflection (prompt v2 + Appendix C/D)"`
+
+### 2026-07-12 세션 9 — NEXT_STEPS 부록 D 실행: enrich 하네스 v2 강화 (Codex)
+
+- **C-0/D-1 데이터 무결성 확인**: `cs_index/catalog.sqlite`의 `doc_meta.clause_map_json`을 직접
+  확인해 `손해배상`, `진술보장` 등 조항 키가 정상 한글 태그로 보존되어 있음을 확인했다.
+- **C-1/D-2 하네스 v2 반영**: `enrich_contracts.py`의 `META_SCHEMA_VERSION`을 2로 올리고,
+  v1 `doc_meta`가 재추출 대상으로 잡히는지 테스트했다. `clause_map_json`에 들어온 평가 태그는
+  `present`가 반드시 boolean이어야 하며, `present=null` 또는 누락은 `EnrichError`로 거부한다.
+  `손해배상.present=true`인 경우 `cap_verbatim`, `basket_verbatim`, `de_minimis_verbatim`,
+  `survival_verbatim` 4개 필드를 필수로 검증하고, 미확인 값은 `"not confirmed"` 문자열만 허용한다.
+- **C-2/D-3 샘플 10건 v2 재검증**: A-2와 동일한 SPA 10건을 v2 결과 JSON으로 정규화해
+  `python enrich_contracts.py --out cs_index --limit 10`으로 재적재했다. 결과는 10 processed,
+  0 errors. 재실행 skip도 `--file-key 2a08ef8b2699dca5 --dry-run`에서 candidate 0으로 확인했다.
+  비교 보고서는 `A2_SAMPLE_QUALITY_v2_20260712.md`에 기록했다.
+- **문서 반영**: README의 T3 enrich 하네스 설명을 v2 기준으로 갱신했다.
+
+검증:
+- `python -m pytest -q tests/test_enrich_contracts.py` → 10 passed
+- `python -m pytest -q tests/test_read_contract.py tests/test_search_contracts.py tests/test_eval_search.py` → 30 passed
+- `python -m pytest -q` → 116 passed (pytest cache warning 1건, 테스트 실패 아님)
