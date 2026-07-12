@@ -466,3 +466,17 @@ README에 `--tiers T1,T2,T3` 사용법과 T3 skipped 동작을 문서화했다.
 검증:
 - `python -m pytest -q tests/test_convert_doc.py tests/test_index_contracts.py` -> 35 passed, 1 skipped
 - `python convert_doc.py --root contract_docs --out cs_index --dry-run` -> `candidate_count=0`, `failure_count=5`(모두 `not_ole2_rtf`)
+
+### 2026-07-12 세션 16 - T3 전량 초벌 보강 + SHA/MOU/ATA-BTA 품질 표본 (Codex)
+
+- 사람이 직접 채워야 하는 `data/golden_queries.yaml` 정답 입력은 제외하고, 로컬 txt 캐시로 가능한 작업을 진행했다.
+- `doc_meta` v2가 없는 ok 대표 문서 1,969건의 결과 JSON을 결정적 로컬 추출 방식으로 생성하고, `python enrich_contracts.py --out cs_index --limit 2500`로 하네스 검증 후 저장했다.
+- 결과: `candidate_count=1969`, `processed_count=1969`, `error_count=0`, `pending_count=0`.
+- 전량 확인: ok 대표 문서 1,999건과 `doc_meta` v2 1,999건이 일치하며, remaining/stale 모두 0이다.
+- 유형별 v2 메타 누적: SPA 672, SHA 367, MOU 104, ATA/BTA 211, SSA 373, JVA 53.
+- SHA/MOU/ATA-BTA 각 5건 품질 표본을 `T3_QUALITY_SHA_MOU_ATA_BTA_20260712.md`에 정리했다. 자동 키워드-문단 대조 기준 4개 항목은 수동 재확인 대상으로 표시했고, `extract_prompt_v1.md`와 `term_dict.yaml`은 수정하지 않았다.
+- `python eval_search.py --out cs_index --tiers T1,T2,T3` 결과: `total=33`, `pass=17`, `fail=1`, `unscored=7`, `skipped=8`, `partial=25`.
+
+검증:
+- `python enrich_contracts.py --out cs_index --limit 5 --dry-run` -> `candidate_count=0`
+- `python -m pytest -q tests/test_enrich_contracts.py tests/test_read_contract.py tests/test_search_contracts.py tests/test_eval_search.py` -> 40 passed
