@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
 
 from lib.console import configure_utf8_stdio
+from lib.db_guard import integrity_warnings, risky_out_path_warnings
 
 
 META_SCHEMA_VERSION = 2
@@ -382,6 +383,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     configure_utf8_stdio()
     parser = build_parser()
     args = parser.parse_args(argv)
+
+    for warning in risky_out_path_warnings(args.out):
+        print("WARNING: %s" % warning, file=sys.stderr)
+
     try:
         result = enrich_contracts(
             args.out,
@@ -395,6 +400,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     except EnrichError as exc:
         print("ERROR: %s" % exc, file=sys.stderr)
         return 1
+
+  
+    if not args.dry_run:
+        for warning in integrity_warnings(Path(args.out).resolve() / "catalog.sqlite"):
+            print("WARNING: %s" % warning, file=sys.stderr)
+
     print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
     return 0 if result["error_count"] == 0 else 1
 

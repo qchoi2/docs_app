@@ -30,6 +30,7 @@ import yaml
 
 from lib.catalog import CatalogError, initialize_catalog
 from lib.console import configure_utf8_stdio
+from lib.db_guard import integrity_warnings, risky_out_path_warnings
 from lib.normalize import normalize
 
 
@@ -1138,6 +1139,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
+    for warning in risky_out_path_warnings(args.out):
+        print(f"WARNING: {warning}", file=sys.stderr)
+
     try:
         result = index_contracts(
             args.root,
@@ -1155,6 +1159,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     except (CatalogError, ValueError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
+
+    if not args.dry_run:
+        for warning in integrity_warnings(result["db"]):
+            print(f"WARNING: {warning}", file=sys.stderr)
 
     if not args.quiet:
         print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
