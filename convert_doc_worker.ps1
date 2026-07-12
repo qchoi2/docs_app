@@ -28,24 +28,30 @@ try {
             if (-not (Test-Path -LiteralPath $targetDir)) {
                 New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
             }
-            $document = $word.Documents.Open(
-                $source,
-                $false,
-                $true,
-                $false,
-                "__codex_dummy_password__",
-                "__codex_dummy_password__",
-                $false,
-                "__codex_dummy_password__",
-                "__codex_dummy_password__",
-                $false,
-                $false,
-                $false,
-                $false,
-                $false,
-                $false,
-                $false
-            )
+            try {
+                $document = $word.Documents.Open(
+                    $source,
+                    $false,
+                    $true,
+                    $false,
+                    "__codex_dummy_password__",
+                    "__codex_dummy_password__",
+                    $false,
+                    "__codex_dummy_password__",
+                    "__codex_dummy_password__",
+                    0,
+                    $false,
+                    $true,
+                    $false,
+                    $false,
+                    $false,
+                    $false
+                )
+            } catch {
+                # Some Word COM builds reject the long optional-argument form.
+                # Keep ReadOnly=True and ConfirmConversions=False as a fallback.
+                $document = $word.Documents.Open($source, $false, $true)
+            }
             $document.SaveAs2($target, 16)
             [void]$results.Add([ordered]@{
                 source = $source

@@ -453,3 +453,16 @@ README에 `--tiers T1,T2,T3` 사용법과 T3 skipped 동작을 문서화했다.
 검증:
 - `python -m pytest -q tests/test_webapp.py tests/test_webapp_jobs.py` -> 23 passed
 - `python -m pytest -q` -> 127 passed, 1 skipped
+
+### 2026-07-12 세션 15 - .doc 변환 배치 완료 + full 재색인 (Codex)
+
+- `convert_doc.py --root contract_docs --out cs_index --chunk-size 1 --timeout 180`로 남은 Word 변환 실패 16건을 재시도했다.
+- PowerShell Word COM 환경에서 긴 `Documents.Open(...)` 선택 인자 호출이 실패하는 경우가 있어, 안전 옵션 우선 시도 후 기존 읽기전용 3인자 호출로 fallback하도록 `convert_doc_worker.ps1`를 보강했다.
+- 변환 매니페스트 결과: `ok=557`, `unsupported=5`. 남은 5건은 확장자만 `.doc`이고 실제 내용은 RTF(`not_ole2_rtf`)라 변환 대상에서 제외했다.
+- `python index_contracts.py --root contract_docs --out cs_index --full --batch-label full_doc_converted`로 변환본을 포함해 전체 재색인했다.
+- 카탈로그 상태: `ok=2016`, `empty=48`, `error=1`, `unsupported=41`. 이 중 `.doc`은 `ok=497`, `unsupported=5`로 기록되었고, `source_format=doc_converted` 문서 497건이 검색 가능 상태다.
+- `python eval_search.py --out cs_index --tiers T1,T2,T3` 결과: `total=33`, `pass=16`, `fail=1`, `unscored=8`, `skipped=8`, `partial=25`.
+
+검증:
+- `python -m pytest -q tests/test_convert_doc.py tests/test_index_contracts.py` -> 35 passed, 1 skipped
+- `python convert_doc.py --root contract_docs --out cs_index --dry-run` -> `candidate_count=0`, `failure_count=5`(모두 `not_ole2_rtf`)
