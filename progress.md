@@ -423,3 +423,21 @@ README에 `--tiers T1,T2,T3` 사용법과 T3 skipped 동작을 문서화했다.
 - `python enrich_contracts.py --out cs_index --limit 20` -> `processed_count=20`, `error_count=0`, `pending_count=0`
 - `python enrich_contracts.py --out cs_index --file-key 156c3a81342d4697 --dry-run` -> `candidate_count=0` (증분 skip 확인)
 - SQLite 확인 -> 이번 배치 20건 조회 성공, `doc_meta` schema v2 누적 30건
+
+### 2026-07-12 세션 13 - 부록 B convert_doc.py 구현 (Codex)
+
+구현 계획:
+- 원본 `.doc`는 읽기 전용으로만 다루고, 변환본과 매니페스트는 `cs_index/converted/` 아래에 둔다.
+- `convert_doc.py`는 표준 라이브러리 `subprocess`로 PowerShell worker를 호출하고, 새 파이썬 패키지는 추가하지 않는다.
+- 변환본 파일명은 원본 바이트 sha256 기반으로 만들어 충돌을 피하고, `manifest.json`으로 증분 skip과 재개를 관리한다.
+- `index_contracts.py`는 변환본이 있는 `.doc`만 `.docx`로 추출하되, 카탈로그에는 원본 `.doc` 경로와 원본 파일명을 기준으로 기록한다.
+- Word가 없거나 샘플 `.doc`가 없는 환경에서도 단위 테스트는 mock으로 결정적으로 통과하고, 실제 Word 통합 테스트는 환경변수가 있을 때만 실행한다.
+
+완료:
+- `convert_doc.py`와 `convert_doc_worker.ps1` 구현.
+- `index_contracts.py`에 변환 매니페스트 연동 추가.
+- 테스트 추가: 증분 skip, mock 변환 성공, RTF/zip 오인 `.doc` 기록, 청크 실패 격리 후 재개, Word 미설치 중단, dry-run 비기록, 변환본 색인 연동.
+
+검증:
+- `python -m pytest -q tests/test_convert_doc.py tests/test_index_contracts.py` -> 35 passed, 1 skipped
+- `python -m pytest -q` -> 124 passed, 1 skipped

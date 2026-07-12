@@ -35,6 +35,8 @@ from lib.normalize import normalize
 
 SUPPORTED_EXTENSIONS = {".docx", ".pdf"}
 ZIP_EXTENSIONS = {".zip"}
+LEGACY_DOC_EXTENSION = ".doc"
+CONVERSION_MANIFEST_PATH = Path("converted/manifest.json")
 TYPE_RULE_PATHS = (Path("data/type_rules.yaml"), Path(".docs/type_rules.yaml"))
 MANUAL_OVERRIDE_PATHS = (
     Path("data/manual_overrides.yaml"),
@@ -451,6 +453,59 @@ def extract_file(path: Path) -> ExtractedDocument:
     return ExtractedDocument([], "unsupported", "unsupported_ext")
 
 
+def load_conversion_manifest(out_dir: Path) -> Dict[str, Dict[str, object]]:
+    path = out_dir / CONVERSION_MANIFEST_PATH
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    items = data.get("items", {})
+    if not isinstance(items, dict):
+        return {}
+    converted: Dict[str, Dict[str, object]] = {}
+    for rel_path, item in items.items():
+        if isinstance(rel_path, str) and isinstance(item, dict) and item.get("status") == "ok":
+            converted[rel_path] = item
+    return converted
+
+
+def resolve_converted_doc(
+    out_dir: Path,
+    rel_path: str,
+    source_sha256: str,
+    manifest: Dict[str, Dict[str, object]],
+) -> Tuple[Optional[Path], Optional[Dict[str, object]]]:
+    item = manifest.get(rel_path)
+    if not item or item.get("source_sha256") != source_sha256:
+        return None, None
+    converted_docx = item.get("converted_docx")
+    if not isinstance(converted_docx, str):
+        return None, None
+    converted_path = (out_dir / converted_docx).resolve()
+    try:
+        converted_path.relative_to(out_dir.resolve())
+    except ValueError:
+        return None, None
+    if not converted_path.exists() or converted_path.suffix.lower() != ".docx":
+        return None, None
+    return converted_path, item
+
+
+def add_conversion_source_signals(source_signals: str, conversion: Dict[str, object]) -> str:
+    try:
+        signals = json.loads(source_signals) if source_signals else {}
+    except json.JSONDecodeError:
+        signals = {}
+    if not isinstance(signals, dict):
+        signals = {}
+    signals["source_format"] = "doc_converted"
+    signals["converted_docx"] = conversion.get("converted_docx")
+    signals["converter_version"] = conversion.get("converter_version")
+    return json.dumps(signals, ensure_ascii=False, sort_keys=True)
+
+
 def error_reason_for_os_error(exc: OSError) -> str:
     if isinstance(exc, PermissionError):
         return "permission_denied"
@@ -819,6 +874,7 @@ def index_contracts(
     overrides = load_manual_overrides()
     candidates, is_full_scan = choose_candidates(root_path, options, rules)
     db_path = out_dir / "catalog.sqlite"
+    conversion_manifest = load_conversion_manifest(out_dir)
     if not options.dry_run:
         out_dir.mkdir(parents=True, exist_ok=True)
         db_path = initialize_catalog(db_path)
@@ -927,6 +983,7 @@ def index_contracts(
                 continue
 
             file_key = sha256_short(file_bytes)
+            source_sha256 = hashlib.sha256(file_bytes).hexdigest()
             seen_keys.add(file_key)
             existing_same_key = by_key.get(file_key)
 
@@ -950,13 +1007,24 @@ def index_contracts(
             elif not existing_at_path and not existing_same_key:
                 changes.new.append(rel_path)
 
-            extracted = extract_file(path)
+            extract_path = path
+            conversion_info: Optional[Dict[str, object]] = None
+            if path.suffix.lower() == LEGACY_DOC_EXTENSION:
+                converted_path, conversion_info = resolve_converted_doc(
+                    out_dir, rel_path, source_sha256, conversion_manifest
+                )
+                if converted_path is not None:
+                    extract_path = converted_path
+
+            extracted = extract_file(extract_path)
             text_for_hash = "\n".join(extracted.paragraphs)
             content_hash = hash_text(text_for_hash)
             txt_path = out_dir / "txt" / f"{file_key}.txt"
             ctype, lang, is_draft, version_hint, source_signals = classify_path(
                 rel_path, text_for_hash, rules
             )
+            if conversion_info is not None and extracted.status != "unsupported":
+                source_signals = add_conversion_source_signals(source_signals, conversion_info)
             ctype, lang, is_draft, version_hint, source_signals = apply_manual_overrides(
                 rel_path, file_key, ctype, lang, is_draft, version_hint,
                 source_signals, overrides,

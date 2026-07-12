@@ -1,4 +1,5 @@
 import hashlib
+import json
 import sqlite3
 from contextlib import closing
 from pathlib import Path
@@ -410,6 +411,50 @@ def test_unsupported_files_are_recorded_and_zip_is_report_excluded(tmp_path):
     report = Path(result["report"]).read_text(encoding="utf-8")
     assert "- archive.zip" in report
     assert read_rows(out / "catalog.sqlite", "SELECT COUNT(*) FROM fts") == [(0,)]
+
+
+def test_converted_doc_manifest_indexes_original_doc_path(tmp_path):
+    root = tmp_path / "contracts"
+    out = tmp_path / "cs_index"
+    root.mkdir()
+    original = root / "legacy.doc"
+    original.write_bytes(bytes.fromhex("D0CF11E0") + b"legacy")
+    source_sha256 = hashlib.sha256(original.read_bytes()).hexdigest()
+    converted = out / "converted" / ("%s.docx" % source_sha256)
+    converted.parent.mkdir(parents=True)
+    write_docx(converted, "Converted body")
+    manifest = {
+        "schema_version": 1,
+        "items": {
+            "legacy.doc": {
+                "source_path": "legacy.doc",
+                "source_sha256": source_sha256,
+                "converted_docx": "converted/%s.docx" % source_sha256,
+                "converter_version": "mock-word",
+                "status": "ok",
+                "error_reason": None,
+            }
+        },
+    }
+    (out / "converted" / "manifest.json").write_text(
+        json.dumps(manifest, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+    result = index_contracts(root, out)
+
+    assert result["changes"]["unsupported"] == 0
+    rows = read_rows(
+        out / "catalog.sqlite",
+        "SELECT path, ext, status, error_reason, source_signals FROM files",
+    )
+    assert rows[0][0:4] == ("legacy.doc", ".doc", "ok", None)
+    signals = json.loads(rows[0][4])
+    assert signals["source_format"] == "doc_converted"
+    assert signals["converter_version"] == "mock-word"
+    assert read_rows(out / "catalog.sqlite", "SELECT content FROM fts") == [
+        ("Converted body",)
+    ]
 
 
 def test_arbitrary_unsupported_extension_is_recorded(tmp_path):
