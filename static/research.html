@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>리서치 보드</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header class="nav-bar">
+  <span class="wordmark">리서치 보드</span>
+  <span class="mono-eyebrow">UI-3</span>
+  <span class="spacer"></span>
+  <a class="nav-link" href="/">검색</a>
+  <a class="nav-link" href="/operations">운영</a>
+  <a class="nav-link" href="/setup">색인/설정</a>
+</header>
+
+<main class="container research-layout">
+  <section class="feature-card research-card">
+    <div class="section-head">
+      <h2>저장 검색</h2>
+    </div>
+    <div id="saved-searches" class="compact-list"></div>
+  </section>
+
+  <section class="feature-card research-card">
+    <div class="section-head">
+      <h2>북마크와 메모</h2>
+    </div>
+    <div id="marks" class="compact-list"></div>
+  </section>
+
+  <section class="feature-card research-card">
+    <div class="section-head">
+      <h2>기본 비교 목록</h2>
+      <a class="button-ghost-sm" href="/api/compare/default/export">Markdown</a>
+    </div>
+    <div id="compare-items" class="compact-list"></div>
+  </section>
+
+  <section class="feature-card research-card">
+    <div class="section-head">
+      <h2>리서치 세션</h2>
+    </div>
+    <form id="session-form" class="inline-form">
+      <input id="session-name" class="text-input" type="text" placeholder="새 세션 이름" aria-label="새 세션 이름">
+      <button class="button-primary-sm" type="submit">만들기</button>
+    </form>
+    <div id="sessions" class="compact-list"></div>
+  </section>
+</main>
+
+<div id="live" aria-live="polite" class="visually-hidden"></div>
+<script src="/static/research.js"></script>
+</body>
+</html>

@@ -441,3 +441,15 @@ README에 `--tiers T1,T2,T3` 사용법과 T3 skipped 동작을 문서화했다.
 검증:
 - `python -m pytest -q tests/test_convert_doc.py tests/test_index_contracts.py` -> 35 passed, 1 skipped
 - `python -m pytest -q` -> 124 passed, 1 skipped
+
+### 2026-07-12 세션 14 - 웹 UI-2 운영 대시보드 + UI-3 리서치 UI 완료 (Codex)
+
+- UI-2 운영 대시보드 구현: `/operations` 화면과 `/api/ops/dashboard`, `/api/ops/failures`, `/api/ops/manual-overrides/export`를 추가했다. 색인 상태, 실패/본문 없음 문서, batch 통계, 미분류 폴더, 최근 job, 저장 검색/피드백 요약을 확인할 수 있다.
+- UI-2 저장 검색/피드백 구현: `/api/saved-searches`, `/api/feedback`를 추가하고 검색 화면에서 현재 검색 저장 및 결과 피드백을 남길 수 있게 했다.
+- UI-3 리서치 UI 구현: `/research` 화면과 북마크/메모(`/api/marks`), 기본 비교 목록(`/api/compare/default`), 리서치 세션(`/api/research/sessions`), 선택 문단 Markdown export(`/api/export/paragraphs`)를 추가했다.
+- 사용자 상태는 계속 `cs_index/ui_state.sqlite`에 저장하고, `catalog.sqlite`에는 사용자 테이블을 만들지 않는 경계를 테스트로 확인했다.
+- 검색 화면 상단에 운영/리서치 링크를 추가하고, 결과 카드에 비교 추가/북마크/피드백 버튼을 추가했다.
+
+검증:
+- `python -m pytest -q tests/test_webapp.py tests/test_webapp_jobs.py` -> 23 passed
+- `python -m pytest -q` -> 127 passed, 1 skipped

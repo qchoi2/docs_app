@@ -68,6 +68,14 @@ async function api(path, options) {
   return response;
 }
 
+async function postJson(path, payload) {
+  return (await api(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  })).json();
+}
+
 async function loadCorpusStatus() {
   try {
     const status = await (await api("/api/corpus/status")).json();
@@ -128,6 +136,7 @@ function bindEvents() {
   $("more-button").addEventListener("click", () => { state.offset += state.limit; runSearch(true); });
   $("export-md").addEventListener("click", () => exportResults("markdown", "search_export.md"));
   $("export-csv").addEventListener("click", () => exportResults("csv", "search_export.csv"));
+  $("save-search").addEventListener("click", saveCurrentSearch);
 
   // j/k 결과 카드 이동 — 입력창/셀렉트 포커스 중에는 비활성화
   document.addEventListener("keydown", (event) => {
@@ -257,7 +266,7 @@ function renderSummary(data) {
     badge.textContent = label;
     badges.appendChild(badge);
   }
-  $("export-md").disabled = $("export-csv").disabled = data.total === 0;
+  $("export-md").disabled = $("export-csv").disabled = $("save-search").disabled = data.total === 0;
 }
 
 function renderResults(data, append) {
@@ -298,12 +307,18 @@ function resultCard(item) {
     (item.snippet ? `<div class="snippet">${highlightHtml(item.snippet, itemTerms(item))}</div>` : "") +
     `<div class="card-actions">` +
     `<button type="button" class="button-ghost-sm act-context">문단 주변 보기</button>` +
+    `<button type="button" class="button-ghost-sm act-compare">비교 추가</button>` +
+    `<button type="button" class="button-ghost-sm act-bookmark">북마크</button>` +
+    `<button type="button" class="button-ghost-sm act-feedback">피드백</button>` +
     (item.dup_count > 1 ? `<button type="button" class="button-ghost-sm act-dups">중복본 보기</button>` : "") +
     `</div><div class="detail-panel" hidden></div>`;
 
   const panel = card.querySelector(".detail-panel");
   card.querySelector(".act-context").addEventListener("click",
     () => toggleContext(item, panel));
+  card.querySelector(".act-compare").addEventListener("click", () => addCompare(item));
+  card.querySelector(".act-bookmark").addEventListener("click", () => addBookmark(item));
+  card.querySelector(".act-feedback").addEventListener("click", () => sendFeedback(item));
   const dupButton = card.querySelector(".act-dups");
   if (dupButton) dupButton.addEventListener("click", () => toggleDuplicates(item, panel));
   return card;
@@ -378,6 +393,68 @@ async function exportResults(kind, filename) {
     URL.revokeObjectURL(url);
     announce("내보내기 완료: " + filename);
   } catch (error) { announce("내보내기 실패: " + errMsg(error.message)); }
+}
+
+async function saveCurrentSearch() {
+  const label = state.kw.join(", ") || state.type || state.lang || "검색";
+  const name = window.prompt("저장 검색 이름", label);
+  if (!name) return;
+  try {
+    await postJson("/api/saved-searches", {
+      name,
+      query: state.kw.join(", "),
+      filters: {
+        kw: state.kw,
+        type: state.type || null,
+        lang: state.lang || null,
+        exclude_drafts: state.excludeDrafts,
+        show_duplicates: state.showDuplicates,
+      },
+      expand_mode: state.expand,
+    });
+    announce("검색을 저장했습니다.");
+  } catch (error) { announce("검색 저장 실패: " + errMsg(error.message)); }
+}
+
+async function addCompare(item) {
+  const para = (item.snippet_paras || [])[0] || null;
+  try {
+    await postJson("/api/compare/default/items", {
+      file_key: item.file_key,
+      para,
+      note: state.kw.join(", "),
+    });
+    announce("비교 목록에 추가했습니다.");
+  } catch (error) { announce("비교 추가 실패: " + errMsg(error.message)); }
+}
+
+async function addBookmark(item) {
+  const para = (item.snippet_paras || [])[0] || null;
+  const note = window.prompt("메모", state.kw.join(", "));
+  try {
+    await postJson("/api/marks", {
+      file_key: item.file_key,
+      para,
+      mark_type: note ? "note" : "bookmark",
+      note: note || null,
+    });
+    announce("북마크를 저장했습니다.");
+  } catch (error) { announce("북마크 저장 실패: " + errMsg(error.message)); }
+}
+
+async function sendFeedback(item) {
+  const value = window.prompt("피드백: useful, wrong, missing, unclear", "useful");
+  if (!value) return;
+  const para = (item.snippet_paras || [])[0] || null;
+  try {
+    await postJson("/api/feedback", {
+      file_key: item.file_key,
+      para,
+      feedback: value,
+      note: state.kw.join(", "),
+    });
+    announce("피드백을 저장했습니다.");
+  } catch (error) { announce("피드백 저장 실패: " + errMsg(error.message)); }
 }
 
 /* ---------- 최근 검색 (ui_state.sqlite 영속 — query_log와 별개) ---------- */

@@ -126,3 +126,20 @@ mark { background: var(--color-warning-soft); color: inherit; border-radius: 2px
 .nav-bar .spacer { flex: 1; }
 .budget-label { display: flex; flex-direction: column; gap: var(--sp-xxs); font-size: 13px; color: var(--color-body); }
 .empty-hints { text-align: left; display: inline-block; margin: var(--sp-xs) 0; }
+
+/* ---- operations / research (UI-2, UI-3) ---- */
+.ops-layout, .research-layout { display: grid; gap: var(--sp-md); }
+.ops-card, .research-card { margin-bottom: 0; }
+.section-head { display: flex; align-items: center; gap: var(--sp-sm); margin-bottom: var(--sp-sm); }
+.section-head h2 { margin: 0; font-size: 16px; line-height: 24px; }
+.section-head .spacer { flex: 1; }
+.metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: var(--sp-xs); }
+.metric { border-top: 1px solid var(--color-hairline); padding-top: var(--sp-xs); }
+.metric span { display: block; color: var(--color-mute); font-size: 12px; }
+.metric strong { display: block; font-size: 22px; line-height: 30px; font-weight: 600; }
+.compact-list { display: grid; gap: var(--sp-xs); }
+.list-row { display: flex; justify-content: space-between; gap: var(--sp-sm);
+  border-top: 1px solid var(--color-hairline); padding-top: var(--sp-xs); overflow-wrap: anywhere; }
+.list-row.vertical { display: grid; justify-content: stretch; }
+.inline-form { display: flex; gap: var(--sp-xs); margin-bottom: var(--sp-sm); }
+.inline-form .text-input { flex: 1; min-width: 0; }

@@ -295,3 +295,101 @@ def test_setup_assets_use_no_external_resources():
     for name in ["setup.html", "setup.js"]:
         text = (static_dir / name).read_text(encoding="utf-8")
         assert "http://" not in text and "https://" not in text, name
+
+
+def test_operations_dashboard_and_manual_override_export(tmp_path):
+    app = make_app(tmp_path)
+
+    status, data = get_json(app, "GET", "/api/ops/dashboard")
+    assert status == 200
+    assert data["statuses"]["ok"] == 3
+    assert data["statuses"]["empty"] == 1
+    assert data["failures"][0]["status"] == "empty"
+    assert "feedback" in data and "saved_search_count" in data
+
+    status, data = get_json(app, "GET", "/api/ops/failures", query="limit=10")
+    assert status == 200
+    assert [item["path"] for item in data["items"]] == ["scan.pdf"]
+
+    status, headers, payload = call(app, "GET", "/api/ops/manual-overrides/export")
+    assert status == 200
+    assert "text/yaml" in headers["Content-Type"]
+    assert b"manual_overrides candidates" in payload
+
+
+def test_saved_search_feedback_marks_compare_and_sessions(tmp_path):
+    app = make_app(tmp_path)
+    out = tmp_path / "cs_index"
+    file_key = "a" * 16
+
+    status, saved = get_json(app, "POST", "/api/saved-searches",
+                             body={"name": "Indemnity", "query": "q",
+                                   "filters": {"kw": ["q"], "type": "SPA"},
+                                   "expand_mode": "normal"})
+    assert status == 201
+    assert saved["name"] == "Indemnity"
+
+    status, data = get_json(app, "GET", "/api/saved-searches")
+    assert status == 200
+    assert data["items"][0]["filters"]["type"] == "SPA"
+
+    status, mark = get_json(app, "POST", "/api/marks",
+                            body={"file_key": file_key, "para": 2,
+                                  "mark_type": "note", "note": "check cap"})
+    assert status == 201
+    assert mark["para"] == 2
+
+    status, feedback = get_json(app, "POST", "/api/feedback",
+                                body={"file_key": file_key, "para": 2,
+                                      "feedback": "useful", "note": "ok"})
+    assert status == 201
+    assert feedback["feedback"] == "useful"
+
+    status, compare = get_json(app, "POST", "/api/compare/default/items",
+                               body={"file_key": file_key, "para": 2, "note": "A"})
+    assert status == 201
+    assert compare["file_key"] == file_key
+
+    status, compare_list = get_json(app, "GET", "/api/compare/default")
+    assert status == 200
+    assert compare_list["items"][0]["file"]["path"] == "spa_one.docx"
+
+    status, session = get_json(app, "POST", "/api/research/sessions",
+                               body={"name": "Deal review", "note": "memo"})
+    assert status == 201
+    status, session_item = get_json(app, "POST", f"/api/research/sessions/{session['id']}/items",
+                                    body={"file_key": file_key, "para": 2})
+    assert status == 201
+    assert session_item["session_id"] == session["id"]
+
+    status, headers, payload = call(app, "POST", "/api/export/paragraphs",
+                                    body={"items": [{"file_key": file_key, "para": 2}],
+                                          "context": 0})
+    assert status == 200
+    assert f"[{file_key}]".encode("utf-8") in payload
+
+    with closing(sqlite3.connect(out / "catalog.sqlite")) as conn:
+        tables = {row[0] for row in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'")}
+    assert "user_marks" not in tables
+    assert "compare_items" not in tables
+
+
+def test_ui2_ui3_static_assets_are_served_and_local_only(tmp_path):
+    app = make_app(tmp_path)
+    for path in ["/operations", "/research"]:
+        status, headers, payload = call(app, "GET", path)
+        assert status == 200
+        assert "text/html" in headers["Content-Type"]
+        assert b"aria-live" in payload
+
+    for path in ["/static/operations.js", "/static/research.js"]:
+        status, headers, _ = call(app, "GET", path)
+        assert status == 200
+        assert "javascript" in headers["Content-Type"]
+
+    from pathlib import Path
+    static_dir = Path(__file__).resolve().parent.parent / "static"
+    for name in ["operations.html", "operations.js", "research.html", "research.js"]:
+        text = (static_dir / name).read_text(encoding="utf-8")
+        assert "http://" not in text and "https://" not in text, name

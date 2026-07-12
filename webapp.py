@@ -37,7 +37,13 @@ from lib.console import configure_utf8_stdio
 from lib.jobs import JobError, JobQueue
 from lib.settings_store import (ai_status, api_key_status, delete_api_key,
                                 save_api_key, save_budget)
-from lib.ui_state import ensure_ui_state, recent_searches, record_search
+from lib.ui_state import (add_compare_item, add_mark, add_session_item,
+                          compare_items, create_research_session,
+                          create_saved_search, delete_compare_item,
+                          delete_mark, delete_saved_search, ensure_ui_state,
+                          feedback_summary, list_marks, recent_searches,
+                          record_feedback, record_search, research_sessions,
+                          saved_searches)
 from open_text import open_text
 from search_contracts import connect_search_db, search_contracts
 
@@ -58,6 +64,8 @@ STATIC_TYPES = {
 EXPAND_MODES = {"strict", "normal", "broad"}
 MAX_LIMIT = 100
 MAX_KEYWORDS = 10
+MAX_NOTE_CHARS = 2000
+FEEDBACK_VALUES = {"useful", "wrong", "missing", "unclear"}
 MAX_BODY_BYTES = 1_000_000  # 로컬 앱 기준 요청 본문 상한 (실수/폭주 방지)
 
 
@@ -182,6 +190,63 @@ def require_file_key(raw: str) -> str:
     if not FILE_KEY_RE.match(raw or ""):
         raise ApiError(400, "VALIDATION_ERROR", "file_key must be 16 lowercase hex characters.")
     return raw
+
+
+def require_positive_int(value, name: str) -> int:
+    if isinstance(value, bool):
+        raise ApiError(400, "VALIDATION_ERROR", f"'{name}' must be a positive integer.")
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        raise ApiError(400, "VALIDATION_ERROR", f"'{name}' must be a positive integer.")
+    if number < 1:
+        raise ApiError(400, "VALIDATION_ERROR", f"'{name}' must be a positive integer.")
+    return number
+
+
+def optional_para(body: Dict[str, object]) -> Optional[int]:
+    value = body.get("para")
+    if value is None or value == "":
+        return None
+    return require_positive_int(value, "para")
+
+
+def optional_note(body: Dict[str, object]) -> Optional[str]:
+    value = body.get("note")
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ApiError(400, "VALIDATION_ERROR", "'note' must be a string.")
+    value = value.strip()
+    if len(value) > MAX_NOTE_CHARS:
+        raise ApiError(400, "VALIDATION_ERROR", "'note' is too long.")
+    return value
+
+
+def require_short_text(body: Dict[str, object], name: str, max_len: int = 120) -> str:
+    value = body.get(name)
+    if not isinstance(value, str) or not value.strip():
+        raise ApiError(400, "VALIDATION_ERROR", f"'{name}' is required.")
+    value = value.strip()
+    if len(value) > max_len:
+        raise ApiError(400, "VALIDATION_ERROR", f"'{name}' is too long.")
+    return value
+
+
+def file_exists(out: Path, file_key: str) -> bool:
+    with closing(open_catalog_ro(out)) as conn:
+        row = conn.execute(
+            "SELECT 1 FROM files WHERE file_key = ? AND status != 'missing'",
+            (file_key,),
+        ).fetchone()
+    return row is not None
+
+
+def require_existing_file_key(out: Path, raw: str) -> str:
+    file_key = require_file_key(raw)
+    if not file_exists(out, file_key):
+        raise ApiError(404, "FILE_NOT_FOUND_IN_CATALOG", "Unknown file_key.")
+    return file_key
 
 
 # ---------------- job / indexing write layer ----------------
@@ -480,6 +545,296 @@ def handle_recent_searches(app, match, query, body):
     return 200, {"items": recent_searches(app.out, limit)}
 
 
+def handle_ops_dashboard(app, match, query, body):
+    with closing(open_catalog_ro(app.out)) as conn:
+        statuses = dict(conn.execute(
+            "SELECT status, COUNT(*) FROM files GROUP BY status"
+        ).fetchall())
+        batches = [
+            {"batch_label": row[0] or "(none)", "count": row[1]}
+            for row in conn.execute(
+                """
+                SELECT COALESCE(batch_label, ''), COUNT(*)
+                FROM files
+                WHERE status != 'missing'
+                GROUP BY COALESCE(batch_label, '')
+                ORDER BY COUNT(*) DESC, 1
+                """
+            ).fetchall()
+        ]
+        failures = [
+            dict(row)
+            for row in conn.execute(
+                """
+                SELECT file_key, path, status, error_reason, ctype, lang
+                FROM files
+                WHERE status IN ('empty', 'error', 'unsupported')
+                ORDER BY status, path, file_key
+                LIMIT 50
+                """
+            ).fetchall()
+        ]
+        unclassified = [
+            {"folder": row[0] or ".", "count": row[1]}
+            for row in conn.execute(
+                """
+                SELECT COALESCE(NULLIF(folder, ''), '.'), COUNT(*)
+                FROM files
+                WHERE ctype = ? AND status != 'missing'
+                GROUP BY COALESCE(NULLIF(folder, ''), '.')
+                ORDER BY COUNT(*) DESC, 1
+                LIMIT 30
+                """,
+                ("미분류",),
+            ).fetchall()
+        ]
+        last_indexed = conn.execute("SELECT MAX(indexed_at) FROM files").fetchone()[0]
+    return 200, {
+        "statuses": statuses,
+        "batch_labels": batches,
+        "failures": failures,
+        "unclassified_folders": unclassified,
+        "last_indexed_at": last_indexed,
+        "jobs": app.jobs.list_jobs(10),
+        "saved_search_count": len(saved_searches(app.out, 200)),
+        "feedback": feedback_summary(app.out),
+    }
+
+
+def handle_ops_failures(app, match, query, body):
+    try:
+        limit = max(1, min(int(query.get("limit", "100")), 500))
+    except ValueError:
+        raise ApiError(400, "VALIDATION_ERROR", "'limit' must be an integer.")
+    with closing(open_catalog_ro(app.out)) as conn:
+        rows = conn.execute(
+            """
+            SELECT file_key, path, status, error_reason, ctype, lang, batch_label
+            FROM files
+            WHERE status IN ('empty', 'error', 'unsupported')
+            ORDER BY status, path, file_key
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+    return 200, {"items": [dict(row) for row in rows]}
+
+
+def handle_manual_overrides_export(app, match, query, body):
+    with closing(open_catalog_ro(app.out)) as conn:
+        rows = conn.execute(
+            """
+            SELECT path, ctype, lang, is_draft, version_hint, status, error_reason
+            FROM files
+            WHERE ctype = ? OR lang = ? OR status IN ('error', 'unsupported')
+            ORDER BY path
+            LIMIT 200
+            """,
+            ("미분류", "미상"),
+        ).fetchall()
+    lines = [
+        "# manual_overrides candidates",
+        "# Review these suggestions before copying them into data/manual_overrides.yaml.",
+        "paths:",
+    ]
+    if not rows:
+        lines.append("  {}")
+    for row in rows:
+        path = str(row["path"]).replace("\\", "/").replace('"', '\\"')
+        lines.append(f'  "{path}":')
+        lines.append(f"    # current: ctype={row['ctype']} lang={row['lang']} status={row['status']} reason={row['error_reason'] or ''}")
+        lines.append("    # ctype: SPA")
+        lines.append("    # lang: 국문")
+    payload = ("\n".join(lines) + "\n").encode("utf-8")
+    return ("raw", 200, "text/yaml; charset=utf-8", payload,
+            [("Content-Disposition", 'attachment; filename="manual_overrides_candidates.yaml"')])
+
+
+def handle_saved_searches(app, match, query, body):
+    return 200, {"items": saved_searches(app.out, 100)}
+
+
+def handle_saved_search_create(app, match, query, body):
+    name = require_short_text(body, "name")
+    query_text = body.get("query") or ""
+    if not isinstance(query_text, str):
+        raise ApiError(400, "VALIDATION_ERROR", "'query' must be a string.")
+    filters = body.get("filters") or {}
+    if not isinstance(filters, dict):
+        raise ApiError(400, "VALIDATION_ERROR", "'filters' must be an object.")
+    expand_mode = body.get("expand_mode") or "normal"
+    if expand_mode not in EXPAND_MODES:
+        raise ApiError(400, "VALIDATION_ERROR", "'expand_mode' must be strict|normal|broad.")
+    item = create_saved_search(app.out, name, query_text.strip(), filters, expand_mode)
+    return 201, item
+
+
+def handle_saved_search_delete(app, match, query, body):
+    search_id = require_positive_int(match.group("id"), "id")
+    if not delete_saved_search(app.out, search_id):
+        raise ApiError(404, "NOT_FOUND", "Saved search not found.")
+    return 200, {"deleted": True, "id": search_id}
+
+
+def handle_feedback_create(app, match, query, body):
+    feedback = require_short_text(body, "feedback", 40)
+    if feedback not in FEEDBACK_VALUES:
+        raise ApiError(400, "VALIDATION_ERROR", "'feedback' is not supported.")
+    file_key = body.get("file_key")
+    if file_key is not None:
+        file_key = require_existing_file_key(app.out, str(file_key))
+    para = optional_para(body)
+    search_history_id = body.get("search_history_id")
+    if search_history_id is not None:
+        search_history_id = require_positive_int(search_history_id, "search_history_id")
+    item = record_feedback(
+        app.out,
+        feedback,
+        search_history_id=search_history_id,
+        file_key=file_key,
+        para=para,
+        note=optional_note(body),
+    )
+    return 201, item
+
+
+def handle_marks(app, match, query, body):
+    try:
+        limit = max(1, min(int(query.get("limit", "100")), 500))
+    except ValueError:
+        raise ApiError(400, "VALIDATION_ERROR", "'limit' must be an integer.")
+    return 200, {"items": list_marks(app.out, limit)}
+
+
+def handle_mark_create(app, match, query, body):
+    file_key = require_existing_file_key(app.out, str(body.get("file_key") or ""))
+    mark_type = body.get("mark_type") or "bookmark"
+    if mark_type not in {"bookmark", "note"}:
+        raise ApiError(400, "VALIDATION_ERROR", "'mark_type' must be bookmark|note.")
+    item = add_mark(app.out, file_key, optional_para(body), mark_type, optional_note(body))
+    return 201, item
+
+
+def handle_mark_delete(app, match, query, body):
+    mark_id = require_positive_int(match.group("id"), "id")
+    if not delete_mark(app.out, mark_id):
+        raise ApiError(404, "NOT_FOUND", "Mark not found.")
+    return 200, {"deleted": True, "id": mark_id}
+
+
+def handle_compare_default(app, match, query, body):
+    return 200, {"items": enrich_file_refs(app.out, compare_items(app.out))}
+
+
+def handle_compare_item_create(app, match, query, body):
+    file_key = require_existing_file_key(app.out, str(body.get("file_key") or ""))
+    item = add_compare_item(app.out, file_key, optional_para(body), optional_note(body))
+    return 201, item
+
+
+def handle_compare_item_delete(app, match, query, body):
+    item_id = require_positive_int(match.group("id"), "id")
+    if not delete_compare_item(app.out, item_id):
+        raise ApiError(404, "NOT_FOUND", "Compare item not found.")
+    return 200, {"deleted": True, "id": item_id}
+
+
+def handle_research_sessions(app, match, query, body):
+    return 200, {"items": research_sessions(app.out, 100)}
+
+
+def handle_research_session_create(app, match, query, body):
+    item = create_research_session(app.out, require_short_text(body, "name"), optional_note(body))
+    return 201, item
+
+
+def handle_research_session_item_create(app, match, query, body):
+    session_id = require_positive_int(match.group("id"), "id")
+    file_key = require_existing_file_key(app.out, str(body.get("file_key") or ""))
+    try:
+        item = add_session_item(app.out, session_id, file_key, optional_para(body), optional_note(body))
+    except KeyError:
+        raise ApiError(404, "NOT_FOUND", "Research session not found.")
+    return 201, item
+
+
+def enrich_file_refs(out: Path, items: List[Dict[str, object]]) -> List[Dict[str, object]]:
+    if not items:
+        return []
+    keys = sorted({str(item["file_key"]) for item in items})
+    placeholders = ",".join("?" for _ in keys)
+    with closing(open_catalog_ro(out)) as conn:
+        rows = conn.execute(
+            f"SELECT file_key, path, ctype, lang, status FROM files WHERE file_key IN ({placeholders})",
+            keys,
+        ).fetchall()
+    by_key = {row["file_key"]: dict(row) for row in rows}
+    enriched = []
+    for item in items:
+        merged = dict(item)
+        merged["file"] = by_key.get(str(item["file_key"]))
+        enriched.append(merged)
+    return enriched
+
+
+def selected_paragraph_lines(out: Path, items: List[Dict[str, object]], context: int = 0) -> List[str]:
+    lines: List[str] = []
+    for item in items:
+        file_key = require_existing_file_key(out, str(item.get("file_key") or ""))
+        para = item.get("para")
+        note = item.get("note")
+        with closing(open_catalog_ro(out)) as conn:
+            row = conn.execute(
+                "SELECT path, ctype, lang FROM files WHERE file_key = ?",
+                (file_key,),
+            ).fetchone()
+        title = row["path"] if row else file_key
+        lines.append(f"## [{file_key}] {title}")
+        if note:
+            lines.append(f"- note: {note}")
+        if para is None or para == "":
+            lines.append("")
+            continue
+        para_value = require_positive_int(para, "para")
+        try:
+            data = open_text(out, file_key, para_value, None, context)
+        except (KeyError, FileNotFoundError, ValueError):
+            lines.extend(["", "_paragraph unavailable_", ""])
+            continue
+        lines.append("")
+        lines.append("```")
+        for paragraph in data["paragraphs"]:
+            lines.append(f"[¶{paragraph['para']}] {paragraph['text']}")
+        lines.append("```")
+        lines.append("")
+    return lines
+
+
+def handle_export_paragraphs(app, match, query, body):
+    items = body.get("items")
+    if not isinstance(items, list) or not items:
+        raise ApiError(400, "VALIDATION_ERROR", "'items' must be a non-empty list.")
+    if len(items) > 50 or any(not isinstance(item, dict) for item in items):
+        raise ApiError(400, "VALIDATION_ERROR", "'items' is invalid.")
+    context = body.get("context", 0)
+    if isinstance(context, bool) or not isinstance(context, int) or not (0 <= context <= 5):
+        raise ApiError(400, "VALIDATION_ERROR", "'context' must be between 0 and 5.")
+    lines = ["# Selected Contract Paragraphs", ""]
+    lines.extend(selected_paragraph_lines(app.out, items, context))
+    payload = "\n".join(lines).encode("utf-8")
+    return ("raw", 200, "text/markdown; charset=utf-8", payload,
+            [("Content-Disposition", 'attachment; filename="selected_paragraphs.md"')])
+
+
+def handle_compare_export(app, match, query, body):
+    items = compare_items(app.out)
+    lines = ["# Compare List Export", ""]
+    lines.extend(selected_paragraph_lines(app.out, items, 0))
+    payload = "\n".join(lines).encode("utf-8")
+    return ("raw", 200, "text/markdown; charset=utf-8", payload,
+            [("Content-Disposition", 'attachment; filename="compare_list.md"')])
+
+
 def handle_context(app, match, query, body):
     file_key = require_file_key(match.group("file_key"))
     para = query.get("para")
@@ -648,6 +1003,14 @@ def handle_settings_page(app, match, query, body):
     return _serve_static("settings.html")
 
 
+def handle_operations_page(app, match, query, body):
+    return _serve_static("operations.html")
+
+
+def handle_research_page(app, match, query, body):
+    return _serve_static("research.html")
+
+
 def handle_static(app, match, query, body):
     return _serve_static(match.group("name"))
 
@@ -656,6 +1019,8 @@ ROUTES = [
     ("GET", re.compile(r"^/$"), handle_index),
     ("GET", re.compile(r"^/setup$"), handle_setup),
     ("GET", re.compile(r"^/settings$"), handle_settings_page),
+    ("GET", re.compile(r"^/operations$"), handle_operations_page),
+    ("GET", re.compile(r"^/research$"), handle_research_page),
     ("GET", re.compile(r"^/api/settings/runtime-api$"), handle_runtime_api_settings),
     ("POST", re.compile(r"^/api/settings/anthropic-key$"), handle_anthropic_key_save),
     ("DELETE", re.compile(r"^/api/settings/anthropic-key$"), handle_anthropic_key_delete),
@@ -666,6 +1031,24 @@ ROUTES = [
     ("GET", re.compile(r"^/api/corpus/status$"), handle_corpus_status),
     ("POST", re.compile(r"^/api/search$"), handle_search),
     ("GET", re.compile(r"^/api/history/recent$"), handle_recent_searches),
+    ("GET", re.compile(r"^/api/ops/dashboard$"), handle_ops_dashboard),
+    ("GET", re.compile(r"^/api/ops/failures$"), handle_ops_failures),
+    ("GET", re.compile(r"^/api/ops/manual-overrides/export$"), handle_manual_overrides_export),
+    ("GET", re.compile(r"^/api/saved-searches$"), handle_saved_searches),
+    ("POST", re.compile(r"^/api/saved-searches$"), handle_saved_search_create),
+    ("DELETE", re.compile(r"^/api/saved-searches/(?P<id>[0-9]+)$"), handle_saved_search_delete),
+    ("POST", re.compile(r"^/api/feedback$"), handle_feedback_create),
+    ("GET", re.compile(r"^/api/marks$"), handle_marks),
+    ("POST", re.compile(r"^/api/marks$"), handle_mark_create),
+    ("DELETE", re.compile(r"^/api/marks/(?P<id>[0-9]+)$"), handle_mark_delete),
+    ("GET", re.compile(r"^/api/compare/default$"), handle_compare_default),
+    ("POST", re.compile(r"^/api/compare/default/items$"), handle_compare_item_create),
+    ("DELETE", re.compile(r"^/api/compare/default/items/(?P<id>[0-9]+)$"), handle_compare_item_delete),
+    ("GET", re.compile(r"^/api/compare/default/export$"), handle_compare_export),
+    ("GET", re.compile(r"^/api/research/sessions$"), handle_research_sessions),
+    ("POST", re.compile(r"^/api/research/sessions$"), handle_research_session_create),
+    ("POST", re.compile(r"^/api/research/sessions/(?P<id>[0-9]+)/items$"), handle_research_session_item_create),
+    ("POST", re.compile(r"^/api/export/paragraphs$"), handle_export_paragraphs),
     ("GET", re.compile(r"^/api/files/(?P<file_key>[^/]+)/context$"), handle_context),
     ("GET", re.compile(r"^/api/files/(?P<file_key>[^/]+)/duplicates$"), handle_duplicates),
     ("POST", re.compile(r"^/api/export/markdown$"), handle_export_markdown),
@@ -745,7 +1128,7 @@ def _json_bytes(data) -> bytes:
 
 
 def _reason(status: int) -> str:
-    return {200: "OK", 202: "Accepted", 400: "Bad Request", 404: "Not Found",
+    return {200: "OK", 201: "Created", 202: "Accepted", 400: "Bad Request", 404: "Not Found",
             405: "Method Not Allowed", 409: "Conflict", 413: "Payload Too Large",
             500: "Internal Server Error", 503: "Service Unavailable"}.get(status, "OK")
 

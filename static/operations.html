@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>운영 대시보드</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header class="nav-bar">
+  <span class="wordmark">운영 대시보드</span>
+  <span class="mono-eyebrow">UI-2</span>
+  <span class="spacer"></span>
+  <a class="nav-link" href="/">검색</a>
+  <a class="nav-link" href="/research">리서치</a>
+  <a class="nav-link" href="/setup">색인/설정</a>
+  <a class="nav-link" href="/settings">API 설정</a>
+</header>
+
+<main class="container ops-layout">
+  <section class="feature-card ops-card">
+    <div class="section-head">
+      <h2>색인 상태</h2>
+      <button id="refresh" class="button-ghost-sm" type="button">새로고침</button>
+    </div>
+    <div id="status-grid" class="metric-grid"></div>
+    <p id="last-indexed" class="body-muted"></p>
+  </section>
+
+  <section class="feature-card ops-card">
+    <div class="section-head">
+      <h2>Batch 통계</h2>
+    </div>
+    <div id="batch-list" class="compact-list"></div>
+  </section>
+
+  <section class="feature-card ops-card">
+    <div class="section-head">
+      <h2>실패/본문 없음 문서</h2>
+      <a class="button-ghost-sm" href="/api/ops/manual-overrides/export">보정 후보 내보내기</a>
+    </div>
+    <div id="failure-list" class="compact-list"></div>
+  </section>
+
+  <section class="feature-card ops-card">
+    <div class="section-head">
+      <h2>저장 검색과 피드백</h2>
+    </div>
+    <div id="feedback-box" class="compact-list"></div>
+  </section>
+
+  <section class="feature-card ops-card">
+    <div class="section-head">
+      <h2>미분류 폴더</h2>
+    </div>
+    <div id="unclassified-list" class="compact-list"></div>
+  </section>
+
+  <section class="feature-card ops-card">
+    <div class="section-head">
+      <h2>최근 색인 작업</h2>
+    </div>
+    <div id="job-list" class="compact-list"></div>
+  </section>
+</main>
+
+<div id="live" aria-live="polite" class="visually-hidden"></div>
+<script src="/static/operations.js"></script>
+</body>
+</html>
