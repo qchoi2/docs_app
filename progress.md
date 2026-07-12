@@ -410,3 +410,16 @@ README에 `--tiers T1,T2,T3` 사용법과 T3 skipped 동작을 문서화했다.
 검증/산출물:
 - 색인 리포트: `cs_index/report_20260712.md`
 - 평가 로그: `cs_index/eval_history.jsonl`에 누적
+
+### 2026-07-12 세션 12 - T3 enrich 배치 20건 처리 (Codex)
+
+- `python enrich_contracts.py --out cs_index --limit 20`로 다음 SPA 우선순위 20건의 입력 JSON을 생성했다.
+- 각 입력 JSON의 txt 캐시 문단을 로컬로 읽어 `.docs/extract_prompt_v1.md`의 조항 범위 기준으로 결과 JSON을 작성했다. 현재 하네스는 schema v2 기준이므로 `present` 필드와 손해배상 하위 근거(`cap_verbatim`, `basket_verbatim`, `de_minimis_verbatim`, `survival_verbatim`)도 함께 채웠다.
+- 결과 JSON을 다시 `enrich_contracts.py`로 검증 및 저장해 `doc_meta`에 반영했다.
+- 처리 결과: 성공 20건, 실패 0건, 보류 0건. `doc_meta`의 schema v2 레코드는 누적 30건이 되었다.
+- 낮은 신뢰도 문서 2건은 긴 PDF/대형 DOCX라 조항 위치는 저장했지만 후속 샘플 점검 때 우선 확인이 필요하다: `0ddde0e62bd84e41`, `ac3103e193f693ed`.
+
+검증:
+- `python enrich_contracts.py --out cs_index --limit 20` -> `processed_count=20`, `error_count=0`, `pending_count=0`
+- `python enrich_contracts.py --out cs_index --file-key 156c3a81342d4697 --dry-run` -> `candidate_count=0` (증분 skip 확인)
+- SQLite 확인 -> 이번 배치 20건 조회 성공, `doc_meta` schema v2 누적 30건
