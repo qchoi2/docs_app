@@ -1026,3 +1026,31 @@ README에 `--tiers T1,T2,T3` 사용법과 T3 skipped 동작을 문서화했다.
 - `python -m pytest tests/test_v4_schema.py tests/test_v4_1r.py tests/test_store_v4_results.py -q`
   → 18 passed
 - `python -m pytest -q` → 172 passed, 1 skipped
+
+### 2026-07-23 — V4-2 나머지 9건 taxonomy v8 사전분류 (Codex)
+
+- 승인·적재된 국문 SPA `[0ba3a1b8246c5dd5]`가 기존 대표 표본의
+  `[0ddde0e62bd84e41]`를 대체하도록 하여, 전체 유형 분포 SPA 3·SSA 2·SHA 3·
+  ATA/BTA 2를 유지하는 나머지 9건을 확정했다.
+- `plan_v4_batch.py`로 10건 입력을 taxonomy v8·369노드 기준으로 재생성했다.
+  manifest의 고정된 taxonomy v4 표기도 실제 version을 사용하도록 수정했다.
+- `propose_v4_remaining_nine.py`를 추가해 canonical·alias가 원문에 직접 일치하는
+  명제만 보수적으로 제안하고, 미분류 atomic unit은 문맥·taxonomy 검토 후보로
+  보존하도록 했다. 유료 API와 운영 DB 쓰기는 사용하지 않는다.
+- 9건에서 사전분류 item 528개와 검토 후보 451개를 만들었다. 모든 item은
+  `needs_review`, 본문·별지 coverage는 `partial/not_evaluated`로 유지했다.
+- 감사 결과는 review 9, error 0이며, 이슈 75건은 제공된 별지 source를 사람
+  전수검토 전이므로 complete로 올리지 않은 `available_source_not_complete`뿐이다.
+  후보 원문·좌표 불일치는 0건이다.
+- 운영 DB는 기존 209 item·60문서, taxonomy v8 369노드로 변경하지 않았다.
+
+산출물:
+- `.docs/V4_BATCH_02_PRE_REVIEW_20260723.md`
+- `cs_index/v4_batch_02_pre_review_manifest.json`
+- `cs_index/enrich_results_v4_batch_02_pre_review/`
+- `cs_index/v4_batch_02_pre_review_audit.json`
+
+검증:
+- `python -m pytest tests/test_propose_v4_remaining_nine.py tests/test_v4_schema.py tests/test_v4_1r.py -q`
+  → 19 passed
+- V4 감사 → review 9, error 0, 후보 원문·좌표 불일치 0

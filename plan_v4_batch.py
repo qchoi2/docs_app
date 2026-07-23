@@ -658,7 +658,7 @@ def main() -> int:
         "meta_schema_version": 4,
         "taxonomy_version": taxonomy_version,
         "schema_revision": "1R2",
-        "batch": "V4-2 representative 10 (taxonomy v4)",
+        "batch": f"V4-2 representative 10 (taxonomy v{taxonomy_version})",
         "count": len(items),
         "items": items,
     }
