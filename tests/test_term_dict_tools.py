@@ -48,6 +48,43 @@ terms:
     assert "invalid expansion_strength" in out
 
 
+def test_validate_v2_mapping_accepts_non_representation_canonical(tmp_path, capsys):
+    path = tmp_path / "term_dict.yaml"
+    path.write_text(
+        """
+terms:
+  - canonical: 동반매도참여권
+    kind: clause
+    ko: [동반매도참여권]
+    en: [tag-along]
+""",
+        encoding="utf-8",
+    )
+    mapping = tmp_path / "v4_term_mapping.yaml"
+    mapping.write_text(
+        """
+mapping_version: 2
+mappings:
+  동반매도참여권: [COV.SHA.TAG_ALONG]
+""",
+        encoding="utf-8",
+    )
+
+    rc = main(
+        [
+            "--validate",
+            "--dict",
+            str(path),
+            "--v4-mapping",
+            str(mapping),
+        ]
+    )
+    out = capsys.readouterr().out
+
+    assert rc == 0
+    assert "non-subtopic" not in out
+
+
 def test_suggest_reports_unknown_terms_with_evidence(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
     (tmp_path / "data").mkdir()

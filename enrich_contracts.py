@@ -12,9 +12,11 @@ from typing import Dict, List, Optional, Sequence, Tuple
 
 from lib.console import configure_utf8_stdio
 from lib.db_guard import integrity_warnings, risky_out_path_warnings
+from t3_schema import T3SchemaError, V3_SCHEMA_VERSION, validate_v3_result
 
 
 META_SCHEMA_VERSION = 2
+SUPPORTED_META_SCHEMA_VERSIONS = (META_SCHEMA_VERSION, V3_SCHEMA_VERSION)
 INDEMNITY_TAG = "\uc190\ud574\ubc30\uc0c1"
 INDEMNITY_REQUIRED_FIELDS = (
     "cap_verbatim",
@@ -164,20 +166,32 @@ def ensure_doc_meta_columns(conn: sqlite3.Connection) -> None:
             conn.execute("ALTER TABLE doc_meta ADD COLUMN %s %s" % (name, column_type))
 
 
-def build_agent_input(out_dir: Path, candidate: Candidate) -> Dict[str, object]:
+def build_agent_input(
+    out_dir: Path,
+    candidate: Candidate,
+    meta_schema_version: int = META_SCHEMA_VERSION,
+) -> Dict[str, object]:
+    if meta_schema_version not in SUPPORTED_META_SCHEMA_VERSIONS:
+        raise EnrichError("unsupported meta_schema_version: %s" % meta_schema_version)
+    required_keys = list(REQUIRED_RESULT_KEYS)
+    if meta_schema_version >= V3_SCHEMA_VERSION:
+        required_keys.extend(["document_status", "confidence_reason"])
     return {
         "file_key": candidate.file_key,
         "path": candidate.path,
         "ctype": candidate.ctype,
         "lang": candidate.lang,
         "content_hash": candidate.content_hash,
-        "meta_schema_version": META_SCHEMA_VERSION,
+        "meta_schema_version": meta_schema_version,
         "paragraphs": load_txt_cache(out_dir, candidate.txt_path),
         "instructions": {
             "task": "extract_structured_contract_metadata",
             "no_paid_api": True,
             "output_file": "%s.json" % candidate.file_key,
-            "required_keys": list(REQUIRED_RESULT_KEYS),
+            "required_keys": required_keys,
+            "schema_reference": ".docs/extract_prompt_v3.md"
+            if meta_schema_version >= V3_SCHEMA_VERSION
+            else ".docs/extract_prompt_v2.md",
         },
     }
 
@@ -224,13 +238,22 @@ def _validate_clause_map(value: object) -> None:
                     )
 
 
-def validate_result(data: Dict[str, object], candidate: Candidate) -> Dict[str, object]:
+def validate_result(
+    data: Dict[str, object],
+    candidate: Candidate,
+    meta_schema_version: int = META_SCHEMA_VERSION,
+) -> Dict[str, object]:
+    if meta_schema_version >= V3_SCHEMA_VERSION:
+        try:
+            return validate_v3_result(data, file_key=candidate.file_key, ctype=candidate.ctype)
+        except T3SchemaError as exc:
+            raise EnrichError(str(exc)) from exc
     for key in REQUIRED_RESULT_KEYS:
         if key not in data:
             raise EnrichError("missing result key: %s" % key)
     if data["file_key"] != candidate.file_key:
         raise EnrichError("result file_key does not match candidate")
-    if int(data["meta_schema_version"]) != META_SCHEMA_VERSION:
+    if int(data["meta_schema_version"]) != meta_schema_version:
         raise EnrichError("unsupported meta_schema_version")
     confidence = str(data["confidence"])
     if confidence not in CONFIDENCE_VALUES:
@@ -244,7 +267,11 @@ def validate_result(data: Dict[str, object], candidate: Candidate) -> Dict[str, 
     return data
 
 
-def read_result(result_dir: Path, candidate: Candidate) -> Optional[Dict[str, object]]:
+def read_result(
+    result_dir: Path,
+    candidate: Candidate,
+    meta_schema_version: int = META_SCHEMA_VERSION,
+) -> Optional[Dict[str, object]]:
     path = result_dir / ("%s.json" % candidate.file_key)
     if not path.exists():
         return None
@@ -254,10 +281,15 @@ def read_result(result_dir: Path, candidate: Candidate) -> Optional[Dict[str, ob
         raise EnrichError("invalid JSON in %s: %s" % (path.name, exc))
     if not isinstance(data, dict):
         raise EnrichError("result JSON must be an object")
-    return validate_result(data, candidate)
+    return validate_result(data, candidate, meta_schema_version)
 
 
-def upsert_doc_meta(conn: sqlite3.Connection, candidate: Candidate, data: Dict[str, object]) -> None:
+def upsert_doc_meta(
+    conn: sqlite3.Connection,
+    candidate: Candidate,
+    data: Dict[str, object],
+    meta_schema_version: int = META_SCHEMA_VERSION,
+) -> None:
     now = datetime.now(timezone.utc).isoformat()
     stored = dict(data)
     stored["extracted_at"] = now
@@ -272,7 +304,7 @@ def upsert_doc_meta(conn: sqlite3.Connection, candidate: Candidate, data: Dict[s
         """,
         (
             candidate.file_key,
-            META_SCHEMA_VERSION,
+            meta_schema_version,
             candidate.content_hash,
             now,
             json.dumps(data["parties_json"], ensure_ascii=False, sort_keys=True),
@@ -307,13 +339,17 @@ def enrich_contracts(
     dry_run: bool = False,
     input_dir: Optional[Path] = None,
     result_dir: Optional[Path] = None,
+    meta_schema_version: int = META_SCHEMA_VERSION,
 ) -> Dict[str, object]:
     out_dir = Path(out).resolve()
     db_path = out_dir / "catalog.sqlite"
     if not db_path.exists():
         raise EnrichError("catalog.sqlite not found: %s" % db_path)
-    input_dir = input_dir or out_dir / "enrich_inputs"
-    result_dir = result_dir or out_dir / "enrich_results"
+    if meta_schema_version not in SUPPORTED_META_SCHEMA_VERSIONS:
+        raise EnrichError("unsupported meta_schema_version: %s" % meta_schema_version)
+    version_suffix = "" if meta_schema_version == META_SCHEMA_VERSION else "_v%d" % meta_schema_version
+    input_dir = input_dir or out_dir / ("enrich_inputs" + version_suffix)
+    result_dir = result_dir or out_dir / ("enrich_results" + version_suffix)
 
     processed: List[str] = []
     pending: List[str] = []
@@ -327,18 +363,18 @@ def enrich_contracts(
             priority=priority,
             file_key=file_key,
             limit=limit,
-            meta_schema_version=META_SCHEMA_VERSION,
+            meta_schema_version=meta_schema_version,
         )
         for candidate in candidates:
             try:
-                payload = build_agent_input(out_dir, candidate)
+                payload = build_agent_input(out_dir, candidate, meta_schema_version)
                 if not dry_run:
                     written_inputs.append(str(write_agent_input(input_dir, payload)))
-                    result = read_result(result_dir, candidate)
+                    result = read_result(result_dir, candidate, meta_schema_version)
                     if result is None:
                         pending.append(candidate.file_key)
                         continue
-                    upsert_doc_meta(conn, candidate, result)
+                    upsert_doc_meta(conn, candidate, result, meta_schema_version)
                     processed.append(candidate.file_key)
                 else:
                     pending.append(candidate.file_key)
@@ -349,7 +385,7 @@ def enrich_contracts(
 
     result_payload = {
         "out": str(out_dir),
-        "meta_schema_version": META_SCHEMA_VERSION,
+        "meta_schema_version": meta_schema_version,
         "candidate_count": len(candidates),
         "processed_count": len(processed),
         "pending_count": len(pending),
@@ -376,6 +412,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--input-dir", type=Path)
     parser.add_argument("--result-dir", type=Path)
+    parser.add_argument(
+        "--meta-schema-version",
+        type=int,
+        choices=list(SUPPORTED_META_SCHEMA_VERSIONS),
+        default=META_SCHEMA_VERSION,
+        help="2 keeps the current corpus contract; 3 uses the stricter pilot schema",
+    )
     return parser
 
 
@@ -396,6 +439,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             dry_run=args.dry_run,
             input_dir=args.input_dir,
             result_dir=args.result_dir,
+            meta_schema_version=args.meta_schema_version,
         )
     except EnrichError as exc:
         print("ERROR: %s" % exc, file=sys.stderr)

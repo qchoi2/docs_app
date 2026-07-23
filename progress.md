@@ -480,3 +480,549 @@ README에 `--tiers T1,T2,T3` 사용법과 T3 skipped 동작을 문서화했다.
 검증:
 - `python enrich_contracts.py --out cs_index --limit 5 --dry-run` -> `candidate_count=0`
 - `python -m pytest -q tests/test_enrich_contracts.py tests/test_read_contract.py tests/test_search_contracts.py tests/test_eval_search.py` -> 40 passed
+
+### 2026-07-16 세션 17 - 웹앱 병행 읽기 전용 MCP 어댑터 추가 (Codex)
+
+- 기존 웹앱과 CLI를 유지하면서 `mcp_server.py` 로컬 stdio 어댑터를 추가했다. 검색·조항 정독·문단 읽기·파일 점검·중복 확인·코퍼스 상태·필터 조회의 7개 도구를 제공한다.
+- MCP는 기존 `search_contracts.py`, `read_contract.py`, `open_text.py`, `inspect_file.py` 코어를 직접 재사용하며 색인·설정·사용자 상태를 변경하지 않는다. 쓰기 작업은 계속 웹앱의 단일 job queue가 담당한다.
+- 서버 instructions에 file_key 인용, 부재 판정, 미평가 구분, 중복 제거, 5건 이내 부분 정독 등 검색 에이전트 원칙을 포함했다.
+- MCP 응답에서는 로컬 txt 캐시 절대경로를 제거하고 필요한 검색 스니펫과 조항 문단만 반환한다.
+- 공식 MCP Python SDK는 선택 의존성 `requirements-mcp.txt`로 분리하고 안정판 `mcp==1.28.1`을 고정했다. 기본 `requirements.txt` 설치만으로 웹앱과 CLI는 계속 동작한다.
+- README에 설치, `--check`, AI 클라이언트 stdio command/args 등록 예시를 추가했다.
+
+검증:
+- `python -m pytest -q tests/test_mcp_server.py` -> 4 passed
+- 검색·조항·웹앱 관련 회귀 테스트 -> 52 passed
+- `python -m pytest -q` -> 139 passed, 1 skipped
+- `python mcp_server.py --out cs_index --check` -> 정상, searchable 2,016건·unsearchable 49건 확인
+
+### 2026-07-16 세션 18 - T3 v3 정밀 보강 파일럿 준비 (Codex)
+
+- 기존 `doc_meta` v2 1,999건을 보존하면서 v3를 별도 입출력 폴더에서 검증하는 경로를 추가했다.
+- `t3_schema.py`에 당사자·대금·정의의 평가 상태, 유형별 필수 조항, present 조항의 위치·원문,
+  정규화 수치와 항목별 confidence 검증을 구현했다.
+- `plan_t3_v3_pilot.py`로 유형·언어·Draft·기존 신뢰도를 층화한 60건을 선정하고
+  `cs_index/enrich_inputs_v3`, manifest, 사람 검수표를 생성했다.
+- `audit_t3_v3.py`로 DB 저장 전 스키마·문단 위치·verbatim·정규화 수치 근거를 자동 점검하도록 했다.
+- `search_contracts.py`, 웹앱 API, MCP 검색에 당사자명/역할, 지급 방식·대금 범위,
+  손해배상 상한 비율, 존속기간, 준거법, 법원·중재기관 조건을 추가했다.
+- 구조화 조건에서 v2 문서를 불일치·부재로 오판하지 않고 `needs_review` 미평가로 분리한다.
+- `.docs/extract_prompt_v3.md`, `.docs/T3_V3_PILOT.md`와 README 운용 절차를 추가했다.
+
+실데이터 파일럿:
+- 60건: SPA 8, SHA 8, SSA 6, MOU 6, ATA/BTA 5, 기타 27.
+- 언어: 국문 39, 영문 18, 국영문 3.
+- Draft 상태: Draft 18, 비Draft 21, 미상 21.
+- 기존 신뢰도: low 47, med 9, high 4.
+- v3 입력 60건 생성 완료, 결과 JSON은 60건 모두 대기. 기존 catalog.sqlite에는 v3를 기록하지 않았다.
+
+검증:
+- `python -m pytest -q tests/test_mcp_server.py tests/test_webapp.py tests/test_search_contracts.py tests/test_t3_v3.py tests/test_enrich_contracts.py` -> 57 passed
+- `python audit_t3_v3.py --manifest cs_index/t3_v3_pilot_manifest.json` -> total=60, pending=60, error=0
+
+### 2026-07-16 세션 19 - T3 v3 대표 10건 결과 생성 + 사람 검증표 (Codex)
+
+- 60건 층화 파일럿 중 유형·언어·Draft·문서 성격을 대표하는 10건을 선정해
+  `cs_index/enrich_results_v3/<file_key>.json` 결과를 생성했다. 유료 API는 호출하지 않았으며,
+  로컬 txt 캐시의 관련 조항만 부분 정독해 당사자·대금·정의·필수 조항·정규화 수치와 원문 위치를 채웠다.
+- 문서 자체가 계약서인지 먼저 판정하도록 v3에 `document_status=contract|not_contract|insufficient_text`를
+  추가했다. 비계약 문서는 당사자·대금·정의·조항을 추측하지 않고 명시적으로 미평가 처리한다.
+  `t3_schema.py`, `enrich_contracts.py`, `.docs/extract_prompt_v3.md` 및 관련 테스트를 함께 보강했다.
+- 대표 10건 판정은 계약 8건, 비계약 2건이다. 비계약 2건은 각각 법률자문 킥오프 자료와
+  주식교환 관련 법률의견서였다. 별도로 색인상 `주식교환`이지만 실제 내용은 CJ-네이버
+  사업제휴 합의서인 분류 불일치 1건도 확인해 `deal_type_detail`과 검토 메모에 기록했다.
+- 사용자가 JSON을 직접 읽지 않아도 검증할 수 있도록
+  `cs_index/t3_v3_human_review_10.md`를 생성했다. 문서 판정, 실제 거래유형, 당사자·역할,
+  거래대금, 존재 조항의 AI 요약·원문 인용·문단 위치·정규화 값과 체크 칸을 문서별로 제공한다.
+- `audit_t3_v3.py`가 `3년→36개월`, `[1]년→12개월` 같은 정규화 단위 환산을 원문 근거로
+  인정하도록 보강하고 회귀 테스트를 추가했다.
+- 대표 결과는 사람 승인 전 검토용으로만 두었으며 `catalog.sqlite`에는 v3를 저장하지 않았다.
+  기존 `doc_meta` v2 1,999건은 그대로 유지된다.
+
+검증:
+- `python audit_t3_v3.py --manifest cs_index/t3_v3_pilot_manifest.json` -> `pass=10`, `review=0`, `error=0`, `pending=50`
+- v3 결과 JSON 10건, 사람 검증표 1건 생성 확인
+- `python -m pytest -q tests/test_t3_v3.py` -> 7 passed
+- `python -m pytest -q` -> 150 passed, 1 skipped
+- `git diff --check` -> 오류 없음(기존 Windows LF/CRLF 경고만 출력)
+
+### V4 다음 단계 - 세부 조항 원자 항목 분류(계획 확정, 미구현)
+
+- v3 결과가 정확하다는 전제 아래, v4는 v3를 덮어쓰지 않고 `진술보장`·`선행조건`·`확약`
+  아래의 세부 의미를 검색 가능한 원자 항목으로 저장하는 계층으로 설계한다.
+- 단순히 긴 세부 태그를 계속 추가하지 않고, `조항 유형 + 분야 + 세부주제 + 행위/쟁점 + 대상 +
+  시점 + 주체 + 원자적 명제`를 분리한다. 예: `진술보장/노무/임금/미지급임금 없음`,
+  `선행조건/종결서류/이사 사임서 제출`, `확약/정부신고/기업결합신고서 제출`.
+- 조항의 부재와 부정형 진술을 구분한다. 예를 들어 “미지급임금이 없음”은 미지급임금 관련
+  진술보장이 존재하는 것이며, 해당 세부 조항이 없는 것으로 저장하지 않는다.
+- 예정 저장 구조는 통제 분류체계 `v4_taxonomy_node`, 표현 변이 `v4_taxonomy_alias`,
+  문서별 원자 항목 `v4_clause_item`, 평가완료·부분평가·미평가를 구분하는
+  `v4_document_coverage`, 신규 분류 검토 큐 `v4_taxonomy_candidate`이다.
+- 신규 표현은 즉시 정식 태그로 만들지 않는다. 기존 분류와 의미가 같으면 alias, 대상만 다르면
+  object/qualifier로 저장하고, 독립적인 검색 의도와 법적 의미가 있는 경우에만 후보→검토→승인 후
+  정식 taxonomy로 승격한다.
+- 구현 순서는 v4 스키마·초기 taxonomy·추출 프롬프트와 감사기 구축 → 현재 대표 10건 재추출 →
+  기존 60건 파일럿으로 taxonomy 발견·안정화 → CLI·웹·MCP 세부 검색/비교 기능 → 골든 질의 평가 →
+  전체 계약 순차 확장으로 정했다.
+- 전체 확장에서도 프로젝트가 유료 API를 자동 호출하지 않는 원칙을 유지한다. AI 클라이언트가
+  MCP 또는 파일 기반 작업으로 문서별 필요한 조항만 읽고 결과를 제출하며, 서버는 검증·저장만 담당한다.
+
+### 2026-07-16 세션 20 — V4 계획 검토·확정: `.docs/V4_PLAN.md` (Claude)
+
+- 위 V4 초안을 검토해 `.docs/V4_PLAN.md`로 확정했다. 초안 대비 변경·추가 사항:
+  - **적용 범위**: 전 항목 추출 대상을 SPA·SSA·ATA/BTA에 **SHA 추가**(소유자 지시).
+    나머지 유형은 v3 유지, agent_log 수요 확인 시 유형 단위 편입.
+  - **taxonomy 거버넌스 UI(UI-5)**: 신규 분류 후보의 승격·alias 병합·반려를 웹앱
+    `/taxonomy` 화면에서 **버튼 클릭만으로** 처리(소유자 지시 — 이후 개발 없이 운영 가능
+    해야 함). 초기 seed는 family/domain 2단계까지만, 3단계는 후보 큐에서 UI로만 승격.
+    DB 테이블이 taxonomy 단일 원천, yaml은 내보내기 산출물. `UI_ROADMAP.md`에 UI-5 추가.
+  - **하이브리드 검색**: taxonomy 필터 ∪ 항목 텍스트 FTS(`v4_item_fts`) ∪ 문단 FTS
+    합집합 — 분류 오류를 recall 손실이 아닌 순위 하락으로 강등(누락 방지의 핵심).
+  - **coverage 본문/별지 분리**: 부재 판정은 body+annex 평가 완료 시에만 허용,
+    스캔 별지 미평가 건수 상시 고지.
+  - **term_dict 통합**: 진술보장 하위 주제 항목을 v4 노드에 1:1 매핑/alias 흡수,
+    `term_dict_tools.py --validate`에 매핑 검증 추가.
+  - **추출 경로 단순화**: 신규 MCP 추출 도구 대신 검증된 enrich 파일 하네스 재사용
+    (`enrich_inputs_v4`/`enrich_results_v4` + `audit_t3_v4.py`). MCP는 질의 쪽
+    `search_clause_items`·`compare_clause_items` 2개만 추가. 결정적 로컬 추출로
+    대체 금지(v2 초벌의 한계가 v4를 하는 이유).
+  - **이중 게이트**: 자체 품질 게이트 A에 더해, 세부 골든 질의 30~50개로
+    (a) v3+MCP 에이전트 정독 vs (b) v4 하이브리드를 비교하는 **게이트 B**를 전량 확장
+    조건으로 추가. (b)가 recall 우위가 아니면 부재 판정·비교 기능만 남기는 축소판 전환.
+  - **선행 게이트**: V4-0 = v3 파일럿 60건 사람 승인. 승인 전 V4 착수 금지.
+- 관련 문서 갱신: `.docs/UI_ROADMAP.md`(UI-5 + 우선순위), `.docs/T3_V3_PILOT.md`(다음
+  단계 포인터), `.docs/MANIFEST.txt`. 코드 변경 없음.
+
+### 2026-07-16 세션 21 — T3 v3 대표 10건 QA + 소유자 지시 정정 (Claude)
+
+- 대표 10건을 원문과 독립 대조(`cs_index/qa_v3_10.py`)해 QA 리포트
+  `cs_index/t3_v3_qa_10.md`를 생성했다. verbatim↔문단 위치는 10건 전부 100% 일치,
+  비계약 2건도 정상 처리. present 조항 정규화 수치 1건이 원문 미근거로 확인됐다.
+- 소유자 지시 반영: 753aeef4 진술보장 present=true(¶109 원용 근거, med),
+  37c9a8 선행조건은 부재 유지, dc3b4d MAC 부재판정 유지 + 근거 메모.
+- 37c9a8 손해배상액 예정은 제11조(주식양도제한) 위반 시 1억원 지급으로,
+  거래무산 위약금이 아님을 원문(¶104) 확인 → `break_fee_amount` 매핑 제거.
+- 753aeef4 풋옵션의 근거없는 `closing_days:60/interest_rate_pct:10` 제거,
+  loc를 소제목→운영문단(108–111)으로 확장, verbatim 교체.
+- `.docs/extract_prompt_v3.md`에 지침 11–15 추가(정규화 숫자 근거 강제, verbatim 소제목 금지,
+  다문단 loc, 부재 근거메모, break_fee 오용 금지).
+- `audit_t3_v3.py` 숫자-근거 검사를 3필드→전체 숫자형 필드로 확장, 콤마·억/만·대괄호 표기 인정.
+
+검증:
+- `python audit_t3_v3.py --manifest cs_index/t3_v3_pilot_manifest.json` -> pass=10, review=0, error=0
+- 감사기 음성테스트: 근거없는 60/10 탐지, 콤마 5억·[1]년→12개월 정상 통과
+- `python -m pytest -q tests/test_t3_v3.py tests/test_enrich_contracts.py` -> 17 passed
+
+### 2026-07-16 세션 22 — T3 v3 국문 우선 배치 01 추출·감사·QA (Codex)
+
+- V4-0 게이트의 남은 50건 중 국문 우선 10건을 부분 정독했다: SPA 4건, SHA 3건,
+  SSA 2건, MOU 1건. `cs_index/enrich_results_v3/<file_key>.json` 10건과
+  `cs_index/t3_v3_human_review_batch_01.md`를 생성했다. 유료 API와 DB 쓰기는 사용하지 않았다.
+- 부속합의서·Joinder가 원 SPA/SHA를 포괄 원용해도 현재 파일에 조문이 재현되지 않으면
+  해당 조항을 추측하지 않았다. MOU의 향후 본계약 진술보장, SSA의 조세 진술보장 존속기간,
+  매도인 명의 계약금 계좌도 각각 현재 진술보장·독립 조세배상·에스크로로 오분류하지 않았다.
+- 최초 감사에서 인용 위치·문구 불일치 4건을 원문에 맞게 정정했다. 감사기가 `0.5억원` 같은
+  소수 억 단위 금액을 인식하도록 보강하고 회귀 테스트를 추가했다.
+- 배치 종합 QA 리포트 `cs_index/t3_v3_qa_batch_01.md`를 생성했다. 원문 근거가 있는
+  present 조항 81개는 모두 지정 문단과 일치하고 정규화 숫자도 근거 검사를 통과했다.
+- 배치 결과는 pass 7, review 3이다. review 3건(`0ddde0e62bd84e41`,
+  `2a08ef8b2699dca5`, `a5da55951cfdabfb`)은 오류가 아니라 당사자·대금·책임제한 등이
+  공란인 초안이므로 사람 확인 대상으로 유지했다.
+- V4-0 누적 상태는 결과 생성 20/60, pass 17, review 3, error 0, pending 40이다.
+  사람 승인 전이므로 `catalog.sqlite`에는 v3 결과를 기록하지 않았다.
+
+검증:
+- `python audit_t3_v3.py --manifest cs_index/t3_v3_pilot_manifest.json` -> `pass=17`, `review=3`, `error=0`, `pending=40`
+- `python -m pytest -q tests/test_t3_v3.py tests/test_enrich_contracts.py` -> 18 passed
+
+### 2026-07-16 세션 23 — v3 공란 처리 기준 소유자 확인 (Codex)
+
+- 소유자가 당사자명·매매대금·배상상한 등 원문 입력값이 공란이면 값 없음으로 반영하도록
+  확인했다. 공란 당사자는 임의 생성하지 않고, 공란 금액·비율은 `null` 또는 정규화 필드
+  미생성으로 유지한다.
+- 배치 01 결과 JSON은 이미 이 원칙대로 작성되어 있어 수정이 필요하지 않았다.
+  `cs_index/t3_v3_qa_batch_01.md`에 소유자 확인 기록을 추가하고 관련 공란 체크 항목을 승인 처리했다.
+- `review` 3건은 자동감사 오류가 아니라 초안 문서의 `low` 신뢰도 표시이므로 그대로 유지한다.
+  남은 사람 확인은 원문에 실제 기재된 수치·조항의 법률적 의미 판정뿐이다.
+
+### 2026-07-16 세션 24 — 배치 01 전건 사람 승인 + SHA 참조금액 구분 (Codex)
+
+- 소유자가 배치 01의 남은 법률적 의미 판정을 모두 승인했다. 원문 재대조 결과
+  `a5da55951cfdabfb`의 300억원은 현재 SHA 자체 대금이 아니라 별도 신주인수계약의
+  RCPS 투자금액이고, Drag-along은 투자대상회사 별도 SHA상 권리이며, IRR 15% 초과분의
+  10% 지급은 거래대금 earn-out이 아닌 주주간 초과이익 배분이라는 판정을 확정했다.
+- `a5da55951cfdabfb`의 현재 SHA 대금은 `amount_value=null`로 바꾸고, 300억원은
+  `definitions_json`의 `관련 신주인수계약 투자금액`으로 보존했다. 따라서 SHA 자체 대금
+  범위 검색에서 300억원으로 오인되지 않는다.
+- `동반매도요구권.present=false`, `earn-out.present=false`, `has_earnout=false`는 유지했다.
+  다만 별도 Drag-along의 행사 효과와 초과이익 배분 내용은 원문 위치·검토 메모에 남겼다.
+- `cs_index/t3_v3_human_review_batch_01.md`의 문서별·조항별 확인란과 배치 승인란을 모두
+  승인 완료로 기록했다. `cs_index/t3_v3_qa_batch_01.md`에도 사람 승인 10/10을 반영했다.
+- 자동감사 결과의 `review=3`은 공란이 있는 초안의 `low` 신뢰도 표시로 유지되며,
+  미승인 상태를 뜻하지 않는다. V4-0 사람 승인 누계는 배치 01의 10/60건이다.
+  결과 생성 누계는 20/60건이며, 나머지 40건 추출·감사·사람 승인이 남았다.
+- 전체 60건 승인 전이므로 `catalog.sqlite`에는 v3 결과를 기록하지 않았다.
+
+검증:
+- `python audit_t3_v3.py --manifest cs_index/t3_v3_pilot_manifest.json` -> `pass=17`, `review=3`, `error=0`, `pending=40`
+- `python -m pytest -q tests/test_t3_v3.py tests/test_enrich_contracts.py` -> 18 passed
+
+### 2026-07-16 세션 25 — T3 v3 국문 중심 혼합유형 배치 02 추출·감사·QA (Codex)
+
+- V4-0 게이트에서 결과가 없던 40건 중 국문 중심 혼합유형 10건을 부분 정독했다:
+  SSA 1건, ATA/BTA 2건, JVA 1건, 공동투자 1건, BW 1건, EB 2건,
+  주식교환 1건, MOU 1건. `cs_index/enrich_results_v3/<file_key>.json` 10건과
+  `cs_index/t3_v3_human_review_batch_02.md`를 생성했다. 유료 API와 DB 쓰기는 사용하지 않았다.
+- 당사자명·대금·교환비율 등 원문 입력값이 없으면 `null` 또는 정규화 필드 미생성으로
+  처리했다. 실사 후 합의할 MOU 대금, 총액 없는 공동출자, 공란인 주식교환비율을 임의 보충하지 않았다.
+- `d52f0cbc2a9171bb`의 800억원은 현재 변경계약의 신규 대금이 아니라 원 교환사채인수계약의
+  전자등록총액이므로 현재 대금은 `null`로 두고 정의·메모에만 참조금액으로 보존했다.
+- 비구속 MOU의 별첨·거래범위 제안은 현재 확정 의무와 구분했다. `30fae2c6d27a9f8c`의
+  500억원, 선행조건과 경업금지는 비구속 별첨 조건으로 표시했고, `b0a1cc03cb0baa69`의
+  임직원·자산·부채 승계도 비구속 거래범위 제안으로 신뢰도를 낮췄다.
+- `584a623ee466906c`와 `c06cdd8feff8b75b`는 각각 손상된 JVA 중간 조각과 BW 비교본 조각이라
+  당사자·대금·조항을 추측하지 않고 `document_status=insufficient_text`로 분리했다.
+- 배치 QA 리포트 `cs_index/t3_v3_qa_batch_02.md`를 생성했다. present 조항 64개는 모두
+  지정 문단과 일치하고 정규화 숫자도 원문 근거 검사를 통과했다.
+- 이번 배치 결과는 pass 5, review 5, error 0이다. review 5건은 초안·공란 또는 본문 추출
+  불충분에 따른 낮은 문서 신뢰도이며 자동감사 오류는 없다.
+- V4-0 누적 상태는 결과 생성 30/60, pass 22, review 8, error 0, pending 30이다.
+  배치 02는 사람 검토 대기이며, 사람 승인 누계는 10/60건이다. 전체 승인 전이므로
+  `catalog.sqlite`에는 v3 결과를 기록하지 않았다.
+
+검증:
+- `python audit_t3_v3.py --manifest cs_index/t3_v3_pilot_manifest.json --input-dir cs_index/enrich_inputs_v3 --result-dir cs_index/enrich_results_v3 --report cs_index/t3_v3_audit_report.json` -> `pass=22`, `review=8`, `error=0`, `pending=30`
+- `python -m pytest -q tests/test_t3_v3.py` -> 8 passed
+
+### 2026-07-16 세션 26 — T3 v3 최종 30건 추출·전건 승인·V4-0 통과 (Codex)
+
+- 배치 03~05 각 10건을 원문 부분 정독해 `enrich_results_v3` 60건을 완성했다. 공란 당사자·대금·배상상한은 값 없음으로 두고, 별도 계약의 금액·권리와 비구속 제안은 현재 계약의 확정값으로 승격하지 않았다.
+- `c28dbecbb5bac628` 초안은 가액·비율 공란, `7084be8d0c8a3f68` 체결본은 현물출자가액 129,605,780,224원과 분할·분할합병대금 590,426,332,130원을 서로 다른 구성가치로 보존하고 임의 총액을 만들지 않았다.
+- `dbccf24bc86783f4`는 매수인명·기초가격·에스크로가 미확정인 Buyer First Markup, `a51842fc51010f69`은 1,130억원 기초대금과 5억6500만원 basket이 명시된 체결본으로 구분했다.
+- Kurly·Danggeun SHA의 별도 SSA 투자금은 현재 SHA 대금으로 넣지 않았고, FnStars Term Sheet의 USD 11.1m·USD 5m는 비구속 제안값으로 표시했다. 영문 BTA 양식의 당사자·대금 공란은 `null`로 유지했다.
+- 자동 감사 결과는 총 60건, pass 42, review 18, error 0, pending 0이다. review 18건에는 근거 이슈가 없으며 초안·공란·양식에 따른 low 신뢰도 표시다.
+- 소유자의 원문검토 위임·나머지 승인 지시에 따라 `t3_v3_human_approval_60.json`과 `t3_v3_v4_0_gate.md`에 60/60 승인을 기록했다.
+- 승인 범위를 정확히 저장하는 `store_t3_v3_manifest.py`를 추가해 manifest 60건만 `doc_meta` v3로 저장했다. 결과는 processed=60, stored=60, error=0이다.
+
+검증:
+- `python audit_t3_v3.py ...` -> pass=42, review=18, error=0, pending=0
+- `python eval_search.py --out cs_index --tiers T1,T2,T3` -> pass=17, fail=1, unscored=7, skipped=8 (기존 Q28 1건 실패 유지, 신규 회귀 없음)
+- T3·검색·MCP 관련 테스트 -> 41 passed
+
+### 2026-07-16 세션 27 — V4-1 원자항목 기반·coverage·감사기 구현 (Codex)
+
+- 기존 v3를 변경하지 않는 additive V4 스키마를 `v4_schema.py`에 구현하고 `catalog.sqlite`에 초기화했다: taxonomy node 43, alias 168, clause item 0, coverage 0.
+- `v4_clause_item`과 trigram FTS, `v4_document_coverage`의 body/annex 분리 상태, `v4_taxonomy_candidate` 후보 큐와 taxonomy 버전 메타를 추가했다.
+- 초기 taxonomy는 계획대로 family/domain 2단계까지만 seed하고 topic은 만들지 않았다. 신규 topic은 후보 큐와 향후 UI 승격 절차를 거친다.
+- `statement_polarity=none_exist`를 지원해 “미지급임금이 없음”을 진술보장 존재로 저장하며, 부재 판정은 body complete + annex complete/no_annex일 때만 허용한다.
+- `.docs/extract_prompt_v4.md`와 `audit_t3_v4.py`를 추가했다. 감사기는 taxonomy ID·family·문단 위치·verbatim·정규화 숫자 근거·coverage·후보 근거를 검사한다.
+- `data/v4_term_mapping.yaml`에 term_dict의 진술보장 하위 7개 검색축을 V4 RW domain에 연결하고 `term_dict_tools.py --validate`가 누락·잘못된 taxonomy ID를 검증하도록 보강했다. `data/term_dict.yaml` 자체는 수정하지 않았다.
+
+검증:
+- `python -m pytest -q tests/test_v4_schema.py tests/test_t3_v3.py` -> 16 passed
+- `python term_dict_tools.py --validate --dict data/term_dict.yaml --v4-mapping data/v4_term_mapping.yaml` -> errors=0 (기존 공유 변이 경고 3건)
+- `python init_v4_schema.py --out cs_index` -> taxonomy_nodes=43, taxonomy_aliases=168, clause_items=0, coverage=0
+
+### 2026-07-16 세션 28 — V4-2 대표 10건 입력 준비 (Codex)
+
+- 승인된 v3 60건 중 V4 전 항목 대상인 SPA·SSA·SHA·ATA/BTA에서 초안/체결본과 high/med/low 신뢰도가 섞이도록 대표 10건을 확정했다.
+- `plan_v4_batch.py`를 추가해 v3에서 승인된 진술보장·선행조건·확약의 문단 범위만 `cs_index/enrich_inputs_v4`에 생성했다. 문서 전체를 다시 입력하지 않고 관련 조항 범위만 전달한다.
+- 대표 표본은 SPA 3건, SSA 2건, SHA 3건, ATA/BTA 2건이다. 별도계약 참조가 있는 SHA, 영업양도 양식, 대형 체결 SPA, 공란 초안을 함께 포함해 경계사례를 우선 검증한다.
+- `cs_index/v4_batch_01_manifest.json`과 초기 `t3_v4_audit_report.json`을 생성했다. 현재 V4 결과는 아직 작성 전이므로 pending 10, error 0이며 다음 작업은 원자 항목 추출과 사람 검수표 작성이다.
+
+검증:
+- `python plan_v4_batch.py --out cs_index` -> count=10
+- `python audit_t3_v4.py ...` -> total=10, pending=10, error=0
+### 2026-07-23 — V4-1R 세부 원자화·별지 전수평가 기반 구현 (Codex)
+
+- 기존 V4 테이블을 삭제하지 않는 additive migration으로 `v4_clause_item`에
+  `source_kind/source_id/source_name/source_ref/parent_clause_ref`를 추가하고,
+  참조자료별 평가 상태를 저장하는 `v4_source_coverage`를 구축했다.
+- taxonomy version을 2로 올리고 노무 세부 노드
+  `RW.LABOR.NO_VIOLATION`, `RW.LABOR.WORKING_CONDITIONS`,
+  `RW.LABOR.NO_OFF_BOOK_WAGES`, `RW.LABOR.UNPAID_COMPENSATION` 및 aliases를 seed했다.
+- `plan_v4_batch.py`가 활성 taxonomy 정의·alias 전체, 본문 하위 단위 힌트,
+  Schedule·Disclosure Schedule·별지·부속서·첨부 인벤토리와 실제 발견 범위를 입력에 포함한다.
+- V3 위치가 제목이나 첫 하위조항에서 끝나더라도 다음 V4 family 시작 직전까지 Article 범위를
+  확장한다. 국문 대표 SPA는 RW 614~980(367문단·64 단위), COV 981~1249
+  (269문단·26 단위), CP 1250~1376(127문단·21 단위)로 재생성되어 대상회사 세부
+  진술보장과 후속 확약이 입력에서 빠지지 않는다.
+- `audit_t3_v4.py`가 자료별 coverage 누락, available 별지 미완료, non-leaf taxonomy 남용,
+  미커버 원자 단위, 기존 alias와 중복되는 신규 후보를 검사한다.
+- `store_v4_results.py`를 추가해 감사 `pass` 결과만 V4 테이블에 저장하고 `doc_meta`는 보존한다.
+  사람 검토 결과는 `--allow-review` 없이는 저장하지 않는다.
+- 실제 `cs_index/catalog.sqlite`를 schema revision `1R`, taxonomy 47노드·188 aliases로
+  마이그레이션하고 대표 10건 V4 입력을 새 형식으로 재생성했다.
+- 기존 데모 결과 2건은 `source_coverage`가 없는 구형 결과여서 새 감사에서 error로 분리했다.
+  삭제하지 않았으며 V4-2에서 재추출한다.
+
+검증:
+- `python -m pytest -q` → 169 passed, 1 skipped
+- `python init_v4_schema.py --out cs_index` → schema_revision=1R,
+  taxonomy_nodes=47, taxonomy_aliases=188
+- `python plan_v4_batch.py --out cs_index` → 대표 입력 10건 재생성
+- `git diff --check` → 오류 없음(기존 Windows LF/CRLF 경고만 출력)
+
+### 2026-07-23 — 한국·미국형 M&A 20건 V4 범위 재검토 (Codex)
+
+- 국문 12건, 영문·국영문 8건의 SPA·SSA·SHA·ATA/BTA 및 독립 Disclosure Letter를
+  층화 표본으로 선정해 V3 메타와 관련 조항·별지 범위를 부분 정독했다.
+- 한국형 계약의 계약금·중도금·잔금·위약벌·대금배분·임직원 승계와 미국형 계약의
+  Estimated/Final Purchase Price, NWC/debt/cash adjustment, escrow/holdback,
+  disclosure schedules, Knowledge/MAE/Permitted Lien, efforts standard를 반복 검색축으로 확인했다.
+- 검토 결과를 `.docs/V4_SCOPE_REVIEW_20_20260723.md`에 file_key 근거와 함께 기록했다.
+- V4 범위를 `RW|CP|COV|DEF|PAY|REM`으로 확장하고, 정의·지급구조·위반구제에도
+  원자 item·source coverage·통제 taxonomy를 적용하도록 `.docs/V4_PLAN.md`를 보강했다.
+- 계약금 몰취처럼 복수 기능을 가지는 문구는 PAY/REM 양쪽 item으로 저장하고 연결하며,
+  독립 Disclosure Letter/Schedule은 본계약 source로 연결하는 원칙을 확정했다.
+
+### 2026-07-23 — 추가 100건 검토 및 V4-1R2 6-family 보강 (Codex)
+
+- 기존 20건과 겹치지 않게 SPA·SSA·SHA·ATA/BTA 각 25건, 국문 52건·영문 48건을
+  층화 선정했다. 체결/비초안 34건, 초안 33건, 판별불가 33건이며 같은 유형·언어 안에서
+  동일 거래 계열의 여러 버전이 중복되지 않도록 정규화한 project key로 제한했다.
+- `review_v4_scope_sample.py`를 추가해 표본 선정, 관련 문구의 제한된 근거 수집,
+  재현 가능한 JSON/Markdown 보고서 생성을 자동화했다. 결과는
+  `cs_index/v4_scope_review_100.json`과
+  `.docs/V4_SCOPE_REVIEW_100_20260723.md`에 저장했다.
+- 대표 문단 부분 정독으로 사이버보안·침해사고 [847d7467e106d64f], anti-sandbagging·
+  배타적 구제 [e45d3402878d30f6], 이중배상·보험·조세혜택 차감 [4b65065b177cad18],
+  R&W 보험·대위권 포기 [76fc85ad82adef8e], rollover [113536aa319e1e0f],
+  payoff·담보해제 [847d7467e106d64f], TSA [1f0dc2031c3e3bf9]를 확인했다.
+- schema revision을 `1R2`, taxonomy version을 3으로 올리고 runtime family를
+  `RW|CP|COV|DEF|PAY|REM`으로 확장했다. 정의·대금·구제와 추가 100건에서 확인된
+  한미형 세부 항목을 반영해 taxonomy를 148노드·572 aliases로 보강했다.
+- SQLite의 기존 3-family CHECK는 직접 변경할 수 없어, V4 생성 데이터와 promoted node가
+  모두 0일 때만 V4 계층을 재구축하는 guarded migration을 구현했다. 실제 DB는 조건을
+  확인한 뒤 V4 계층만 재구축했으며 T1-T3 `files`·`doc_meta`는 보존했다.
+- `v4_clause_item.item_ref/related_item_ref`를 추가해 payoff(PAY/COV/CP), 계약금(PAY/REM),
+  Fraud(DEF/REM), R&W 보험(COV/REM) 같은 복수 기능 문구를 연결한다.
+- `plan_v4_batch.py`가 definitions_json, consideration_json과 대금조정·earn-out·
+  에스크로·손해배상·조세배상·해제 범위를 이용해 DEF/PAY/REM 입력도 생성한다.
+  대표 10건 입력과 manifest를 schema revision 1R2/taxonomy version 3으로 재생성했다.
+- 추출 프롬프트를 `v4-prompt-3`으로 올리고 6-family coverage, DEF/PAY/REM 원자화,
+  `related_item_ref` 규칙을 추가했다.
+
+검증:
+- `python init_v4_schema.py --out cs_index` → schema_revision=1R2,
+  taxonomy_nodes=148, taxonomy_aliases=572, V4 생성 데이터 0
+- `python plan_v4_batch.py --out cs_index` → 대표 입력 10건 재생성, 6개 family 포함
+- `python -m pytest -q tests/test_v4_schema.py tests/test_v4_1r.py tests/test_store_v4_results.py`
+  → 17 passed
+
+### 2026-07-23 — V4-1R2 국문 대표 1건 색인 테스트 (Codex)
+
+- 국문 대표 SPA `[0ddde0e62bd84e41]`에 대해 RW·COV·CP·DEF·PAY·REM 6개
+  family를 현재 V4-1R2 taxonomy로 다시 평가했다.
+- 조항 범위 탐지에서 정의 조항, 손해배상·해제 조항 및 대금 조항이 중간에서
+  잘리던 경우를 보정하고, Seller Draft·Purchaser comments 등 편집 흔적은
+  원자 단위 힌트에서 제외했다.
+- 총 205개 원자 item을 추출했다: RW 88, COV 30, CP 16, DEF 40, PAY 6,
+  REM 25. 노무는 위반 없음, 근로조건 준수, 규정 외 임금 없음, 미지급 보수
+  없음 등을 독립 taxonomy로 분리했다.
+- 파일에 포함된 별지 1(주주·지분·매매대금 표)은 전체 평가해
+  RW.CAPITALIZATION과 PAY.ALLOCATION으로 색인하고 관련 item을 상호 연결했다.
+  실제 내용이 없는 매도인 공개사항과 별지 1의 3은 source coverage에서
+  missing으로 명시했다.
+- 감사 결과는 review 1건, item 205개, issues 0건이다. review 사유는
+  taxonomy 후보 29개와 OCR 표·정의어 관련 needs_review 44개이다.
+- 명시적 사람 승인 전 review 결과를 저장하지 않는 가드를 확인했다:
+  stored 0, skipped 1.
+- 결과 보고서: `.docs/V4_KO_REPRESENTATIVE_TEST_0DDDE0E6_20260723.md`
+
+검증:
+- `python audit_t3_v4.py ...` → review=1, item_count=205, issues=0
+- `python store_v4_results.py ...` → stored_count=0, skipped_count=1
+- `python -m pytest -q` → 170 passed, 1 skipped
+
+### 2026-07-23 — 신규 M&A 계약 200건 검토 및 taxonomy v4 보강 (Codex)
+
+- 기존 범위검토 120건과 겹치지 않는 SPA·SSA·SHA·ATA/BTA 200건을 새로
+  층화 선정했다. 각 유형마다 국문 25건·영문 25건이며, 동일 유형·언어 안에서
+  정규화된 거래 project 중복은 0건이다.
+- 표본 상태는 체결/비초안 57건, 초안 72건, 판별불가 71건이고 영문 표본 중
+  미국 법·규제 표지가 직접 검출된 문서는 54건이다.
+- 기존 taxonomy 개념의 표현 근거를 전수 스캔한 뒤 38개 gap 후보를 추가
+  점검했다. 36개는 반복 또는 미국형 특수 개념의 근거가 확인됐고,
+  `PAY.MILESTONE`, `PAY.EARNOUT_ACCELERATION`은 0건이어서 승격하지 않았다.
+- 대표 5건의 관련 조항만 부분 정독해 정의 안의 단순 권리명 열거와 실제 SHA
+  운영권리, CP bring-down 중요성 기준과 REM materiality scrape, 매매대금
+  원천징수와 배상금 tax gross-up을 구분했다.
+- taxonomy version을 4로 올리고 36개 seed를 추가했다. 주요 보강 범위는
+  매출채권·재고·지급능력·개인정보 준수, 장부보존·특권·보증해제·종결후협조,
+  SHA tag/drag·ROFR/ROFO·put/call·reserved matters·이사지명·정보권·배당·
+  lock-up·창업자 전념, 기업결합·주주승인·FIRPTA·good standing,
+  양수/제외자산·승계/제외채무, materiality scrape·연대/개별책임·구상·
+  기본진술 별도 cap·청구통지기한·배상금 tax gross-up이다.
+- 추출 프롬프트를 `v4-prompt-4`로 보강해 SHA 권리 구성요소, 자산양수도
+  포함·제외 범위, materiality scrape scope, 청구통지 효과와 gross-up 문맥을
+  원자화하도록 했다.
+- term_dict의 관련 canonical 검색축을 가장 구체적인 V4 노드에 연결하도록
+  `v4_term_mapping.yaml`을 version 2/taxonomy version 4로 확장했다.
+- 실제 `catalog.sqlite`는 schema revision 1R2를 유지하면서 taxonomy version 4,
+  184 nodes, 732 aliases로 갱신했다. 기존 V4 clause item·coverage는 0건이어서
+  사용자 검토 결과를 덮어쓰지 않았다.
+
+산출물:
+- `.docs/V4_SCOPE_REVIEW_200_20260723.md`
+- `.docs/V4_SCOPE_GAPS_200_20260723.md`
+- `cs_index/v4_scope_review_200.json`
+- `cs_index/v4_scope_gaps_200.json`
+
+검증:
+- `python term_dict_tools.py --validate ...` → errors=0
+- `python init_v4_schema.py --out cs_index` → taxonomy_version=4,
+  taxonomy_nodes=184, taxonomy_aliases=732
+- `python -m pytest -q` → 172 passed, 1 skipped
+
+## 2026-07-23 — V4 잔여 651건 검토·taxonomy v8·운영 적재 완료
+
+- 앞서 검토한 20+100+200건과 절반 표본 652건을 제외한 정확한 보완집합
+  651건을 확정했다.
+- 사용자 요청에 따라 file_key 고정 순서로 1차 300건, 2차 351건을
+  비중복 배치로 검토했다.
+- 기존 49개 후보와 신규 세분화 후보 65개를 로컬 원문 캐시에서 검사하고,
+  대표 문단 문맥과 기존 taxonomy 중복을 확인했다.
+- 문맥 오탐과 기존 노드 중복을 제외하고 taxonomy v8에 43개 노드
+  (상위 `RW.IT` 1개, 검색용 원자 leaf 42개)를 추가했다.
+- taxonomy 누적은 369 nodes / 1,390 aliases다.
+- 확정 근거 42 items / 26 documents를 `review_status=approved`,
+  관련 family `body_status=partial`, `annex_status=not_evaluated`로
+  운영 DB에 적재했다.
+- 운영 V4 누적은 209 items / 60 documents이며 approved 209개다.
+- 감사 결과 pass=26, review=0, error=0, stored=26, skipped=0이다.
+
+주요 세분화:
+- `RW.IT.SYSTEMS_SUFFICIENCY`, `RW.IT.DISASTER_RECOVERY`
+- `COV.RWI.PROCUREMENT|MAINTENANCE|SUBROGATION_WAIVER`
+- `COV.TAX.CONSISTENT_REPORTING|AUDIT_CONTROL|TRANSFER_TAX`
+- `REM.THIRD_PARTY_CLAIMS.DEFENSE_CONTROL|SETTLEMENT_CONSENT|COOPERATION`
+- `REM.INDEMNITY.RW_BREACH|COVENANT_BREACH|TAX|EXCLUDED_LIABILITIES`
+- `REM.CONSEQUENTIAL.LOST_PROFITS|DIMINUTION_IN_VALUE|MULTIPLE_BASED`
+- `PAY.HOLDBACK`, `PAY.EARNOUT.DISPUTE`, `PAY.ESCROW.RELEASE`
+
+산출물:
+- `.docs/V4_REMAINING_REST_REVIEW_20260723.md`
+- `cs_index/v4_remaining_rest_review.json`
+- `cs_index/v4_remaining_rest_node_update.json`
+- `cs_index/v4_remaining_rest_confirmed_manifest.json`
+- `cs_index/v4_remaining_rest_confirmed_audit.json`
+- `cs_index/v4_remaining_rest_confirmed_store_audit.json`
+
+검증:
+- `python -m pytest -q` → 172 passed, 1 skipped
+- `python eval_search.py --out cs_index --json` → fail 0, pass 6
+- `python term_dict_tools.py --validate --out cs_index` → errors 0
+
+### 2026-07-23 — 색인 업데이트 전달·운영 프로토콜 문서화
+
+- 신규 계약서와 기존 운영 DB를 다음 세션 또는 새 환경에 전달해 현재 V4
+  기준으로 증분 업데이트할 수 있도록 `색인 업데이트 설명서.md`를 작성했다.
+- 계약서 본문·별지·Disclosure Schedule, 전체 `cs_index` 전달을 기본으로 하고,
+  DB만 전달할 때의 한계와 SQLite WAL 복사 주의사항을 명시했다.
+- 기존 taxonomy만 사용하는 방식, 신규 taxonomy 판단까지 위임하는 방식,
+  후보를 먼저 검토한 뒤 적재하는 방식별 요청 문구를 제공했다.
+- 패키지 무결성 확인, 백업, 증분 색인, 별지 인벤토리, V4 원자화, taxonomy
+  후보 판정, 감사, 운영 DB 적재, 회귀검사 순서와 완료 보고 항목을 정리했다.
+- 기준이 세션 기억에만 의존하지 않도록 `AGENTS.md`, V4 prompt, schema,
+  감사기, term mapping 등 새 환경에 함께 전달할 기준 파일 목록을 포함했다.
+
+### 2026-07-23 — V4-2 대표시험 131개 item 소유자 승인·적재 (Codex)
+
+- 소유자 지시에 따라 `[0ba3a1b8246c5dd5]`의 V4-2 결과 131개를 모두
+  `review_status=approved`로 전환했다.
+- 재감사 결과 pass 1건, issues 0건을 확인한 뒤 운영
+  `v4_clause_item`에 131개, `v4_document_coverage`에 6개 family,
+  `v4_source_coverage`에 별지·공개목록 2개 source를 적재했다.
+- 적재 분포는 body 19개, annex 102개, disclosure_schedule 10개이고,
+  본문·별지·공개예외를 잇는 `related_item_ref`는 11개다.
+- RW coverage는 body/annex 모두 complete이며, 이번 V4-2 범위 밖의
+  CP·COV·DEF·PAY·REM은 not_evaluated로 명시해 부재와 혼동되지 않게 했다.
+- `cs_index/v4_v2_trial_store_audit.json`에 저장 감사 결과를 남겼고
+  `.docs/V4_V2_TRIAL_0BA3A1B8_20260723.md`도 운영 적재 상태로 갱신했다.
+
+### 2026-07-23 — 미검토 주요 M&A 계약 절반 652건 검토·taxonomy v7 보강 (Codex)
+
+- 기존 검토 320건을 제외한 검색가능 `SPA|SSA|SHA|ATA/BTA` 1,303건 중
+  유형·언어 비율을 유지한 절반(올림) 652건(50.04%)을 선정했다.
+  SPA 295건, SSA 147건, SHA 143건, ATA/BTA 67건이며 국문 422건,
+  영문 223건, 국영문 7건이다.
+- 652건의 추출 문단 전체를 49개 미보유 원자개념 후보로 로컬 스캔했다.
+  42개 후보가 검출되었고, 대표 문단 부분 정독으로 정의·목차·단순 열거와
+  기존 taxonomy 중복을 제거한 뒤 36개를 taxonomy version 7로 승격했다.
+- 추가 노드는 RW 9, CP 3, COV 8, DEF 5, PAY 4, REM 7개다. 주요 예시는
+  경쟁법·관세·이민법·금융약정·보조금 환수·정부계약·도메인·부동산 용도/
+  수용, 핵심인력·에스크로·반대주주 주식매수청구권 조건, 개인정보 시정·
+  standstill·비방금지·조세환급·SHA 등록권/의결권위임/정족수/캐스팅보트,
+  회계원칙·데이터룸·공개목록·종결순차입금·목표운전자본, 마일스톤·주식대가·
+  정산기한·언아웃 보증, 공제형/소급형 basket·징벌손해·취소권포기·
+  에스크로 한정구제·청구대표자·배상재원 순서다.
+- `CP.STOCK_EXCHANGE_APPROVAL`, `CP.DATA_ROOM_DELIVERY`,
+  `COV.LITIGATION_COOPERATION`, `COV.IT_MIGRATION`,
+  `PAY.PRICE_ADJUSTMENT_COLLAR`,
+  `RW.CORPORATE_GOVERNANCE.NO_POWER_OF_ATTORNEY`는 오탐 또는 기존 노드
+  중복으로 승격하지 않았다.
+- taxonomy는 version 6의 290 nodes/1,002 aliases에서 version 7의
+  326 nodes/1,171 aliases로 증가했다. 추출 프롬프트도 `v4-prompt-7`로
+  올려 basket, SHA 운영규칙, 대금·정의, 구제재원 세분화 규칙을 반영했다.
+- 사용자의 운영 DB 적재 요청에 따라 명확한 근거 36개 item/33개 문서를
+  `review_status=approved`, 해당 family `body_status=partial`,
+  `annex_status=not_evaluated`로 저장했다. 감사 pass 33, issues 0,
+  stored 33, skipped 0이다.
+- 전체 운영 V4 item은 대표계약 131개를 포함해 167개/34개 문서이며 전부
+  approved다. partial 문서는 부재검색 근거로 사용하지 않는다.
+
+산출물:
+- `.docs/V4_REMAINING_HALF_REVIEW_20260723.md`
+- `cs_index/v4_remaining_half_review.json`
+- `cs_index/v4_remaining_half_node_update.json`
+- `cs_index/v4_remaining_half_confirmed_manifest.json`
+- `cs_index/v4_remaining_half_confirmed_audit.json`
+- `cs_index/v4_remaining_half_confirmed_store_audit.json`
+
+검증:
+- `python term_dict_tools.py --validate --out cs_index` → errors=0
+- `python eval_search.py --out cs_index --json` → fail=0
+- `python -m pytest -q` → 172 passed, 1 skipped
+
+### 2026-07-23 — V4-2 RW 세분화 및 신규 국문 SPA 대표시험 (Codex)
+
+- 누적 범위검토 320건(20+100+200)의 관련 문단을 로컬 규칙으로 재점검해
+  RW 표준 하위명제 82개의 실제 표현 근거를 확인했다. 권한·자본구조·재무·
+  자산·계약·소송·조세·IP·환경·보험·인허가·부동산·복리후생·제품·
+  고객/공급업체·특수관계인·브로커·개인정보 영역을 taxonomy version 5에
+  82개 leaf로 추가했다.
+- 기존 국문 대표와 다른 체결본 SPA `[0ba3a1b8246c5dd5]`를 선정했다.
+  본문 제5.1조의 진술보장뿐 아니라 별지 5.1(8) 대상회사 진술보장
+  (¶259~¶284)과 그 공개목록 세부자료(¶285~¶304)를 모두 V4-2 입력에 포함했다.
+- 대표계약에서 매출채권 발생·회수·대손충당금·제한부담, 재고 판매가능성·
+  수량 적정성·평가, 차임 지급·임대차보증금 회수, 인허가 분쟁, 세무장부,
+  세법상 거주자, 거래추가조세 부재, 일반 법규준수, 제공정보의 정확성·누락,
+  공동인력 등의 독립 명제를 추가 확인해 taxonomy version 6에 24개 노드
+  (구조노드 2개 포함)를 더했다.
+- taxonomy는 184개/732 aliases에서 누적 320건 보강 후 266개/896 aliases,
+  대표시험 반영 후 290개/1,002 aliases가 되었다. RW 노드는 41개에서
+  123개, 최종 147개로 확장됐다.
+- 대표계약은 총 131개 RW 원자 item으로 추출했다: 본문 19개, 진술보장 별지
+  102개, 공개목록 10개. 94개 서로 다른 최하위 taxonomy 노드를 사용했다.
+- 공개목록의 개인정보 동의·파기·보호조치 미이행, 외국인 근로자 보험 미가입,
+  공동인력, 산업안전보건 조치 미이행, 환경책임보험 미가입을 해당 본문/별지
+  진술보장 item과 `related_item_ref`로 연결하고 반대 극성과
+  `disclosure_exception` qualifier로 표시했다.
+- 감사 결과는 pass 1건, item 131개, issues 0건이다. 소유자 검수 전이므로
+  모든 item은 `review_status=pending`으로 두고 운영 `v4_clause_item`에는
+  적재하지 않았다.
+
+산출물:
+- `.docs/V4_V2_TRIAL_0BA3A1B8_20260723.md`
+- `cs_index/enrich_results_v4_v2_trial/0ba3a1b8246c5dd5.json`
+- `cs_index/v4_v2_trial_node_update.json`
+- `cs_index/v4_v2_trial_audit.json`
+- `cs_index/rw_leaf_gaps_320.json`
+
+검증:
+- `python audit_t3_v4.py ...` → pass=1, item_count=131, issues=0
+- `python term_dict_tools.py --validate --out cs_index` → errors=0
+- `python -m pytest tests/test_v4_schema.py tests/test_v4_1r.py tests/test_store_v4_results.py -q`
+  → 18 passed
+- `python -m pytest -q` → 172 passed, 1 skipped

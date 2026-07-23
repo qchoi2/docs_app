@@ -40,7 +40,7 @@ def load_raw_dict(dict_path: Optional[Path]):
     return yaml.safe_load(path.read_text(encoding="utf-8")) or {}, path
 
 
-def validate(dict_path: Optional[Path]) -> int:
+def validate(dict_path: Optional[Path], v4_mapping_path: Optional[Path] = None) -> int:
     try:
         data, path = load_raw_dict(dict_path)
     except (FileNotFoundError, yaml.YAMLError) as exc:
@@ -106,7 +106,59 @@ def validate(dict_path: Optional[Path]) -> int:
         if len(owners) > 1:
             warnings.append(f"variant '{key}' shared by: {', '.join(owners)}")
 
+    mapping_path = v4_mapping_path or path.parent / "v4_term_mapping.yaml"
+    subtopics = {
+        str(item.get("canonical") or "").strip()
+        for item in terms
+        if isinstance(item, dict) and "진술보장 하위" in (item.get("scope") or [])
+    }
+    if mapping_path.exists():
+        try:
+            mapping_data = yaml.safe_load(mapping_path.read_text(encoding="utf-8")) or {}
+        except yaml.YAMLError as exc:
+            errors.append(f"v4 mapping YAML invalid: {exc}")
+            mapping_data = {}
+        mappings = mapping_data.get("mappings") or {}
+        mapping_version = int(mapping_data.get("mapping_version") or 1)
+        if not isinstance(mappings, dict):
+            errors.append("v4 mapping: mappings must be an object")
+            mappings = {}
+        try:
+            from v4_schema import SEED_TAXONOMY
+
+            known_v4_ids = {seed.taxonomy_id for seed in SEED_TAXONOMY}
+        except ImportError:
+            known_v4_ids = set()
+            warnings.append("v4_schema import failed; taxonomy id validation skipped")
+        canonical_terms = {
+            str(item.get("canonical") or "").strip()
+            for item in terms
+            if isinstance(item, dict) and str(item.get("canonical") or "").strip()
+        }
+        required_mappings = (
+            subtopics if mapping_version < 2 else subtopics | set(mappings)
+        )
+        for canonical in sorted(required_mappings):
+            targets = mappings.get(canonical)
+            if not isinstance(targets, list) or not targets:
+                warnings.append(f"{canonical}: v4 taxonomy mapping missing")
+                continue
+            if canonical not in canonical_terms:
+                errors.append(f"v4 mapping has unknown canonical: {canonical}")
+            for target in targets:
+                if known_v4_ids and target not in known_v4_ids:
+                    errors.append(f"{canonical}: unknown v4 taxonomy id {target}")
+                elif canonical in subtopics and not str(target).startswith("RW."):
+                    errors.append(f"{canonical}: representation subtopic must map to RW.*")
+        if mapping_version < 2:
+            for canonical in sorted(set(mappings) - subtopics):
+                warnings.append(f"v4 mapping has non-subtopic entry: {canonical}")
+    else:
+        for canonical in sorted(subtopics):
+            warnings.append(f"{canonical}: v4 taxonomy mapping missing ({mapping_path})")
+
     print(f"dict: {path}")
+    print(f"v4 mapping: {mapping_path}")
     print(f"terms: {len(terms)}, errors: {len(errors)}, warnings: {len(warnings)}")
     for message in errors:
         print(f"ERROR: {message}")
@@ -231,6 +283,7 @@ def build_parser() -> argparse.ArgumentParser:
     group.add_argument("--zero-hits", action="store_true")
     parser.add_argument("--out", type=Path, help="cs_index folder (--suggest/--zero-hits)")
     parser.add_argument("--dict", type=Path, help="explicit term_dict.yaml path")
+    parser.add_argument("--v4-mapping", type=Path, help="explicit v4 term mapping yaml")
     parser.add_argument("--min-seen", type=int, default=1, help="--suggest: minimum query frequency")
     return parser
 
@@ -240,7 +293,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         if args.validate:
-            return validate(args.dict)
+            return validate(args.dict, args.v4_mapping)
         if not args.out:
             print("ERROR: --out is required for --suggest/--zero-hits", file=sys.stderr)
             return 2
