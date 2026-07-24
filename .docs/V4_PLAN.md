@@ -2,19 +2,24 @@
 _2026-07-16 작성. progress.md "V4 다음 단계" 초안을 검토·확장해 확정한 계획.
 전제: T3 v3 파일럿(`.docs/T3_V3_PILOT.md`)의 사람 승인 완료. v3 승인 전에는 V4에 착수하지 않는다._
 
-> 진행 상태(2026-07-24): **V4-0 통과, V4-1R2 구현, taxonomy v11 및
-> V4-2 대표 10건 승인·적재 완료.**
+> 진행 상태(2026-07-24): **V4-0 통과, V4-1R2 구현, V4-2 대표 10건
+> 승인·적재 및 V4-3 60건 파일럿 완료.**
 > `.docs/V4_SCOPE_REVIEW_20_20260723.md`와
 > `.docs/V4_SCOPE_REVIEW_100_20260723.md`의 한국·미국형 표본 결과에 따라 family를
 > `RW|CP|COV|DEF|PAY|REM`으로 확장했다. 기존 additive DB migration,
 > `source_kind/source_ref`, 자료별 `v4_source_coverage`, taxonomy catalog 포함 입력,
 > 별지 인벤토리, 원자 단위·별지 completeness 감사, 검증 통과분 전용 저장 경로를 구현했다.
-> taxonomy는 388노드·1,498 aliases, version 11이다. 국문 SPA
+> taxonomy는 398노드·1,561 aliases, version 12이다. 국문 SPA
 > `[0ba3a1b8246c5dd5]`는 본문·별지·공개목록의 131개 item을 승인·적재했다.
 > 기존 대표 표본의 나머지 9건은 529개 사전분류 item과 450개 후보를 문맥 재검수해
 > 861개 원자 item으로 확정했다. 별지·Schedule·Exhibit 64개 고유 source를 추적했고,
 > 제공된 63개는 검수 완료, 코퍼스에 없는 Seller Disclosure Schedule 1개는
 > `missing`으로 보존했다. 최종 감사 9/9 pass 후 운영 DB에 적재했다.
+> V4-3에서는 기존 대표 10건과 층화 선정한 추가 50건을 합쳐 60건 코호트를
+> 구성했다. 추가 50건에서 확정 item 2,500개를 추출하고 사전 후보 1,583개 중
+> 1,393개를 해소했다. 반복 명제 10개 노드(구조 부모 포함)를 v12에 반영했고,
+> 잔여 후보 190개는 확정 item과 분리해 운영 후보 큐에 저장했다. 감사 결과는
+> pass 17, review 33, pending/error 0, 구조 issue 0이다.
 
 ## 0. 목적과 판단 근거
 
@@ -270,7 +275,7 @@ recall, 정독 문서 수, 소요 시간을 비교한다. **(b)가 recall에서 
 | V4-1R | 기존 스키마 보강: `source_kind/source_ref`, `v4_source_coverage`, 원자성·참조자료 감사, 세부 topic taxonomy/alias 규칙 | 본문·별지 연결 및 중복분류 테스트 |
 | V4-1R2 | 누적 120건 범위검토를 반영해 `DEF|PAY|REM` 런타임 family, 6-family coverage, `related_item_ref`, taxonomy v3 및 입력 범위를 구현 | 6-family 스키마·입력·감사 테스트 |
 | V4-2 | 대표 **국문 SPA 1건을 먼저 재추출**해 모든 RW 하위 항목과 참조 별지를 전수 원자화 → 소유자 검수 후 나머지 9건 진행 | 하위 명제 누락 0, 참조자료 미추적 0, taxonomy 중복 0 |
-| V4-3 | 60건 파일럿 → 후보 큐 축적, 신규 후보 발생률 관찰 | 발생률 안정화 |
+| V4-3 | **완료**: 60건 파일럿, 확정 2,500 item, 후보 190개(7.1%), taxonomy v12 | 구조 issue 0, 후보 큐 운영 적재 |
 | V4-4 | **UI-5 taxonomy 관리 화면**(§5) + 후보 일괄 처리 → taxonomy v1 확정 | 버튼만으로 승격 가능 확인 |
 | V4-5 | CLI·웹·MCP 검색(§8) + 세부 골든 질의 작성 → **게이트 B 실행** | §9 |
 | V4-6 | 통과 시 SPA→SSA→SHA→ATA/BTA 배치 확장, agent_log 기반 깊이·유형 증분 조정 | 유형별 eval 회귀 확인 |

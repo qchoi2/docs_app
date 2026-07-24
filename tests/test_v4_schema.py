@@ -136,6 +136,15 @@ def test_seed_taxonomy_and_fts_are_initialized():
         "COV.SHA.PERMITTED_TRANSFER",
         "CP.GOVERNMENT_APPROVAL.GENERAL",
         "DEF.DEBT.GENERAL",
+        "RW.BUYER.SUFFICIENT_FUNDS",
+        "RW.BUYER.INDEPENDENT_INVESTIGATION",
+        "RW.BUYER.NO_RELIANCE",
+        "CP.WAIVER",
+        "CP.SELF_CAUSED_FAILURE",
+        "CP.ANCILLARY.TRANSACTION_CLOSING",
+        "CP.PURCHASE_PRICE_ADJUSTMENT",
+        "PAY.EARNOUT.PAYMENT",
+        "RW.DISCLOSURE.NO_OTHER_REPRESENTATIONS",
     ):
         assert conn.execute(
             "SELECT status FROM v4_taxonomy_node WHERE taxonomy_id=?",
@@ -189,6 +198,45 @@ def test_items_cannot_exist_for_unreadable_family():
     result["coverage"]["RW"]["body_status"] = "unreadable"
     with pytest.raises(V4SchemaError, match="cannot exist"):
         validate_v4_result(result, file_key="doc1", known_taxonomy=taxonomy_ids(conn))
+
+
+def test_annex_item_can_exist_when_body_remains_not_evaluated():
+    conn = database()
+    result = valid_result()
+    item = result["items"][0]
+    item.update(
+        {
+            "source_kind": "schedule",
+            "source_id": "rw-schedule",
+            "source_name": "Schedule 1",
+        }
+    )
+    result["coverage"]["RW"] = {
+        "body_status": "not_evaluated",
+        "annex_status": "complete",
+        "reason": "별지만 평가",
+    }
+    result["source_coverage"] = [
+        {
+            "family": "RW",
+            "source_id": "rw-schedule",
+            "source_kind": "schedule",
+            "source_name": "Schedule 1",
+            "source_ref": "¶20-¶30",
+            "storage_file_key": "doc1",
+            "status": "complete",
+            "reason": "별지 평가 완료",
+        }
+    ]
+    assert (
+        validate_v4_result(
+            result,
+            file_key="doc1",
+            known_taxonomy=taxonomy_ids(conn),
+        )
+        is result
+    )
+    assert not absence_is_provable(result["coverage"]["RW"])
 
 
 @pytest.mark.parametrize(

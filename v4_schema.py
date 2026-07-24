@@ -13,7 +13,7 @@ from review_rw_leaf_gaps import LEAVES as RW_REFINEMENT_LEAVES
 
 V4_SCHEMA_VERSION = 4
 V4_SCHEMA_REVISION = "1R2"
-DEFAULT_TAXONOMY_VERSION = 11
+DEFAULT_TAXONOMY_VERSION = 12
 FAMILIES = ("RW", "CP", "COV", "DEF", "PAY", "REM")
 CONFIDENCE_VALUES = ("low", "med", "high")
 POLARITY_VALUES = ("affirmative", "negative", "none_exist", "not_applicable")
@@ -664,6 +664,20 @@ SEED_TAXONOMY += (
     TaxonomySeed("DEF.DEBT.GENERAL", "DEF.DEBT", "DEF", "차입금·금융부채 일반 정의", "General debt or indebtedness definition", "특정 순차입금 계산요소가 아닌 계약상 Debt·Indebtedness의 일반 정의", 2, ("debt definition", "indebtedness definition", "차입금 정의", "금융부채 정의")),
 )
 
+# v12 recurring propositions confirmed by the sixty-document pilot.
+SEED_TAXONOMY += (
+    TaxonomySeed("RW.BUYER", "RW", "RW", "매수인 관련 진술보장", "Buyer representations", "매수인의 자금·조사·의존 등에 관한 진술보장", 1, ("buyer representations", "purchaser representations", "매수인 진술보장")),
+    TaxonomySeed("RW.BUYER.SUFFICIENT_FUNDS", "RW.BUYER", "RW", "매수인 자금충분성", "Sufficiency of buyer funds", "매수인이 매매대금과 거래비용을 지급할 충분한 자금 또는 확정된 자금조달원을 보유한다는 진술", 2, ("sufficient funds", "available funds", "funds to pay the purchase price", "매수인 충분한 자금", "매매대금 지급 자금")),
+    TaxonomySeed("RW.BUYER.INDEPENDENT_INVESTIGATION", "RW.BUYER", "RW", "매수인의 독자 조사·판단", "Independent buyer investigation", "매수인이 독자적인 실사·조사·평가에 기초하여 거래를 결정하였다는 진술", 2, ("independent investigation", "independent evaluation", "own assessment", "독자적인 평가", "독자적 조사")),
+    TaxonomySeed("RW.BUYER.NO_RELIANCE", "RW.BUYER", "RW", "매수인의 비의존", "Buyer no-reliance", "매수인이 계약에 명시된 진술보장 외의 진술·자료·예측 등에 의존하지 않았다는 진술", 2, ("no reliance", "has not relied", "not induced by", "비의존", "의존하지 아니")),
+    TaxonomySeed("CP.WAIVER", "CP", "CP", "선행조건 면제", "Waiver of conditions precedent", "선행조건의 전부 또는 일부를 수익 당사자가 서면 등 합의된 방식으로 면제할 수 있는지와 그 절차", 1, ("waiver of condition", "condition precedent waiver", "선행조건 면제", "조건 면제")),
+    TaxonomySeed("CP.SELF_CAUSED_FAILURE", "CP", "CP", "자초한 선행조건 미충족 원용 제한", "No reliance on self-caused condition failure", "자신의 위반 또는 방해로 선행조건이 미충족된 당사자가 그 미충족을 거래종결 거절 사유로 원용하지 못한다는 규정", 1, ("self-caused failure", "may not rely on failure of a condition", "prevention principle", "선행조건 충족 방해", "자초한 미충족")),
+    TaxonomySeed("CP.ANCILLARY.TRANSACTION_CLOSING", "CP.ANCILLARY", "CP", "연계거래 계약 체결·종결", "Ancillary transaction execution and closing", "다른 주식매매·투자·조직재편 등 연계거래의 계약이 유효하게 체결되거나 동시 또는 선행 종결될 것을 요구하는 조건", 2, ("ancillary transaction closing", "simultaneous closing", "related agreement execution", "연계거래 종결", "동시 종결")),
+    TaxonomySeed("CP.PURCHASE_PRICE_ADJUSTMENT", "CP", "CP", "대금조정 절차 완료", "Completion of purchase-price adjustment", "거래종결 전에 매매대금 조정절차가 완료되고 최종 대금 또는 가격조정 합의서가 확정될 것을 요구하는 조건", 1, ("purchase price adjustment completed", "final purchase price determined", "대금조정 완료", "최종 매매대금 확정")),
+    TaxonomySeed("PAY.EARNOUT.PAYMENT", "PAY.EARNOUT", "PAY", "언아웃 지급구조", "Earn-out payment mechanics", "언아웃 금액의 지급시기·지급방법·수령인·분배 등 지급구조", 2, ("earn-out payment", "earnout payment mechanics", "additional consideration payment", "언아웃 지급", "추가대금 지급")),
+    TaxonomySeed("RW.DISCLOSURE.NO_OTHER_REPRESENTATIONS", "RW.DISCLOSURE", "RW", "명시된 것 외 진술보장 부인", "No other representations", "계약에 명시된 진술보장이 전부이고 그 밖의 명시적·묵시적 진술보장은 제공되지 않는다는 진술", 2, ("no other representations", "exclusive representations and warranties", "no implied representation", "다른 진술 및 보장 없음", "명시된 진술보장 외에는")),
+)
+
 
 DDL = """
 CREATE TABLE IF NOT EXISTS v4_meta (
@@ -1126,7 +1140,11 @@ def validate_v4_result(data: Mapping[str, object], *, file_key: str, known_taxon
                     f"{path}.related_item_ref must reference another result item"
                 )
         _location(raw, path)
-        if data["coverage"][family]["body_status"] in ("not_evaluated", "unreadable"):
+        if (
+            raw["source_kind"] == "body"
+            and data["coverage"][family]["body_status"]
+            in ("not_evaluated", "unreadable")
+        ):
             raise V4SchemaError(f"{path} cannot exist when {family} body is not evaluated")
     return data
 

@@ -27,6 +27,9 @@ def test_korean_quoted_definitions_map_to_asset_and_liability_leaves():
     )
     assert classify_text(asset) == ["DEF.PURCHASED_ASSETS"]
     assert classify_text(liability) == ["DEF.ASSUMED_LIABILITIES"]
+    business_day = '"영업일"은 토요일, 일요일 및 공휴일을 제외한 날을 의미한다.'
+    assert defined_term(business_day) == "영업일"
+    assert classify_text(business_day) == ["DEF.BUSINESS_DAY"]
 
 
 def test_new_v10_and_v11_leaf_classifications():
@@ -39,6 +42,27 @@ def test_new_v10_and_v11_leaf_classifications():
     assert classify_text(
         "정부기관의 승인을 거래종결 전에 취득하여야 한다."
     ) == ["CP.GOVERNMENT_APPROVAL.GENERAL"]
+
+
+def test_v12_buyer_condition_and_earnout_classifications():
+    assert classify_text(
+        "매수인은 매매대금을 지급할 충분한 자금을 보유한다."
+    ) == ["RW.BUYER.SUFFICIENT_FUNDS"]
+    assert classify_text(
+        "매수인은 독자적인 평가에 기초하여 거래를 결정하였다."
+    ) == ["RW.BUYER.INDEPENDENT_INVESTIGATION"]
+    assert classify_text(
+        "매수인은 명시된 진술 외의 자료에 의존하지 아니하였다."
+    ) == ["RW.BUYER.NO_RELIANCE"]
+    assert classify_text(
+        "본건 소수지분 매매계약이 유효하게 체결되고 본건 거래와 동시에 종결될 것."
+    ) == ["CP.ANCILLARY.TRANSACTION_CLOSING"]
+    assert classify_text(
+        "최종 매매대금이 확정되고 매매대금 조정 절차가 완료될 것."
+    ) == ["CP.PURCHASE_PRICE_ADJUSTMENT"]
+    assert classify_text(
+        "Additional Consideration shall be paid within five Business Days."
+    ) == ["PAY.EARNOUT.PAYMENT"]
 
 
 def test_assignment_and_contract_compliance_are_reclassified_by_context():

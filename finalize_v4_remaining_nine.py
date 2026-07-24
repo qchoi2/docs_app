@@ -33,9 +33,18 @@ def has(text: str, *patterns: str) -> bool:
 
 def defined_term(text: str) -> str | None:
     match = DEFINITION_RE.search(text)
-    if not match:
-        return None
-    return (match.group(1) or match.group(2) or "").strip(' "')
+    if match:
+        return (match.group(1) or match.group(2) or "").strip(' "')
+    # Korean drafting usually places the topic marker after the quoted term
+    # and the definitional verb at the end of the sentence:
+    #   "영업일"은 ... 날을 의미한다.
+    quoted = re.match(r'^\s*"([^"\n]{1,120})"\s*(?:은|는|이란|란)', text)
+    if quoted and re.search(
+        r"(?:의미한다|뜻한다|말한다|정의한다|의미를\s+가진다)",
+        text,
+    ):
+        return quoted.group(1).strip()
+    return None
 
 
 def definition_taxonomy(term: str, text: str) -> str:
@@ -132,19 +141,72 @@ def classify_text(text: str) -> list[str]:
         ids.append("CP.DELIVERABLE")
     if has(text, r"(?:company|subscriber) required approvals?.*(?:obtained|received)"):
         ids.append("CP.APPROVAL")
+    if has(
+        text,
+        r"(?:condition precedent|condition to (?:closing|completion)).*(?:waiv|waiver)",
+        r"(?:waiv|waiver).*(?:condition precedent|condition to (?:closing|completion))",
+        r"선행조건.*면제",
+        r"(?:면제|포기).*(?:선행조건|조건)",
+    ):
+        ids.append("CP.WAIVER")
+    if has(
+        text,
+        r"(?:may|must|shall)\s+not\s+rely\s+on.*failure.*condition",
+        r"failure.*condition.*caused by.*(?:breach|failure)",
+        r"선행조건.*(?:충족|성취).*(?:방해|귀책).*(?:원용|주장).*(?:못|아니)",
+    ):
+        ids.append("CP.SELF_CAUSED_FAILURE")
+    if has(
+        text,
+        r"(?:governmental|required) approvals?.*(?:obtained|completed)",
+        r"필요적 (?:정부)?승인.*(?:완료|취득)|(?:정부승인|필요적 승인).*(?:받거나|완료)",
+    ):
+        ids.append("CP.GOVERNMENT_APPROVAL.GENERAL")
+    if has(
+        text,
+        r"(?:acquisition|buyer) fund.*(?:formed|established).*(?:exist|subsist)",
+        r"매수펀드.*(?:설립|존속)",
+    ):
+        ids.append("CP.FINANCING")
+    if has(
+        text,
+        r"(?:ancillary|related).*(?:agreement|transaction).*(?:executed|closed|completion)",
+        r"(?:소수지분|연계|관련).*(?:매매계약|거래).*(?:체결|종결)",
+        r"(?:share purchase agreement|investment agreement).*(?:executed|closed)",
+    ):
+        ids.append("CP.ANCILLARY.TRANSACTION_CLOSING")
+    if has(
+        text,
+        r"purchase price adjustment.*(?:completed|final)",
+        r"매매대금 조정.*(?:완료|최종|확정)|최종 매매대금.*확정",
+    ):
+        ids.append("CP.PURCHASE_PRICE_ADJUSTMENT")
 
     # Representations and warranties.
     if has(text, r"(?:duly )?(?:organized|incorporated).*(?:validly existing|존속)", r"적법하게 설립.*유효하게 존속"):
         ids.append("RW.AUTHORITY.ORGANIZATION")
-    if has(text, r"(?:power|authority|권한|자격).*(?:execute|enter|perform|체결|이행)"):
+    if has(
+        text,
+        r"(?:power|authority|capacity|권한|자격|능력).*(?:execute|enter|perform|체결|이행)",
+        r"(?:execute|enter|perform|체결|이행).*(?:power|authority|capacity|권한|자격|능력)",
+    ):
         ids.append("RW.AUTHORITY.POWER")
     if has(text, r"(?:board|corporate|internal).*(?:authorization|approval)", r"내부수권|이사회.*승인"):
         ids.append("RW.AUTHORITY.AUTHORIZATION")
-    if has(text, r"valid and binding|enforceable|유효.*구속력|집행할 수 있는"):
+    if has(
+        text,
+        r"valid and binding|binding.*enforceable|enforceable",
+        r"유효.*구속력|구속력.*집행\s*가능|집행할 수 있는",
+    ):
         ids.append("RW.AUTHORITY.ENFORCEABILITY")
     if has(text, r"(?:does not|will not).*(?:conflict|violate)", r"(?:위반|충돌).*아니"):
         ids.append("RW.AUTHORITY.NO_CONFLICT")
-    if has(text, r"no.*(?:consent|approval).*required", r"(?:동의|승인).*요구되지 아니"):
+    if has(
+        text,
+        r"no.*(?:consent|approval).*required",
+        r"(?:동의|승인).*요구되지 아니",
+        r"요구되는.*(?:승인|동의).*(?:존재하지|없)",
+    ):
         ids.append("RW.AUTHORITY.NO_CONSENT")
     if has(text, r"(?:represents? and warrants?).*(?:true|correct|accurate)", r"(?:true|correct|accurate).*(?:represents? and warrants?)", r"진술.*보장.*(?:진실|정확)", r"(?:진실|정확).*진술.*보장"):
         ids.append("RW.DISCLOSURE.ACCURACY")
@@ -194,6 +256,41 @@ def classify_text(text: str) -> list[str]:
         ids.append("RW.PERMITS.NO_REVOCATION")
     if has(text, r"(?:complies|compliance).*(?:environmental|applicable laws)", r"(?:환경|관련) 법령.*준수"):
         ids.extend(("RW.ENVIRONMENT.COMPLIANCE", "RW.COMPLIANCE.GENERAL"))
+    if has(
+        text,
+        r"sufficient (?:available )?funds|funds (?:sufficient|available).*purchase price",
+        r"매매대금.*지급.*충분한 자금|충분한 자금.*매매대금.*지급",
+    ):
+        ids.append("RW.BUYER.SUFFICIENT_FUNDS")
+    if has(
+        text,
+        r"independent (?:investigation|review|evaluation)|own (?:investigation|assessment)",
+        r"독자적인 (?:조사|평가|판단)|독자적 (?:조사|평가|판단)",
+    ):
+        ids.append("RW.BUYER.INDEPENDENT_INVESTIGATION")
+    if has(
+        text,
+        r"(?:has|have|had)\s+not\s+relied|no reliance|not been induced by",
+        r"의존하지 아니|의존하지 않|유인되지 아니",
+    ):
+        ids.append("RW.BUYER.NO_RELIANCE")
+    if has(
+        text,
+        r"no other (?:express or implied )?representations?",
+        r"(?:representations? and warranties?).*(?:are|constitute).*(?:all|entire)",
+        r"다른 진술.*보장.*없|진술.*보장.*전부.*이외.*(?:하지|없)",
+    ):
+        ids.append("RW.DISCLOSURE.NO_OTHER_REPRESENTATIONS")
+    if has(
+        text,
+        r"material adverse change",
+        r"(?:declaration|payment) of .*dividend",
+        r"(?:adoption|modification|termination) of .*employee plan",
+        r"change in any method of accounting",
+        r"(?:incur|commitment to incur).*capital expenditure",
+        r"acquire any assets other than in the ordinary course",
+    ):
+        ids.append("RW.ABSENCE_OF_CHANGES")
 
     # Payment and consideration.
     if has(
@@ -205,6 +302,21 @@ def classify_text(text: str) -> list[str]:
         r"(?:매매|양수도).*대금.{0,120}\([\d,]+\)원.*(?:한다|정한다|이다)",
     ):
         ids.append("PAY.BASE_PRICE")
+    if has(
+        text,
+        r"consideration for the sale.*(?:purchase price|payment)",
+        r"(?:purchase price|매매대금).*(?:consideration|대가)",
+    ):
+        ids.append("PAY.BASE_PRICE")
+    if has(
+        text,
+        r"(?:earn.?out|additional consideration).*(?:pay|payment|paid)",
+        r"(?:pay|payment|paid).*(?:earn.?out|additional consideration)",
+        r"언아웃.*지급|추가대금.*지급",
+    ):
+        ids.append("PAY.EARNOUT.PAYMENT")
+    if has(text, r"(?:default|delay) interest|interest.*late payment", r"지연이자"):
+        ids.append("PAY.INTEREST")
     if has(text, r"deposit|계약금|중도금"):
         ids.append("PAY.DEPOSIT")
     if has(text, r"closing.*(?:pay|payment|wire|송금)", r"거래종결.*(?:지급|송금)"):
@@ -320,6 +432,15 @@ def classify_text(text: str) -> list[str]:
         ids.append("COV.FURTHER_ASSURANCES")
     if has(text, r"after (?:the )?closing.*(?:access|entrance)", r"거래종결 후.*(?:출입|사용).*(?:협조|허용)"):
         ids.append("COV.POST_CLOSING_COOPERATION")
+    if has(
+        text,
+        r"(?:extend|make).*(?:loan|advance|contribution)",
+        r"change.*accounting (?:method|polic|practice)",
+        r"(?:merge|consolidate|liquidate|dissolve|wind up)",
+        r"enter into any contract.*foregoing",
+        r"(?:사전 서면 동의|prior written consent).*(?:하지|shall not|must not)",
+    ):
+        ids.append("COV.RESTRICTED_ACTIONS")
 
     # Remedies.
     if has(text, r"surviv(?:e|al).*(?:month|year|period)", r"존속기간"):
@@ -430,6 +551,7 @@ def reject_as_non_atomic(text: str) -> bool:
         r"following terms shall have the following meanings",
         r"다음.*조건.*선행조건으로 한다[.\s]*$",
         r"(?:별지|다음).*(?:진술.*보장한다|같이 진술 및 보장한다)[.\s]*$",
+        r"(?:아래|다음)와 같이.*진술.*보장한다[.:\s]*$",
         r"represents? and warrants? to .* as follows[.:\s]*$",
         r"(?:체결일로부터|between).*(?:행위를 하거나 하지 않을 것을 확약|covenants? as follows)[.\s]*$",
         r"본 계약.*성립.*증명.*(?:서명|기명날인)",
@@ -571,7 +693,10 @@ def finalize_result(
             hint_candidate = {
                 "verbatim": text,
                 "loc_start": int(hint["loc_start"]),
-                "loc_end": int(hint["loc_end"]),
+                # The heading itself is the reviewed evidence. Extending an
+                # item across the whole hint range creates false coordinates
+                # when the range crosses a later article or a sparse union.
+                "loc_end": int(hint["loc_start"]),
                 "proposed_ko": f"원문 atomic hint 재검수: {text[:100]}",
             }
             for taxonomy_id in ids:
@@ -644,15 +769,80 @@ def finalize_result(
 
     result = {
         **data,
-        "taxonomy_version": 11,
+        "taxonomy_version": int(data["taxonomy_version"]),
         "extractor_version": "codex-context-review-1",
-        "prompt_version": "v4-prompt-11",
+        "prompt_version": f"v4-prompt-{int(data['taxonomy_version'])}",
         "items": output,
         "coverage": coverage,
         "source_coverage": source_coverage,
         "taxonomy_candidates": unresolved,
     }
     return result, unresolved
+
+
+def prepare_reviewed_source(source: dict, result: dict) -> dict:
+    """Return a reviewed input payload aligned to final coverage and items."""
+    result_inventory_keys = {
+        (str(row["family"]), str(row["source_id"]))
+        for row in result["source_coverage"]
+    }
+    inventory = [
+        row
+        for row in (source.get("source_inventory") or [])
+        if (str(row["family"]), str(row["source_id"])) in result_inventory_keys
+    ]
+    inventory_keys = {
+        (str(row["family"]), str(row["source_id"]))
+        for row in inventory
+    }
+    inventory_by_id = {
+        str(row["source_id"]): row
+        for row in inventory
+    }
+    for coverage_row in result["source_coverage"]:
+        key = (str(coverage_row["family"]), str(coverage_row["source_id"]))
+        if key in inventory_keys:
+            continue
+        template = inventory_by_id.get(str(coverage_row["source_id"]))
+        if template is None:
+            template = next(
+                (
+                    row
+                    for row in (source.get("source_inventory") or [])
+                    if str(row["source_id"]) == str(coverage_row["source_id"])
+                ),
+                None,
+            )
+        if template is None:
+            continue
+        derived_inventory = dict(template)
+        derived_inventory["family"] = coverage_row["family"]
+        inventory.append(derived_inventory)
+        inventory_keys.add(key)
+        inventory_by_id.setdefault(str(coverage_row["source_id"]), template)
+
+    source["source_inventory"] = inventory
+    source["taxonomy_version"] = int(result["taxonomy_version"])
+    for family, section in (source.get("family_sections") or {}).items():
+        if not isinstance(section, dict):
+            continue
+        family_items = [
+            item
+            for item in result["items"]
+            if item["family"] == family and item["source_kind"] == "body"
+        ]
+        retained_hints = []
+        for hint in section.get("atomic_unit_hints") or []:
+            start = int(hint["loc_start"])
+            end = int(hint["loc_end"])
+            if any(
+                int(item["loc_start"]) <= end
+                and int(item["loc_end"]) >= start
+                for item in family_items
+            ):
+                retained_hints.append(hint)
+        section["atomic_unit_hints"] = retained_hints
+    return source
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -729,55 +919,7 @@ def main(argv: list[str] | None = None) -> int:
                 )
         if not unresolved:
             validate_v4_result(result, file_key=file_key, known_taxonomy=known)
-        result_inventory_keys = {
-            (str(row["family"]), str(row["source_id"]))
-            for row in result["source_coverage"]
-        }
-        inventory = [
-            row
-            for row in (source.get("source_inventory") or [])
-            if (str(row["family"]), str(row["source_id"])) in result_inventory_keys
-        ]
-        inventory_keys = {
-            (str(row["family"]), str(row["source_id"]))
-            for row in inventory
-        }
-        inventory_by_id = {
-            str(row["source_id"]): row
-            for row in inventory
-        }
-        for coverage_row in result["source_coverage"]:
-            key = (str(coverage_row["family"]), str(coverage_row["source_id"]))
-            if key in inventory_keys:
-                continue
-            template = inventory_by_id.get(str(coverage_row["source_id"]))
-            if template is None:
-                continue
-            derived_inventory = dict(template)
-            derived_inventory["family"] = coverage_row["family"]
-            inventory.append(derived_inventory)
-            inventory_keys.add(key)
-        source["source_inventory"] = inventory
-        source["taxonomy_version"] = 11
-        for family, section in (source.get("family_sections") or {}).items():
-            if not isinstance(section, dict):
-                continue
-            family_items = [
-                item
-                for item in result["items"]
-                if item["family"] == family and item["source_kind"] == "body"
-            ]
-            retained_hints = []
-            for hint in section.get("atomic_unit_hints") or []:
-                start = int(hint["loc_start"])
-                end = int(hint["loc_end"])
-                if any(
-                    int(item["loc_start"]) <= end
-                    and int(item["loc_end"]) >= start
-                    for item in family_items
-                ):
-                    retained_hints.append(hint)
-            section["atomic_unit_hints"] = retained_hints
+        source = prepare_reviewed_source(source, result)
         final_input_path = final_input_dir / f"{file_key}.json"
         final_input_path.write_text(
             json.dumps(source, ensure_ascii=False, indent=2),
@@ -799,7 +941,7 @@ def main(argv: list[str] | None = None) -> int:
         )
     manifest = {
         "meta_schema_version": 4,
-        "taxonomy_version": 11,
+        "taxonomy_version": int(result["taxonomy_version"]),
         "schema_revision": "1R2",
         "batch": "V4-2 remaining nine final review",
         "count": len(rows),

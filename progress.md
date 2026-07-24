@@ -1097,3 +1097,51 @@ README에 `--tiers T1,T2,T3` 사용법과 T3 skipped 동작을 문서화했다.
 - `python term_dict_tools.py --validate --out cs_index` → errors 0, warnings 3
 - `python eval_search.py --out cs_index --json` → fail 0
 - `python -m pytest -q` → 179 passed, 1 skipped
+
+### 2026-07-24 — V4-3 60건 파일럿·taxonomy v12·운영 후보 큐
+
+- 기존 대표 10건과 부분평가 모집단 59건 중 유형·언어 비율로 선정한 50건을
+  합쳐 정확히 60건의 파일럿 코호트를 구성했다. 추가 50건은 모두 현재
+  `doc_meta`와 txt 캐시를 사용했으며 유료 API는 호출하지 않았다.
+- 목차 좌표를 실제 조항으로 오인하던 문제를 교정했다. 영문 ARTICLE/목차 재현
+  위치와 국문 6-family 실제 표제를 기준으로 본문 범위를 다시 잡고,
+  Schedule·Annex·Exhibit·Disclosure Schedule을 별도 source inventory로
+  추적하도록 `run_v4_pilot_60.py`를 구현했다.
+- 추가 50건에서 확정 원자 item 2,500개를 생성했다. family 분포는 DEF 1,209,
+  RW 528, REM 269, CP 224, COV 172, PAY 98이다.
+- 사전 후보 1,583개 중 1,393개(88.0%)를 기존 taxonomy 또는 보강 규칙으로
+  해소했다. 남은 190개는 승인 item과 섞지 않고 pending 후보 큐에 저장했다.
+  후보 발생률은 `190 / (2,500 + 190) = 7.1%`이고 33개 문서에 남아 있다.
+- 반복 명제를 근거로 매수인 자금충분성·독자조사·비의존·기타 진술보장 부인,
+  선행조건 면제·자초 실패·연계거래 종결·대금조정 완료, 언아웃 지급구조를
+  taxonomy v12에 추가했다. 구조 부모를 포함해 10개 노드가 늘어
+  398 nodes/1,561 aliases가 되었다.
+- source coverage는 complete 134행, missing 59행이다. missing 59행은 13개
+  문서의 참조자료가 코퍼스에 없거나 참조만 있는 경우로, 내용을 추정하지 않고
+  부재검색 근거에서도 제외했다.
+- V4 감사는 total 50, pass 17, review 33, pending/error 0, 구조 issue 0이다.
+  사용자의 운영 적재 지시에 따라 확정 item과 후보를 분리한 채 50건을 모두
+  저장했다. 운영 DB는 3,502 items/69 documents, pending candidates 190개다.
+- 저장 전 `catalog.pre_v4_pilot60_store_20260724.sqlite`를 생성했다. SQLite
+  integrity check는 ok, foreign-key violation은 0이다.
+
+산출물:
+- `.docs/V4_PILOT_60_20260724.md`
+- `run_v4_pilot_60.py`
+- `tests/test_run_v4_pilot_60.py`
+- `cs_index/v4_pilot60_cohort_manifest.json`
+- `cs_index/v4_pilot60_final_manifest.json`
+- `cs_index/enrich_inputs_v4_pilot60_final/`
+- `cs_index/enrich_results_v4_pilot60_final/`
+- `cs_index/v4_pilot60_final_audit.json`
+- `cs_index/v4_pilot60_store_report.json`
+
+검증:
+- V4 감사 → pass 17, review 33, pending/error 0, 구조 issue 0
+- 운영 저장 → stored 50, skipped 0, `allow_review=true`
+- `python eval_search.py --out cs_index --tiers T1,T2 --json` → fail 0
+- `python -m pytest -q` → 185 passed, 1 skipped
+
+다음 단계:
+- V4-4 UI-5 taxonomy 관리 화면에서 현재 후보 190개를 반복 문구·family·근접
+  taxonomy별로 묶고, 기존 노드 귀속·신규 leaf 승격·기각을 일괄 처리한다.
