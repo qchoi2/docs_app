@@ -21,7 +21,12 @@ from run_v4_pilot_60 import (
     repair_family_sections,
     write_json,
 )
-from v4_schema import initialize_v4_schema, taxonomy_ids, validate_v4_result
+from v4_schema import (
+    V4_SCHEMA_REVISION,
+    initialize_v4_schema,
+    taxonomy_ids,
+    validate_v4_result,
+)
 
 
 TYPE_PRIORITY = ("SPA", "SSA", "SHA", "ATA/BTA")
@@ -184,7 +189,7 @@ def main(argv: list[str] | None = None) -> int:
     manifest = {
         "meta_schema_version": 4,
         "taxonomy_version": version,
-        "schema_revision": "1R2",
+        "schema_revision": V4_SCHEMA_REVISION,
         "batch": args.batch_id,
         "count": len(rows),
         "selection": selection,

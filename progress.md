@@ -1278,3 +1278,26 @@ README에 `--tiers T1,T2,T3` 사용법과 T3 skipped 동작을 문서화했다.
 다음 단계:
 - 차단 이슈가 없으므로 남은 pending은 보존한 채 taxonomy v13과 schema 1R3로
   다음 300건 확장 배치를 진행한다.
+
+### 2026-07-24 — V4-6 확장 배치 02(SPA 추가 300건)
+
+- 기존 평가 문서와 중복 대표를 제외한 eligible 1,254건에서 SPA 300건을
+  추가 선정했다(국문 196, 영문 104).
+- taxonomy v13·schema 1R3로 approved 원자 item 13,905개와 pending 후보
+  1,203개를 생성했다. 후보율은 7.96%로 직전 배치 9.44%보다 낮아졌다.
+- 감사 결과 pass 74, review 226, pending/error 0, 구조 issue 0이었다.
+- WAL-safe 백업 후 300건을 운영 DB에 적재했다. 누적 item 31,090개,
+  평가 문서 669개, pending 후보 2,479개이며 integrity ok, FK violation 0,
+  FTS row 수 일치다.
+- Gate B는 36/36 scored, V4 recall 1.0000, legacy 0.3445, 정독 문서 수
+  58.98% 감소다. T1/T2 fail 0, 전체 회귀 212 passed, 1 skipped다.
+- `run_v4_expansion.py` manifest의 schema revision 하드코딩을 제거하고
+  현재 `V4_SCHEMA_REVISION`을 기록하도록 교정했다.
+
+산출물:
+- `.docs/V4_EXPANSION_02_20260724.md`
+- `cs_index/v4_expansion_02_next300_*`
+
+다음 단계:
+- 다음 계약 배치 전에 Schedule·Annex·Disclosure Schedule 실질 문단이
+  item 또는 명시적 pending 후보로 모두 보존되는지 완전성 감사를 수행한다.
