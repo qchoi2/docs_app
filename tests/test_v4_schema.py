@@ -116,6 +116,31 @@ def test_seed_taxonomy_and_fts_are_initialized():
         WHERE normalized_alias='주주총회 승인'
         """
     ).fetchone()[0] == "CP.SHAREHOLDER_APPROVAL"
+    for taxonomy_id in (
+        "DEF.CONTRACT_TERM",
+        "COV.ASSIGNMENT",
+        "COV.SHA.TRANSFER.RESTRICTION",
+        "COV.REGULATORY.COMPLIANCE",
+        "REM.SURVIVAL.GENERAL",
+        "REM.DIRECT_CLAIMS.GENERAL",
+        "PAY.TRANSACTION_COSTS",
+        "PAY.CLOSING_MECHANICS",
+        "RW.CONTRACTS.ARM_LENGTH",
+        "RW.FINANCIAL.NO_GUARANTEE_SECURITY",
+        "REM.GOVERNING_LAW",
+        "REM.DISPUTE_RESOLUTION",
+        "REM.ENTIRE_AGREEMENT",
+        "REM.AMENDMENT",
+        "REM.CUMULATIVE_REMEDIES",
+        "REM.EFFECTIVE_DATE",
+        "COV.SHA.PERMITTED_TRANSFER",
+        "CP.GOVERNMENT_APPROVAL.GENERAL",
+        "DEF.DEBT.GENERAL",
+    ):
+        assert conn.execute(
+            "SELECT status FROM v4_taxonomy_node WHERE taxonomy_id=?",
+            (taxonomy_id,),
+        ).fetchone()[0] == "active"
     assert "source_kind" in {
         row[1] for row in conn.execute("PRAGMA table_info(v4_clause_item)")
     }

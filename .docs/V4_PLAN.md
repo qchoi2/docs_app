@@ -2,18 +2,19 @@
 _2026-07-16 작성. progress.md "V4 다음 단계" 초안을 검토·확장해 확정한 계획.
 전제: T3 v3 파일럿(`.docs/T3_V3_PILOT.md`)의 사람 승인 완료. v3 승인 전에는 V4에 착수하지 않는다._
 
-> 진행 상태(2026-07-23): **V4-0 통과, V4-1R2 구현, taxonomy v8 및
-> V4-2 대표 1건 승인·적재 완료.**
+> 진행 상태(2026-07-24): **V4-0 통과, V4-1R2 구현, taxonomy v11 및
+> V4-2 대표 10건 승인·적재 완료.**
 > `.docs/V4_SCOPE_REVIEW_20_20260723.md`와
 > `.docs/V4_SCOPE_REVIEW_100_20260723.md`의 한국·미국형 표본 결과에 따라 family를
 > `RW|CP|COV|DEF|PAY|REM`으로 확장했다. 기존 additive DB migration,
 > `source_kind/source_ref`, 자료별 `v4_source_coverage`, taxonomy catalog 포함 입력,
 > 별지 인벤토리, 원자 단위·별지 completeness 감사, 검증 통과분 전용 저장 경로를 구현했다.
-> taxonomy는 369노드·1,390 aliases, version 8이다. 국문 SPA
+> taxonomy는 388노드·1,498 aliases, version 11이다. 국문 SPA
 > `[0ba3a1b8246c5dd5]`는 본문·별지·공개목록의 131개 item을 승인·적재했다.
-> 기존 대표 표본의 나머지 9건은 taxonomy v8 입력으로 재생성했고, 보수적 사전분류
-> 528개 item과 451개 문맥·taxonomy 후보를 `needs_review/partial` 상태로 격리했다.
-> 다음은 9건의 원문 문맥 검수, 별지 coverage 확정 및 감사 pass 처리다.
+> 기존 대표 표본의 나머지 9건은 529개 사전분류 item과 450개 후보를 문맥 재검수해
+> 861개 원자 item으로 확정했다. 별지·Schedule·Exhibit 64개 고유 source를 추적했고,
+> 제공된 63개는 검수 완료, 코퍼스에 없는 Seller Disclosure Schedule 1개는
+> `missing`으로 보존했다. 최종 감사 9/9 pass 후 운영 DB에 적재했다.
 
 ## 0. 목적과 판단 근거
 

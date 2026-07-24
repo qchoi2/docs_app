@@ -13,7 +13,7 @@ from review_rw_leaf_gaps import LEAVES as RW_REFINEMENT_LEAVES
 
 V4_SCHEMA_VERSION = 4
 V4_SCHEMA_REVISION = "1R2"
-DEFAULT_TAXONOMY_VERSION = 8
+DEFAULT_TAXONOMY_VERSION = 11
 FAMILIES = ("RW", "CP", "COV", "DEF", "PAY", "REM")
 CONFIDENCE_VALUES = ("low", "med", "high")
 POLARITY_VALUES = ("affirmative", "negative", "none_exist", "not_applicable")
@@ -627,6 +627,41 @@ SEED_TAXONOMY += (
     TaxonomySeed("REM.INDEMNITY.COVENANT_BREACH", "REM.INDEMNITY", "REM", "확약 위반 손해배상", "Covenant-breach indemnity", "계약상 확약, 약속, 합의 또는 기타 의무의 위반으로 발생한 손해를 배상 대상으로 정하는 trigger", 2, ("covenant breach indemnity", "breach of obligations indemnity", "확약 위반 손해배상", "의무 위반 보상")),
     TaxonomySeed("REM.INDEMNITY.RW_BREACH", "REM.INDEMNITY", "REM", "진술보장 위반 손해배상", "Representation-and-warranty breach indemnity", "진술보장의 부정확, 불완전 또는 위반으로 발생한 손해를 배상 대상으로 정하는 trigger", 2, ("R&W breach indemnity", "representation warranty breach indemnity", "진술보장 위반 손해배상")),
     TaxonomySeed("REM.INDEMNITY.EXCLUDED_LIABILITIES", "REM.INDEMNITY", "REM", "제외채무 손해배상", "Excluded-liabilities indemnity", "자산양수도에서 매수인이 인수하지 않은 제외채무로 인한 손해를 매도인의 배상 대상으로 정하는 조항", 2, ("excluded liabilities indemnity", "indemnity for excluded liabilities", "제외채무 손해배상", "비승계채무 보상")),
+)
+
+# Taxonomy version 9: generic but search-relevant leaves needed to finish the
+# nine-document V4-2 review without misusing a non-leaf parent. Contract-specific
+# defined terms remain individually searchable through object_type/proposition.
+SEED_TAXONOMY += (
+    TaxonomySeed("DEF.CONTRACT_TERM", "DEF", "DEF", "기타 계약상 정의용어", "Other defined contract term", "독립 검색가치는 있으나 별도 표준 정의 노드가 없는 계약별 정의용어", 1, ("other defined term", "contract-specific definition", "기타 정의용어")),
+    TaxonomySeed("COV.ASSIGNMENT", "COV", "COV", "계약상 지위·권리의 양도제한", "Assignment restriction", "계약상 지위·권리·의무를 상대방 동의 없이 양도하거나 이전하지 않을 의무", 1, ("assignment restriction", "no assignment without consent", "계약상 지위 양도금지", "권리의무 양도제한")),
+    TaxonomySeed("COV.SHA.TRANSFER.RESTRICTION", "COV.SHA.TRANSFER", "COV", "일반 주식양도 제한", "General share transfer restriction", "주식·지분의 양도를 금지하거나 사전동의·절차 준수를 조건으로 하는 일반 제한", 3, ("general transfer restriction", "restriction on transfer of shares", "주식양도 제한", "지분 처분 제한")),
+    TaxonomySeed("COV.REGULATORY.COMPLIANCE", "COV.REGULATORY", "COV", "종결 후 인허가·규제준수", "Post-closing regulatory compliance", "거래종결 후 사업 인허가를 취득·유지하고 관련 규제를 준수할 의무", 2, ("post-closing permit compliance", "maintain regulatory approvals", "인허가 취득·유지 의무", "규제준수 확약")),
+    TaxonomySeed("REM.SURVIVAL.GENERAL", "REM.SURVIVAL", "REM", "일반 존속기간", "General contractual survival period", "진술보장·확약·청구권의 계약상 존속기간과 종료시점을 정하는 일반 규칙", 2, ("general survival period", "survival of representations", "진술보장 존속기간", "계약상 존속기간")),
+    TaxonomySeed("REM.DIRECT_CLAIMS.GENERAL", "REM.DIRECT_CLAIMS", "REM", "일반 직접청구 절차", "General direct-claim procedure", "제3자청구가 아닌 당사자 간 직접 손해배상청구의 제기·검토·이의 절차", 2, ("direct claim procedure", "claims between the parties", "직접청구 절차", "당사자간 손해배상청구")),
+)
+
+# v10 gaps confirmed while context-reviewing the remaining nine documents.
+# These are recurring, independently searchable propositions that could not be
+# represented faithfully by the v9 leaves.
+SEED_TAXONOMY += (
+    TaxonomySeed("PAY.TRANSACTION_COSTS", "PAY", "PAY", "거래 관련 세금·비용 부담", "Transaction taxes and expenses allocation", "계약 체결·이행 및 거래와 관련된 세금·비용을 어느 당사자가 부담하는지 정하는 지급구조", 1, ("each party bears its own costs", "transaction expense allocation", "각자 비용 부담", "세금 및 비용 부담")),
+    TaxonomySeed("PAY.CLOSING_MECHANICS", "PAY", "PAY", "거래종결 시기·장소·절차", "Closing time, place and mechanics", "거래종결의 일시·장소와 종결 실행방식을 정하는 절차", 1, ("closing time and place", "closing mechanics", "거래종결 일시", "종결 장소")),
+    TaxonomySeed("RW.CONTRACTS.ARM_LENGTH", "RW.CONTRACTS", "RW", "중요계약의 독립당사자 간 정상조건", "Material contracts on arm's-length terms", "중요계약이 통상적 사업과정에서 독립당사자 간 공정한 조건으로 체결되었다는 진술", 2, ("arm's-length contracts", "ordinary course fair terms", "독립된 제3자 간 공정한 거래조건", "정상가격 계약")),
+    TaxonomySeed("RW.FINANCIAL.NO_GUARANTEE_SECURITY", "RW.FINANCIAL", "RW", "제3자 채무 보증·담보 제공 없음", "No guarantee or security for third-party obligations", "대상회사가 제3자의 채무 또는 이행을 위해 보증이나 담보를 제공하지 않았다는 진술", 2, ("no third-party guarantee", "no security for another's debt", "타인 채무 보증 없음", "제3자 담보 제공 없음")),
+    TaxonomySeed("REM.GOVERNING_LAW", "REM", "REM", "준거법", "Governing law", "계약과 관련 분쟁에 적용될 준거법을 정하는 조항", 1, ("governing law", "laws governing the agreement", "준거법", "법률에 따라 해석")),
+    TaxonomySeed("REM.DISPUTE_RESOLUTION", "REM", "REM", "분쟁해결·관할", "Dispute resolution and jurisdiction", "계약상 분쟁의 법원 관할·중재 또는 기타 해결절차를 정하는 조항", 1, ("exclusive jurisdiction", "dispute resolution", "전속관할", "합의관할", "중재")),
+    TaxonomySeed("REM.ENTIRE_AGREEMENT", "REM", "REM", "완전합의", "Entire agreement", "계약이 당사자 간 최종적·완전한 합의이며 종전 합의를 대체한다는 조항", 1, ("entire agreement", "supersedes prior agreements", "완전한 합의", "종전 합의를 대체")),
+    TaxonomySeed("REM.AMENDMENT", "REM", "REM", "계약 변경 방식", "Amendment requirements", "계약의 수정·개정·변경에 필요한 서면·서명 등 형식요건", 1, ("amendment in writing", "written modification", "서면 변경", "수정 또는 개정")),
+    TaxonomySeed("REM.CUMULATIVE_REMEDIES", "REM", "REM", "구제수단의 누적성", "Cumulative remedies", "계약상 권리·구제수단이 법률상 다른 구제수단을 배제하지 않고 누적 적용된다는 조항", 1, ("cumulative remedies", "rights and remedies are cumulative", "구제수단 중첩", "다른 구제수단을 배제하지 않음")),
+    TaxonomySeed("REM.EFFECTIVE_DATE", "REM", "REM", "계약 효력발생일", "Effective date", "계약의 효력이 발생하는 날짜 또는 시점을 정하는 조항", 1, ("effective date", "agreement becomes effective", "효력발생일", "효력이 발생")),
+    TaxonomySeed("COV.SHA.PERMITTED_TRANSFER", "COV.SHA.TRANSFER", "COV", "허용되는 주식양도", "Permitted share transfer", "일반 양도제한의 예외로 계열회사·핵심인력 등 특정 수령인에게 허용되는 주식양도", 3, ("permitted transfer", "transfer to key personnel", "허용양도", "핵심인력에게 양도")),
+)
+
+# v11 closes the two non-leaf catches exposed by the final audit.
+SEED_TAXONOMY += (
+    TaxonomySeed("CP.GOVERNMENT_APPROVAL.GENERAL", "CP.GOVERNMENT_APPROVAL", "CP", "일반 정부승인·인가", "General governmental approval", "특정 규제유형으로 더 세분되지 않는 정부기관 승인·인가·허가의 취득 조건", 2, ("governmental approval", "regulatory approval", "정부기관 승인", "정부승인 취득")),
+    TaxonomySeed("DEF.DEBT.GENERAL", "DEF.DEBT", "DEF", "차입금·금융부채 일반 정의", "General debt or indebtedness definition", "특정 순차입금 계산요소가 아닌 계약상 Debt·Indebtedness의 일반 정의", 2, ("debt definition", "indebtedness definition", "차입금 정의", "금융부채 정의")),
 )
 
 

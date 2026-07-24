@@ -1054,3 +1054,46 @@ README에 `--tiers T1,T2,T3` 사용법과 T3 skipped 동작을 문서화했다.
 - `python -m pytest tests/test_propose_v4_remaining_nine.py tests/test_v4_schema.py tests/test_v4_1r.py -q`
   → 19 passed
 - V4 감사 → review 9, error 0, 후보 원문·좌표 불일치 0
+
+### 2026-07-24 — V4-2 나머지 9건 최종 문맥검수·taxonomy v11·운영 적재
+
+- 사전분류 529개 item과 450개 후보를 원문 문맥으로 재검수했다. family 범위
+  중복, 정의어 incidental match, 본문과 겹친 annex range를 제거하고 원문
+  atomic hint를 다시 확인해 최종 861개 원자 item으로 확정했다.
+- 최종 분포는 DEF 245, COV 222, RW 163, REM 142, CP 53, PAY 36이며
+  120개 서로 다른 leaf를 사용한다. 미해결 taxonomy 후보는 0개다.
+- 사전 제안에서 누락됐던 `[973d43e89040fb57]`의 `해당 인수대상자산`과
+  `해당 인수대상채무` 정의를 atomic hint 재검수로 복구해
+  `DEF.PURCHASED_ASSETS`, `DEF.ASSUMED_LIABILITIES`로 저장했다.
+- 별지·Schedule·Exhibit 64개 고유 source를 추적했다. family-source 기준
+  115행 중 제공된 114행은 complete이고, 코퍼스에 없는
+  `[a51842fc51010f69]`의 Seller Disclosure Schedule 1행은 추정하지 않고
+  missing으로 보존했다.
+- 반복적으로 확인된 신규 검색축을 taxonomy v9-v11에 19개 leaf로 추가했다.
+  주요 범위는 계약별 정의용어, 계약상 양도제한·허용양도, 거래비용 부담,
+  종결절차, 제3자 보증·담보 부재, arm's-length 계약, 준거법·관할·완전합의·
+  서면변경·누적구제·효력발생일, 일반 정부승인과 일반 Debt 정의다.
+- taxonomy는 v8 369 nodes/1,390 aliases에서 v11 388 nodes/1,498 aliases로
+  증가했다. 감사에서 확인된 비말단 `CP.GOVERNMENT_APPROVAL`, `DEF.DEBT`
+  직접사용은 각각 `.GENERAL` leaf로 교정했다.
+- 최종 V4 감사 결과 9건 전부 pass, review/pending/error 0이었다. 운영 DB에
+  9건을 모두 저장해 누적 1,070 items/69 documents가 되었고, coverage 414행,
+  source coverage 117행, taxonomy candidate 0건이다.
+- 저장 전 `catalog.pre_batch02_store_20260724.sqlite`와 taxonomy v9/v10/v11
+  단계별 SQLite 백업을 생성했다.
+
+산출물:
+- `.docs/V4_BATCH_02_FINAL_20260724.md`
+- `finalize_v4_remaining_nine.py`
+- `tests/test_finalize_v4_remaining_nine.py`
+- `cs_index/v4_batch_02_final_manifest.json`
+- `cs_index/enrich_inputs_v4_batch_02_final/`
+- `cs_index/enrich_results_v4_batch_02_final/`
+- `cs_index/v4_batch_02_final_audit.json`
+- `cs_index/v4_batch_02_store_report.json`
+
+검증:
+- `python audit_t3_v4.py ...` → pass 9, review/pending/error 0
+- `python term_dict_tools.py --validate --out cs_index` → errors 0, warnings 3
+- `python eval_search.py --out cs_index --json` → fail 0
+- `python -m pytest -q` → 179 passed, 1 skipped

@@ -1,6 +1,6 @@
 # V4 세부 조항 원자 항목 추출 지침
 
-버전: `v4-prompt-8` / taxonomy version: 입력값 사용
+버전: `v4-prompt-11` / taxonomy version: 입력값 사용
 
 ## 목적
 
@@ -16,7 +16,7 @@ v3에서 위치가 확정된 `진술보장(RW)`·`선행조건(CP)`·`확약(COV
   "meta_schema_version": 4,
   "taxonomy_version": 1,
   "extractor_version": "ai-file-harness-1",
-  "prompt_version": "v4-prompt-8",
+  "prompt_version": "v4-prompt-11",
   "items": [],
   "coverage": {
     "RW": {"body_status": "complete|partial|not_evaluated|unreadable", "annex_status": "complete|partial|not_evaluated|unreadable|no_annex", "reason": null},
@@ -149,7 +149,7 @@ v3에서 위치가 확정된 `진술보장(RW)`·`선행조건(CP)`·`확약(COV
     `REM.CONSEQUENTIAL|EXCLUSIVE_REMEDY|DIRECT_CLAIMS|INDEMNITY` 상위노드 대신
     해당 하위 leaf를 사용한다.
 
-## Taxonomy v8 추가 원자화 규칙
+## Taxonomy v8-v11 추가 원자화 규칙
 
 29. **IT 진술보장**은 시스템 충분성과 재해복구·업무연속성을 구분한다.
     사업 운영에 충분하다는 명제는 `RW.IT.SYSTEMS_SUFFICIENCY`, 백업·복구계획과
@@ -171,6 +171,19 @@ v3에서 위치가 확정된 `진술보장(RW)`·`선행조건(CP)`·`확약(COV
     별도 기록한다.
 35. **대금구조**에서 holdback, earn-out 이의절차, escrow 해제·분배는
     `PAY.HOLDBACK|PAY.EARNOUT.DISPUTE|PAY.ESCROW.RELEASE`로 분리한다.
+36. 계약별 정의용어는 표준 정의 노드가 없더라도 `DEF.CONTRACT_TERM`으로 저장하고
+    `object_type`과 원문으로 개별 검색되게 한다. 정의 본문에 우연히 등장한 다른
+    정의어로 taxonomy를 정하지 않는다.
+37. 계약상 권리·의무 양도제한, 일반 주식양도 제한, 허용양도는
+    `COV.ASSIGNMENT|COV.SHA.TRANSFER.RESTRICTION|COV.SHA.PERMITTED_TRANSFER`로
+    구분한다.
+38. 거래비용 부담과 종결 일시·장소는 `PAY.TRANSACTION_COSTS|
+    PAY.CLOSING_MECHANICS`, 준거법·분쟁관할·완전합의·서면변경·누적적 구제·
+    효력발생일은 각각의 `REM` leaf로 분리한다.
+39. 제3자 채무 보증·담보 부재와 중요계약의 독립당사자 간 정상조건은
+    `RW.FINANCIAL.NO_GUARANTEE_SECURITY|RW.CONTRACTS.ARM_LENGTH`로 기록한다.
+40. 일반 정부승인과 일반 Debt 정의도 부모 노드에 직접 저장하지 않고
+    `CP.GOVERNMENT_APPROVAL.GENERAL|DEF.DEBT.GENERAL` leaf를 사용한다.
 
 ## 금지
 
