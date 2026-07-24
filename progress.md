@@ -1145,3 +1145,41 @@ README에 `--tiers T1,T2,T3` 사용법과 T3 skipped 동작을 문서화했다.
 다음 단계:
 - V4-4 UI-5 taxonomy 관리 화면에서 현재 후보 190개를 반복 문구·family·근접
   taxonomy별로 묶고, 기존 노드 귀속·신규 leaf 승격·기각을 일괄 처리한다.
+
+### 2026-07-24 — V4-4 UI-5 taxonomy 후보 관리
+
+- `/taxonomy` 관리 화면과 후보 관리 API를 구현했다. 운영 pending 후보
+  190개는 정규화 문구·family·근접 노드 기준 179개 묶음으로 표시된다.
+- 같은 family의 여러 묶음을 선택해 (i) 기존 leaf 귀속, (ii) 신규 leaf 승격,
+  (iii) 사유를 남긴 기각을 일괄 실행할 수 있다.
+- 신규 승격은 canonical ID·부모·국영문 이름·정의·alias를 검증하고 taxonomy
+  version을 1 증가시킨다. 이미 item이 직접 귀속된 leaf를 부모로 바꾸거나
+  다른 family에 귀속하거나 기존 alias와 충돌시키는 작업은 거부한다.
+- `v4_taxonomy_action_log`를 추가해 action, candidate ID 목록, target,
+  payload·사유, UTC 시각을 기록한다. 후보 원문·file_key·¶좌표는 삭제하지 않는다.
+- 모든 쓰기는 `BEGIN IMMEDIATE` 트랜잭션이며 이미 처리된 후보의 재처리는
+  HTTP 409로 차단한다. 운영 앱의 실제 후보는 누르지 않아 pending 190,
+  action log 0건을 유지했다.
+- 실제 로컬 서버에서 `/taxonomy` HTTP 200, taxonomy v12, 179 clusters /
+  190 candidates를 읽기 확인했다. 연결 가능한 브라우저 인스턴스가 없어
+  화면 캡처 기반 시각 QA는 수행하지 못했고, HTML 응답·JS 구문·임시 DB
+  서비스/웹 통합 테스트로 처리 경로를 검증했다.
+
+산출물:
+- `.docs/V4_TAXONOMY_UI_20260724.md`
+- `taxonomy_admin.py`
+- `static/taxonomy.html`
+- `static/taxonomy.css`
+- `static/taxonomy.js`
+- `tests/test_taxonomy_admin.py`
+- `tests/test_taxonomy_web.py`
+
+검증:
+- taxonomy 서비스·웹·스키마 관련 테스트 → 38 passed
+- `node --check static/taxonomy.js` → 통과
+- 운영 DB 읽기 확인 → v12, pending 190, action log 0
+- `python -m pytest -q` → 192 passed, 1 skipped
+
+다음 단계:
+- V4-5 CLI·웹·MCP 검색에서 atomic taxonomy 조건을 노출하고 세부 골든 질의로
+  v3+부분정독 대비 recall·정독 문서 수를 비교하는 게이트 B를 실행한다.

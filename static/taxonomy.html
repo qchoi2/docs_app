@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Taxonomy 관리 · 계약서 검색</title>
+  <link rel="stylesheet" href="/static/tokens.css">
+  <link rel="stylesheet" href="/static/app.css">
+  <link rel="stylesheet" href="/static/taxonomy.css">
+</head>
+<body>
+<header class="nav-bar">
+  <a class="brand" href="/">계약서 검색</a>
+  <a class="nav-link" href="/">검색</a>
+  <a class="nav-link" href="/operations">운영</a>
+  <a class="nav-link" href="/research">리서치</a>
+  <a class="nav-link active" href="/taxonomy">Taxonomy</a>
+  <a class="nav-link" href="/setup">색인/설정</a>
+  <span class="spacer"></span>
+  <span id="version-badge" class="badge">불러오는 중</span>
+</header>
+
+<main class="container taxonomy-layout">
+  <section class="taxonomy-hero">
+    <div>
+      <p class="mono-eyebrow">V4 · UI-5</p>
+      <h1>원자 명제 후보 관리</h1>
+      <p>동일 문구를 묶어 기존 노드에 귀속하거나, 독립된 검색축으로 승격하거나,
+        문맥 조각을 기각합니다. 원문 근거는 그대로 보존됩니다.</p>
+    </div>
+    <button id="refresh-button" class="secondary-button" type="button">새로고침</button>
+  </section>
+
+  <section id="summary-grid" class="summary-grid" aria-label="taxonomy 요약"></section>
+
+  <section class="feature-card toolbar-card">
+    <div class="taxonomy-filters">
+      <label>상태
+        <select id="status-filter" class="text-input">
+          <option value="pending">검토 대기</option>
+          <option value="merged">기존 노드 귀속</option>
+          <option value="approved">신규 노드 승격</option>
+          <option value="rejected">기각</option>
+        </select>
+      </label>
+      <label>Family
+        <select id="family-filter" class="text-input">
+          <option value="">전체</option>
+          <option>RW</option><option>CP</option><option>COV</option>
+          <option>DEF</option><option>PAY</option><option>REM</option>
+        </select>
+      </label>
+      <label class="query-filter">후보 검색
+        <input id="query-filter" class="text-input" type="search"
+          placeholder="문구, file_key, 근접 taxonomy">
+      </label>
+      <button id="apply-filter" class="primary-button" type="button">조회</button>
+    </div>
+    <div class="selection-bar">
+      <label class="check"><input id="select-visible" type="checkbox"> 현재 목록 전체 선택</label>
+      <span id="selection-summary">선택 없음</span>
+      <div class="selection-actions">
+        <button id="merge-open" class="secondary-button" type="button" disabled>기존 노드 귀속</button>
+        <button id="promote-open" class="secondary-button" type="button" disabled>신규 노드 승격</button>
+        <button id="reject-open" class="danger-button" type="button" disabled>기각</button>
+      </div>
+    </div>
+  </section>
+
+  <div class="taxonomy-content">
+    <section>
+      <div class="list-heading">
+        <h2>후보 묶음</h2>
+        <span id="result-count" class="muted"></span>
+      </div>
+      <div id="candidate-list" class="candidate-list" aria-live="polite"></div>
+      <div class="pager">
+        <button id="previous-page" class="secondary-button" type="button">이전</button>
+        <span id="page-status"></span>
+        <button id="next-page" class="secondary-button" type="button">다음</button>
+      </div>
+    </section>
+
+    <aside id="action-panel" class="feature-card action-panel" hidden>
+      <div class="panel-heading">
+        <div>
+          <p class="mono-eyebrow">일괄 처리</p>
+          <h2 id="action-title">후보 처리</h2>
+        </div>
+        <button id="action-close" class="icon-button" type="button" aria-label="닫기">×</button>
+      </div>
+      <p id="action-context" class="callout"></p>
+
+      <form id="merge-form" class="action-form" hidden>
+        <label>귀속할 기존 노드
+          <input id="merge-node-search" class="text-input" type="search" placeholder="노드 검색">
+          <select id="merge-node" class="text-input taxonomy-select" size="10" required></select>
+        </label>
+        <label>판단 사유
+          <textarea id="merge-reason" class="text-input" rows="3"
+            placeholder="예: 기존 노드와 법적 의미가 동일"></textarea>
+        </label>
+        <button class="primary-button" type="submit">귀속 확정</button>
+      </form>
+
+      <form id="promote-form" class="action-form" hidden>
+        <label>Canonical ID
+          <input id="promote-id" class="text-input mono" required
+            placeholder="RW.LABOR.NEW_PROPOSITION">
+        </label>
+        <label>부모 노드
+          <select id="promote-parent" class="text-input taxonomy-select" size="8" required></select>
+        </label>
+        <label>국문 이름
+          <input id="promote-ko" class="text-input" required>
+        </label>
+        <label>영문 이름
+          <input id="promote-en" class="text-input" required>
+        </label>
+        <label>정의
+          <textarea id="promote-definition" class="text-input" rows="4" required></textarea>
+        </label>
+        <label>추가 alias <span class="muted">(한 줄에 하나)</span>
+          <textarea id="promote-aliases" class="text-input" rows="4"></textarea>
+        </label>
+        <label>승격 근거
+          <textarea id="promote-reason" class="text-input" rows="3"
+            placeholder="반복 문서 수와 기존 노드와의 구별점"></textarea>
+        </label>
+        <button class="primary-button" type="submit">신규 노드 승격</button>
+      </form>
+
+      <form id="reject-form" class="action-form" hidden>
+        <label>기각 사유
+          <textarea id="reject-reason" class="text-input" rows="5" required
+            placeholder="예: 목차 또는 표 조각으로 독립 명제가 아님"></textarea>
+        </label>
+        <button class="danger-button" type="submit">후보 기각</button>
+      </form>
+      <p id="action-message" class="form-message" role="status"></p>
+    </aside>
+  </div>
+</main>
+
+<script src="/static/taxonomy.js"></script>
+</body>
+</html>

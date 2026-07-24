@@ -46,6 +46,13 @@ from lib.ui_state import (add_compare_item, add_mark, add_session_item,
                           saved_searches)
 from open_text import open_text
 from search_contracts import connect_search_db, search_contracts
+from taxonomy_admin import (
+    handle_taxonomy_candidates,
+    handle_taxonomy_nodes,
+    handle_taxonomy_page,
+    handle_taxonomy_resolve,
+    handle_taxonomy_summary,
+)
 
 
 FILE_KEY_RE = re.compile(r"^[0-9a-f]{16}$")
@@ -1021,6 +1028,11 @@ ROUTES = [
     ("GET", re.compile(r"^/settings$"), handle_settings_page),
     ("GET", re.compile(r"^/operations$"), handle_operations_page),
     ("GET", re.compile(r"^/research$"), handle_research_page),
+    ("GET", re.compile(r"^/taxonomy$"), handle_taxonomy_page),
+    ("GET", re.compile(r"^/api/v4/taxonomy/summary$"), handle_taxonomy_summary),
+    ("GET", re.compile(r"^/api/v4/taxonomy/candidates$"), handle_taxonomy_candidates),
+    ("GET", re.compile(r"^/api/v4/taxonomy/nodes$"), handle_taxonomy_nodes),
+    ("POST", re.compile(r"^/api/v4/taxonomy/candidates/resolve$"), handle_taxonomy_resolve),
     ("GET", re.compile(r"^/api/settings/runtime-api$"), handle_runtime_api_settings),
     ("POST", re.compile(r"^/api/settings/anthropic-key$"), handle_anthropic_key_save),
     ("DELETE", re.compile(r"^/api/settings/anthropic-key$"), handle_anthropic_key_delete),

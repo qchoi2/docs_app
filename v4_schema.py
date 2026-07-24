@@ -810,6 +810,16 @@ CREATE TABLE IF NOT EXISTS v4_taxonomy_candidate (
   CHECK (loc_start > 0 AND loc_end >= loc_start)
 );
 CREATE INDEX IF NOT EXISTS idx_v4_candidate_status ON v4_taxonomy_candidate(status, family);
+CREATE TABLE IF NOT EXISTS v4_taxonomy_action_log (
+  action_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  action TEXT NOT NULL CHECK (action IN ('merge','promote','reject')),
+  candidate_ids_json TEXT NOT NULL,
+  target_taxonomy_id TEXT,
+  payload_json TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_v4_taxonomy_action_created
+  ON v4_taxonomy_action_log(created_at DESC);
 """
 
 
@@ -878,6 +888,7 @@ def _migrate_family_constraints(conn: sqlite3.Connection) -> None:
         DROP TRIGGER IF EXISTS v4_item_ad;
         DROP TRIGGER IF EXISTS v4_item_au;
         DROP TABLE IF EXISTS v4_item_fts;
+        DROP TABLE IF EXISTS v4_taxonomy_action_log;
         DROP TABLE IF EXISTS v4_taxonomy_candidate;
         DROP TABLE IF EXISTS v4_source_coverage;
         DROP TABLE IF EXISTS v4_document_coverage;
