@@ -284,6 +284,30 @@ UI-5는 V4-4에 두되, V4-3 후보가 쌓이기 시작하면 곧바로 필요�
 개발을 허용한다. **V4-6 전량 확장 시작 전에 UI-5가 반드시 완성되어 있어야 한다**
 (확장 중 후보가 대량 발생하며, 이때부터 소유자는 버튼으로만 운영한다).
 
+## 10.1 T4 인계 조건과 임베딩 단위
+
+V4와 검색 티어 T4는 별도 체계다. V4는 검색할 구조화 데이터를 만들고,
+T4는 그 데이터를 의미 유사도로 찾는 검색 경로다. T4 본 구현은 최소한
+V4-5의 게이트 B가 끝나고 taxonomy·coverage·검색 인터페이스가 안정된 뒤 시작한다.
+V4-6 전량 처리가 진행 중이어도 아래 조건을 만족한 승인 범위로 소표본 T4 A/B는 가능하지만,
+미승인·partial 결과를 완전한 V4 데이터처럼 임베딩해서는 안 된다.
+
+T4 입력 우선순위:
+
+1. `review_status=approved`인 V4 원자 항목
+2. V4가 partial/not_evaluated인 범위의 T3 clause_map 조항 청크
+3. V4/T3가 커버하지 않는 문단 슬라이딩 윈도우
+
+각 벡터 레코드는 `unit_kind`, file_key, item_ref 또는 canonical tag, taxonomy_id,
+원문 ¶범위, txt_hash, taxonomy/extractor/prompt/embedding model version을 보존한다.
+V4 item이 수정·재승인되거나 taxonomy가 재지정되면 해당 item 벡터만 stale 처리해
+증분 재생성한다. 문서와 질문 벡터는 동일 임베딩 모델·revision·전처리를 사용한다.
+
+T4는 V4의 부재 판정 규칙을 대체하지 않는다. 벡터 미검출은 부재의 근거가 될 수 없고,
+부재 질의는 계속 §2 coverage 조건과 구조화 item 존재 여부로만 판정한다.
+
+상세 런타임·성능·ablation 계약은 `docs_progress_v2.md`의 T4 계층을 따른다.
+
 ## 11. 사람 확인이 필요한 결정
 
 - v3 파일럿 60건 승인 (V4-0)
