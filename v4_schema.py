@@ -13,7 +13,7 @@ from review_rw_leaf_gaps import LEAVES as RW_REFINEMENT_LEAVES
 
 V4_SCHEMA_VERSION = 4
 V4_SCHEMA_REVISION = "1R3"
-DEFAULT_TAXONOMY_VERSION = 13
+DEFAULT_TAXONOMY_VERSION = 14
 FAMILIES = ("RW", "CP", "COV", "DEF", "PAY", "REM")
 CONFIDENCE_VALUES = ("low", "med", "high")
 POLARITY_VALUES = ("affirmative", "negative", "none_exist", "not_applicable")
@@ -692,6 +692,11 @@ SEED_TAXONOMY += (
     TaxonomySeed("REM.INDEMNITY.CHANGE_IN_LAW_EXCLUSION", "REM.INDEMNITY", "REM", "법령·해석 변경 손해 배제", "Change-in-law loss exclusion", "종결 후 법령·정부입장·해석의 변경으로 발생하거나 확대된 손해를 배상범위에서 제외하는 조항", 2, ("change in law exclusion", "post-closing law change", "법률 변경 손해 배제", "정부기관 해석 변경 손해")),
 )
 
+# v14 leaf fallback for pre-existing broad solvency evidence after v13 refinement.
+SEED_TAXONOMY += (
+    TaxonomySeed("RW.SOLVENCY.GENERAL", "RW.SOLVENCY", "RW", "일반 지급능력·도산 부재", "General solvency", "사해행위 위험 외의 일반적인 지급능력·채무초과·지급불능 또는 도산절차 부재 진술", 3, ("general solvency", "not insolvent", "지급능력", "지급불능 부재", "도산절차 부재")),
+)
+
 
 DDL = """
 CREATE TABLE IF NOT EXISTS v4_meta (
@@ -1261,6 +1266,44 @@ def replace_v4_result(
     extractor_version = str(data["extractor_version"])
     prompt_version = str(data["prompt_version"])
 
+    item_columns = [
+        str(row[1])
+        for row in conn.execute("PRAGMA table_info(v4_clause_item)")
+    ]
+    resolved_item_ids: set[int] = set()
+    for (raw_resolution,) in conn.execute(
+        """
+        SELECT resolution_json FROM v4_taxonomy_candidate
+        WHERE evidence_file_key=? AND status IN ('merged','approved')
+        """,
+        (file_key,),
+    ):
+        try:
+            resolution = json.loads(str(raw_resolution or "{}"))
+        except (TypeError, ValueError, json.JSONDecodeError):
+            continue
+        materialized_ids = resolution.get("materialized_item_ids")
+        if not isinstance(materialized_ids, list):
+            old_single = resolution.get("materialized_item_id")
+            materialized_ids = [old_single] if isinstance(old_single, int) else []
+        resolved_item_ids.update(
+            int(item_id) for item_id in materialized_ids if isinstance(item_id, int)
+        )
+    resolution_items = [
+        item
+        for row in conn.execute(
+            f"""
+            SELECT {','.join(item_columns)}
+            FROM v4_clause_item
+            WHERE file_key=?
+            ORDER BY item_id
+            """,
+            (file_key,),
+        )
+        for item in [dict(zip(item_columns, row))]
+        if str(item["item_ref"]).find("-TC") >= 0
+        or int(item["item_id"]) in resolved_item_ids
+    ]
     conn.execute("DELETE FROM v4_clause_item WHERE file_key=?", (file_key,))
     conn.execute("DELETE FROM v4_document_coverage WHERE file_key=?", (file_key,))
     conn.execute("DELETE FROM v4_source_coverage WHERE file_key=?", (file_key,))
@@ -1404,5 +1447,118 @@ def replace_v4_result(
                 prompt_version,
                 now,
                 now,
+            ),
+        )
+
+    # A document refresh must not erase evidence previously resolved through
+    # the taxonomy queue. Reuse an equivalent freshly extracted item when one
+    # exists; otherwise restore the reviewed TC item and repoint the audit JSON
+    # to its current row id.
+    resolution_item_id_map: Dict[int, int] = {}
+    insert_columns = [name for name in item_columns if name != "item_id"]
+    for preserved in resolution_items:
+        equivalent = conn.execute(
+            """
+            SELECT item_id FROM v4_clause_item
+            WHERE file_key=? AND taxonomy_id=? AND verbatim=?
+              AND loc_start=? AND loc_end=? AND source_kind=?
+              AND COALESCE(source_id,'')=COALESCE(?,'')
+            ORDER BY item_id LIMIT 1
+            """,
+            (
+                file_key,
+                preserved["taxonomy_id"],
+                preserved["verbatim"],
+                preserved["loc_start"],
+                preserved["loc_end"],
+                preserved["source_kind"],
+                preserved["source_id"],
+            ),
+        ).fetchone()
+        if equivalent is not None:
+            new_item_id = int(equivalent[0])
+        else:
+            values = [preserved[name] for name in insert_columns]
+            cursor = conn.execute(
+                f"""
+                INSERT INTO v4_clause_item({','.join(insert_columns)})
+                VALUES ({','.join('?' for _ in insert_columns)})
+                """,
+                values,
+            )
+            new_item_id = int(cursor.lastrowid)
+        resolution_item_id_map[int(preserved["item_id"])] = new_item_id
+
+    resolved_candidates = conn.execute(
+        """
+        SELECT candidate_id,resolution_json,verbatim,loc_start,loc_end,
+               source_kind,source_id
+        FROM v4_taxonomy_candidate
+        WHERE evidence_file_key=? AND status IN ('merged','approved')
+        """,
+        (file_key,),
+    ).fetchall()
+    for (
+        candidate_id,
+        raw_resolution,
+        candidate_verbatim,
+        candidate_start,
+        candidate_end,
+        candidate_source_kind,
+        candidate_source_id,
+    ) in resolved_candidates:
+        try:
+            resolution = json.loads(str(raw_resolution or "{}"))
+        except (TypeError, ValueError, json.JSONDecodeError):
+            continue
+        old_ids = resolution.get("materialized_item_ids")
+        if not isinstance(old_ids, list):
+            old_single = resolution.get("materialized_item_id")
+            old_ids = [old_single] if isinstance(old_single, int) else []
+        new_ids = [
+            resolution_item_id_map[int(item_id)]
+            for item_id in old_ids
+            if isinstance(item_id, int) and int(item_id) in resolution_item_id_map
+        ]
+        if not new_ids:
+            target_ids = resolution.get("taxonomy_ids")
+            if not isinstance(target_ids, list):
+                target = resolution.get("taxonomy_id")
+                target_ids = [target] if isinstance(target, str) and target else []
+            for target_id in target_ids:
+                equivalent = conn.execute(
+                    """
+                    SELECT item_id FROM v4_clause_item
+                    WHERE file_key=? AND taxonomy_id=? AND verbatim=?
+                      AND loc_start=? AND loc_end=? AND source_kind=?
+                      AND COALESCE(source_id,'')=COALESCE(?,'')
+                    ORDER BY item_id LIMIT 1
+                    """,
+                    (
+                        file_key,
+                        target_id,
+                        candidate_verbatim,
+                        candidate_start,
+                        candidate_end,
+                        candidate_source_kind or "body",
+                        candidate_source_id,
+                    ),
+                ).fetchone()
+                if equivalent is not None:
+                    new_ids.append(int(equivalent[0]))
+        if not new_ids:
+            continue
+        resolution["materialized_item_ids"] = list(dict.fromkeys(new_ids))
+        resolution.pop("materialized_item_id", None)
+        conn.execute(
+            """
+            UPDATE v4_taxonomy_candidate
+            SET resolution_json=?,updated_at=?
+            WHERE candidate_id=?
+            """,
+            (
+                json.dumps(resolution, ensure_ascii=False, sort_keys=True),
+                now,
+                candidate_id,
             ),
         )

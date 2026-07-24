@@ -16,7 +16,7 @@ from collections import Counter
 from pathlib import Path
 
 from lib.console import configure_utf8_stdio
-from propose_v4_remaining_nine import FAMILIES, REMAINING_KEYS
+from propose_v4_remaining_nine import FAMILIES, REMAINING_KEYS, substantive
 from v4_schema import initialize_v4_schema, taxonomy_ids, validate_v4_result
 
 
@@ -345,6 +345,12 @@ def classify_text(text: str) -> list[str]:
         r"(?:채권자취소권|사해행위|부인권).*(?:대상|사정).*(?:아니|없|존재하지)",
     ):
         ids.append("RW.SOLVENCY.FRAUDULENT_TRANSFER")
+    if has(
+        text,
+        r"\bsolven(?:t|cy)\b|\binsolven(?:t|cy)\b|bankrupt(?:cy)?",
+        r"지급능력|지급불능|채무초과|도산절차|파산절차",
+    ):
+        ids.append("RW.SOLVENCY.GENERAL")
     if has(
         text,
         r"material adverse change",
@@ -696,6 +702,49 @@ def reject_as_non_atomic(text: str) -> bool:
     )
 
 
+SOURCE_HEADING_RE = re.compile(
+    r"^\s*(?:schedule|annex|exhibit|appendix|별지|부록)\s*"
+    r"(?:[A-Z0-9가-힣]+(?:[.\-][A-Z0-9가-힣]+)*)?\s*$",
+    re.IGNORECASE,
+)
+
+
+def source_needs_candidate(text: str) -> bool:
+    """Keep substantive schedule evidence visible without queuing pure labels."""
+
+    cleaned = " ".join(text.split()).strip()
+    if not cleaned or SOURCE_HEADING_RE.fullmatch(cleaned):
+        return False
+    if reject_as_non_atomic(cleaned):
+        return False
+    if substantive(cleaned):
+        return True
+    if re.fullmatch(r"(?:none|nil|n/?a|없음|해당\s*없음|없다)[.\s]*", cleaned, re.IGNORECASE):
+        return True
+    if "|" in cleaned and len(cleaned) >= 12:
+        return True
+    return False
+
+
+def infer_source_candidate_family(text: str, linked_families: set[str]) -> str:
+    """Choose one review queue while source coverage blocks all linked families."""
+
+    if has(text, r"indemn|damages?|liabilit|termination|remed", r"손해|배상|책임|해제|해지"):
+        return "REM"
+    if has(text, r"purchase price|consideration|payment|escrow", r"매매대금|지급|에스크로|대가"):
+        return "PAY"
+    if has(text, r"condition(?:s)? precedent|condition to closing", r"선행조건|종결조건"):
+        return "CP"
+    if has(text, r"represent(?:s|ed|ation)|warrant", r"진술|보장"):
+        return "RW"
+    if has(text, r"\bshall\b|\bundertake|\bagree", r"하여야|확약|의무"):
+        return "COV"
+    for family in ("RW", "COV", "CP", "PAY", "REM", "DEF"):
+        if family in linked_families:
+            return family
+    return "COV"
+
+
 def clone_item(source: dict, taxonomy_id: str, item_ref: str, family: str) -> dict:
     row = dict(source)
     row.update(
@@ -763,8 +812,9 @@ def finalize_result(
 ) -> tuple[dict, list[dict]]:
     counters: Counter[str] = Counter()
     output: list[dict] = []
-    seen: set[tuple[str, str, int]] = set()
+    seen: set[tuple[str, str, int, str, str]] = set()
     unresolved: list[dict] = []
+    incomplete_source_keys: set[tuple[str, str]] = set()
 
     def add(source: dict, taxonomy_id: str, *, candidate: bool = False) -> None:
         if taxonomy_id not in known:
@@ -775,6 +825,8 @@ def finalize_result(
             taxonomy_id,
             str(source.get("verbatim")),
             int(source["loc_start"]),
+            str(source.get("source_kind") or "body"),
+            str(source.get("source_id") or ""),
         )
         if key in seen:
             return
@@ -838,6 +890,87 @@ def finalize_result(
             for taxonomy_id in ids:
                 add(hint_candidate, taxonomy_id, candidate=True)
 
+    # Review each physical schedule/annex paragraph exactly once. Source
+    # inventory rows can repeat the same physical source for several families;
+    # duplicate family links must not create duplicate clause items.
+    physical_sources: dict[tuple[str, int, str], list[tuple[dict, dict]]] = {}
+    for source_row in (source or {}).get("source_inventory") or []:
+        if str(source_row.get("status_hint") or "").casefold() not in {
+            "available",
+            "partial",
+        }:
+            continue
+        storage_key = str(
+            source_row.get("storage_file_key")
+            or (source or {}).get("file_key")
+            or data.get("file_key")
+        )
+        for paragraph in source_row.get("paragraphs") or []:
+            text = str(paragraph.get("text") or "").strip()
+            key = (storage_key, int(paragraph["para"]), text)
+            physical_sources.setdefault(key, []).append((source_row, paragraph))
+
+    represented_source_evidence = {
+        (int(row["loc_start"]), str(row["verbatim"]).strip())
+        for row in output
+        if row.get("source_kind") != "body"
+    }
+    for (_storage_key, para, text), links in physical_sources.items():
+        if not text or (para, text) in represented_source_evidence:
+            continue
+        taxonomy_ids = [
+            taxonomy_id
+            for taxonomy_id in classify_text(text)
+            if taxonomy_id in known
+        ]
+        representative = links[0][0]
+        linked_families = {str(row["family"]) for row, _paragraph in links}
+        source_candidate = {
+            "verbatim": text,
+            "loc_start": para,
+            "loc_end": para,
+            "source_kind": representative["source_kind"],
+            "source_id": representative["source_id"],
+            "source_name": representative["source_name"],
+            "source_ref": f"¶{para}",
+            "parent_clause_ref": representative["source_name"],
+            "qualifier": {
+                "review_method": "V4-2 별지 물리 문단 전수검수",
+                "linked_source_families": sorted(linked_families),
+            },
+        }
+        if taxonomy_ids:
+            for taxonomy_id in taxonomy_ids:
+                add(source_candidate, taxonomy_id, candidate=True)
+            represented_source_evidence.add((para, text))
+            continue
+        if not source_needs_candidate(text):
+            continue
+        candidate_family = infer_source_candidate_family(text, linked_families)
+        source_candidate.update(
+            {
+                "proposed_ko": (
+                    f"검토후보: {representative['source_name']} ¶{para} 별지 명제"
+                ),
+                "proposed_en": None,
+                "family": candidate_family,
+                "recommended_parent_id": candidate_family,
+                "distinction_reason": (
+                    "별지의 실질 문단이나 기존 taxonomy 규칙으로 확정 분류되지 않아 "
+                    "원문·source 좌표를 보존한 검토가 필요함"
+                ),
+                "nearest_taxonomy_id": candidate_family,
+            }
+        )
+        unresolved.append(source_candidate)
+        for linked_source, _paragraph in links:
+            incomplete_source_keys.add(
+                (str(linked_source["family"]), str(linked_source["source_id"]))
+            )
+        incomplete_source_keys.add(
+            (candidate_family, str(representative["source_id"]))
+        )
+
     body_families_with_items = {
         str(row["family"])
         for row in output
@@ -858,7 +991,11 @@ def finalize_result(
     source_coverage = []
     for row in data.get("source_coverage") or []:
         copied = dict(row)
-        if copied["status"] == "partial":
+        source_key = (str(copied["family"]), str(copied["source_id"]))
+        if source_key in incomplete_source_keys:
+            copied["status"] = "partial"
+            copied["reason"] = "별지 실질 문단에 미해결 taxonomy 후보가 있어 검토 필요"
+        elif copied["status"] == "partial":
             copied["status"] = "complete"
             copied["reason"] = "V4-2 별지·Disclosure Schedule 문맥 검수 완료"
         source_coverage.append(copied)
@@ -870,8 +1007,8 @@ def finalize_result(
         (str(row["family"]), str(row["source_id"]))
         for row in source_coverage
     }
-    for item_row in output:
-        if item_row["source_kind"] == "body" or not item_row.get("source_id"):
+    for item_row in [*output, *unresolved]:
+        if item_row.get("source_kind", "body") == "body" or not item_row.get("source_id"):
             continue
         key = (str(item_row["family"]), str(item_row["source_id"]))
         if key in source_keys:
@@ -881,7 +1018,11 @@ def finalize_result(
             continue
         derived = dict(template)
         derived["family"] = item_row["family"]
-        derived["reason"] = "별지 내용의 실제 법적 기능에 따라 family를 교정하여 검수 완료"
+        if key in incomplete_source_keys:
+            derived["status"] = "partial"
+            derived["reason"] = "별지 실질 문단에 미해결 taxonomy 후보가 있어 검토 필요"
+        else:
+            derived["reason"] = "별지 내용의 실제 법적 기능에 따라 family를 교정하여 검수 완료"
         source_coverage.append(derived)
         source_keys.add(key)
     by_family: dict[str, list[str]] = {family: [] for family in FAMILIES}
@@ -892,15 +1033,35 @@ def finalize_result(
         statuses = by_family[family]
         if statuses and all(status == "complete" for status in statuses):
             coverage[family]["annex_status"] = "complete"
+        elif statuses and any(status == "partial" for status in statuses):
+            coverage[family]["annex_status"] = "partial"
+        elif statuses and any(status == "unreadable" for status in statuses):
+            coverage[family]["annex_status"] = "unreadable"
+        elif statuses:
+            coverage[family]["annex_status"] = "not_evaluated"
         elif not statuses:
             coverage[family]["annex_status"] = "no_annex"
 
-    evidence_in_output = {str(row["verbatim"]) for row in output}
+    evidence_in_output = {
+        (
+            str(row.get("source_kind") or "body"),
+            str(row.get("source_id") or ""),
+            int(row["loc_start"]),
+            str(row["verbatim"]),
+        )
+        for row in output
+    }
     unresolved = [
         row
         for row in unresolved
         if row.get("code") == "unknown_taxonomy"
-        or str(row.get("verbatim") or "") not in evidence_in_output
+        or (
+            str(row.get("source_kind") or "body"),
+            str(row.get("source_id") or ""),
+            int(row.get("loc_start") or 0),
+            str(row.get("verbatim") or ""),
+        )
+        not in evidence_in_output
     ]
 
     result = {

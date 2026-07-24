@@ -281,3 +281,70 @@ def test_replace_v4_result_persists_source_links_without_touching_doc_meta():
     ).fetchone()
     assert item == ("RW.LABOR", "body", "¶10")
     assert conn.execute("SELECT COUNT(*) FROM v4_document_coverage").fetchone()[0] == 6
+
+
+def test_replace_result_repoints_preserved_taxonomy_resolution_evidence():
+    conn = database()
+    now = "2026-07-24T00:00:00+00:00"
+    cursor = conn.execute(
+        """
+        INSERT INTO v4_clause_item(
+          file_key,item_ref,family,taxonomy_id,proposition,statement_polarity,
+          qualifier_json,verbatim,loc_start,loc_end,normalized_json,confidence,
+          txt_hash,taxonomy_version,extractor_version,prompt_version,review_status,
+          created_at,updated_at
+        ) VALUES ('doc1','RW-TC000001','RW','RW.LABOR','미지급 임금이 없다',
+                  'none_exist','{}','미지급된 임금이 없다',10,10,'{}','high',
+                  'hash',13,'resolution','prompt','approved',?,?)
+        """,
+        (now, now),
+    )
+    old_item_id = int(cursor.lastrowid)
+    conn.execute(
+        """
+        INSERT INTO v4_taxonomy_candidate(
+          proposed_ko,family,recommended_parent_id,distinction_reason,
+          evidence_file_key,loc_start,loc_end,verbatim,nearest_taxonomy_id,
+          status,resolution_json,created_at,updated_at
+        ) VALUES ('미지급 임금','RW','RW.LABOR','resolved','doc1',10,10,
+                  '미지급된 임금이 없다','RW.LABOR','merged',?,?,?)
+        """,
+        (
+            json.dumps(
+                {
+                    "action": "merge",
+                    "taxonomy_id": "RW.LABOR",
+                    "materialized_item_ids": [old_item_id],
+                }
+            ),
+            now,
+            now,
+        ),
+    )
+    result = valid_result()
+    replace_v4_result(conn, file_key="doc1", txt_hash="hash", data=result)
+
+    rows = conn.execute(
+        "SELECT item_id,item_ref FROM v4_clause_item ORDER BY item_id"
+    ).fetchall()
+    assert len(rows) == 1
+    assert rows[0][1] == "rw-001"
+    resolution = json.loads(
+        conn.execute(
+            "SELECT resolution_json FROM v4_taxonomy_candidate WHERE status='merged'"
+        ).fetchone()[0]
+    )
+    assert resolution["materialized_item_ids"] == [rows[0][0]]
+
+    # Repeating the same refresh must preserve and repoint the reviewed
+    # evidence even after the original TC item was replaced by a regular item.
+    replace_v4_result(conn, file_key="doc1", txt_hash="hash", data=result)
+    refreshed_item_id = conn.execute(
+        "SELECT item_id FROM v4_clause_item WHERE item_ref='rw-001'"
+    ).fetchone()[0]
+    refreshed_resolution = json.loads(
+        conn.execute(
+            "SELECT resolution_json FROM v4_taxonomy_candidate WHERE status='merged'"
+        ).fetchone()[0]
+    )
+    assert refreshed_resolution["materialized_item_ids"] == [refreshed_item_id]

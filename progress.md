@@ -1301,3 +1301,36 @@ README에 `--tiers T1,T2,T3` 사용법과 T3 skipped 동작을 문서화했다.
 다음 단계:
 - 다음 계약 배치 전에 Schedule·Annex·Disclosure Schedule 실질 문단이
   item 또는 명시적 pending 후보로 모두 보존되는지 완전성 감사를 수행한다.
+
+### 2026-07-24 — V4 별지 물리 문단 완전성 교정·taxonomy v14
+
+- 두 300건 배치의 Schedule·Annex·Exhibit·Disclosure Schedule을 물리
+  `(storage file, ¶, 원문)` 단위로 감사했다. 기존 final review가 배치별
+  6,354개·7,242개의 미표현 실질 문단을 남긴 채 source를 complete로 바꾸던
+  조용한 누락을 확인했다.
+- 물리 문단을 한 번만 전수검수해 분류 가능한 문단은 source item으로,
+  나머지 실질 문단·표 행·None/없음은 source 좌표가 있는 pending 후보로
+  보존하도록 pipeline을 교정했다. 후보가 남은 source와 연결 family는 모두
+  partial로 유지한다.
+- 기존 600건을 재선정 없이 재생성했다. 배치 01은 item 21,047/source item
+  7,708/source 후보 3,847, 배치 02는 item 22,574/source item 9,520/source
+  후보 4,114다.
+- broad `RW.SOLVENCY` item을 새 leaf `RW.SOLVENCY.GENERAL`로 교정해
+  taxonomy v14 409 nodes가 되었다.
+- 운영 DB는 item 47,139/source item 17,712, pending 10,401/source pending
+  7,961이다. source evidence 25,673건은 txt 좌표와 전부 일치하고,
+  incomplete source를 complete로 표시한 사례는 0건이다.
+- 문서 재저장 시 taxonomy 해결 item과 action log 연결을 반복 실행에도
+  보존하도록 수정했다. resolution reference 294개 중 missing 0이다.
+- integrity ok, FK violation 0, FTS row 일치. Gate B V4 recall 1.0000,
+  정독 문서 수 56.69% 감소, T1/T2 fail 0, 전체 회귀 214 passed, 1 skipped다.
+
+산출물:
+- `.docs/V4_ANNEX_COMPLETENESS_20260724.md`
+- `refinalize_v4_batch.py`
+- `cs_index/v4_expansion_01_spa300_annex_*`
+- `cs_index/v4_expansion_02_next300_annex_*`
+
+다음 단계:
+- 47,139 item에서 Gate 조회가 약 95초로 증가했으므로 전체 결과를 매 페이지
+  재구성하는 방식을 SQL count/page pagination으로 바꾼 뒤 다음 배치로 간다.

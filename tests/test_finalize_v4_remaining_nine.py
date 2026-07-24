@@ -2,8 +2,10 @@ from finalize_v4_remaining_nine import (
     classify_text,
     defined_term,
     definition_taxonomy,
+    finalize_result,
     reject_as_non_atomic,
 )
+from v4_schema import FAMILIES, SEED_TAXONOMY, validate_v4_result
 
 
 def test_definition_classifier_uses_defined_term_not_incidental_terms():
@@ -109,3 +111,86 @@ def test_lead_ins_and_signature_blocks_are_rejected_as_non_atomic():
         "각 당사자는 상대방 당사자에게 아래와 같이 확약한다."
     )
     assert reject_as_non_atomic("Employees. Until the Closing, Purchaser shall:")
+
+
+def test_annex_paragraphs_become_items_or_coordinate_backed_candidates():
+    known = {seed.taxonomy_id: seed.family for seed in SEED_TAXONOMY}
+    coverage = {
+        family: {
+            "body_status": "not_evaluated",
+            "annex_status": "not_evaluated",
+            "reason": "no body",
+        }
+        for family in FAMILIES
+    }
+    coverage["RW"]["annex_status"] = "partial"
+    data = {
+        "file_key": "doc1",
+        "meta_schema_version": 4,
+        "taxonomy_version": 13,
+        "extractor_version": "proposal",
+        "prompt_version": "prompt",
+        "items": [],
+        "coverage": coverage,
+        "source_coverage": [
+            {
+                "family": "RW",
+                "source_id": "schedule-1",
+                "source_kind": "schedule",
+                "source_name": "Schedule 4",
+                "source_ref": "¶100-¶102",
+                "storage_file_key": "doc1",
+                "status": "partial",
+                "reason": "pre-review",
+            }
+        ],
+        "taxonomy_candidates": [],
+    }
+    source = {
+        "file_key": "doc1",
+        "family_sections": {},
+        "source_inventory": [
+            {
+                "family": "RW",
+                "source_id": "schedule-1",
+                "source_kind": "schedule",
+                "source_name": "Schedule 4",
+                "source_ref": "¶100-¶102",
+                "storage_file_key": "doc1",
+                "status_hint": "available",
+                "paragraphs": [
+                    {"para": 100, "text": "SCHEDULE 4"},
+                    {
+                        "para": 101,
+                        "text": "No litigation is pending against the Company.",
+                    },
+                    {
+                        "para": 102,
+                        "text": "The Company shall perform a bespoke quantum protocol.",
+                    },
+                ],
+            }
+        ],
+    }
+
+    result, unresolved = finalize_result(data, known, source=source)
+
+    assert [
+        (item["taxonomy_id"], item["source_id"], item["loc_start"])
+        for item in result["items"]
+    ] == [("RW.LITIGATION.NO_PENDING", "schedule-1", 101)]
+    assert len(unresolved) == 1
+    assert unresolved[0]["family"] == "COV"
+    assert unresolved[0]["source_kind"] == "schedule"
+    assert unresolved[0]["source_id"] == "schedule-1"
+    assert unresolved[0]["loc_start"] == 102
+    assert result["coverage"]["RW"]["annex_status"] == "partial"
+    assert result["coverage"]["COV"]["annex_status"] == "partial"
+    assert {
+        (row["family"], row["source_id"], row["status"])
+        for row in result["source_coverage"]
+    } == {
+        ("RW", "schedule-1", "partial"),
+        ("COV", "schedule-1", "partial"),
+    }
+    validate_v4_result(result, file_key="doc1", known_taxonomy=known)
