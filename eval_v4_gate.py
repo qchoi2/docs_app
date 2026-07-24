@@ -110,6 +110,30 @@ def comparison_keys(out: Path, taxonomy_id: str) -> list[str] | None:
     return states if all(states) and len(set(states)) == 3 else None
 
 
+def paged_v4_keys(
+    out: Path, taxonomy_id: str, polarity: str | None
+) -> tuple[set[str], int]:
+    keys: set[str] = set()
+    offset = 0
+    stale = 0
+    while True:
+        page = search_clause_items(
+            out,
+            taxonomy_id,
+            polarity=polarity,
+            show_duplicates=True,
+            limit=500,
+            offset=offset,
+        )
+        keys.update(str(item["file_key"]) for item in page["results"])
+        stale += sum(
+            item["freshness"] == "stale" for item in page["results"]
+        )
+        if not page["has_more"]:
+            return keys, stale
+        offset = int(page["next_offset"])
+
+
 def evaluate(out: Path, manifest: Path) -> dict:
     spec = json.loads(manifest.read_text(encoding="utf-8"))
     details = []
@@ -128,15 +152,10 @@ def evaluate(out: Path, manifest: Path) -> dict:
                 legacy = legacy_candidates(conn, taxonomy_id)
                 legacy_ms = (time.perf_counter() - legacy_started) * 1000
                 v4_started = time.perf_counter()
-                structured = search_clause_items(
-                    out,
-                    taxonomy_id,
-                    polarity=polarity,
-                    show_duplicates=True,
-                    limit=500,
+                v4_keys, stale_items = paged_v4_keys(
+                    out, taxonomy_id, polarity
                 )
                 v4_ms = (time.perf_counter() - v4_started) * 1000
-                v4_keys = {str(item["file_key"]) for item in structured["results"]}
                 details.append(
                     {
                         **query,
@@ -144,7 +163,7 @@ def evaluate(out: Path, manifest: Path) -> dict:
                         "legacy_recall": len(gold & legacy) / len(gold) if gold else None,
                         "v4_recall": len(gold & v4_keys) / len(gold) if gold else None,
                         "legacy_candidate_documents_to_read": len(legacy),
-                        "v4_source_documents_to_read": structured["stale_items"],
+                        "v4_source_documents_to_read": stale_items,
                         "legacy_ms": round(legacy_ms, 3),
                         "v4_ms": round(v4_ms, 3),
                         "status": "scored" if gold else "unscored_no_reference",

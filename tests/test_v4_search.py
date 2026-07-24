@@ -158,3 +158,13 @@ def test_compare_rejects_unknown_file(tmp_path):
             out, "RW.LABOR.NO_VIOLATION", ["a" * 16, "z" * 16]
         )
     assert exc.value.code == "FILE_NOT_FOUND"
+
+
+def test_search_pagination_reports_full_totals(tmp_path):
+    out = make_index(tmp_path)
+    first = search_clause_items(
+        out, "RW.LABOR.NO_VIOLATION", limit=1, offset=0
+    )
+    assert first["total_items"] == 1
+    assert first["returned_items"] == 1
+    assert first["has_more"] is False

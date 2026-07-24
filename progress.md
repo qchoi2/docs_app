@@ -1227,3 +1227,25 @@ README에 `--tiers T1,T2,T3` 사용법과 T3 skipped 동작을 문서화했다.
 - V4-6에서 SPA→SSA→SHA→ATA/BTA 순으로 제한 배치를 확장한다. Gate A가 아직
   미통과이므로 missing source와 pending taxonomy 후보는 계속 `needs_review`로
   보존하고, 유형별 평가 회귀를 함께 기록한다.
+
+### 2026-07-24 — V4-6 확장 배치 01(SPA 300건)
+
+- 미평가 core 계약 1,554개 중 SPA 300건(국문 196, 영문 104)을 중복 대표
+  기준으로 선택했다.
+- 승인 원자 item 13,389개와 pending taxonomy 후보 1,396개를 생성했다.
+  감사 결과 pass 62, review 238, pending/error 0, 구조 issue 0이었다.
+- WAL-safe 백업 후 300건을 운영 DB에 적재했다. 누적 V4 item 16,891개,
+  평가 문서 369개, pending 후보 1,586개이며 integrity ok/FK violation 0이다.
+- 500건을 넘는 결과의 Gate B recall 계산 오류를 찾아 V4 검색과 MCP·웹에
+  pagination을 추가했다. 전체 페이지 재평가 결과 V4 recall 1.0000,
+  legacy 0.3430, 원문 정독 필요량 53.85% 감소, T1/T2 fail 0이다.
+- 전체 회귀는 208 passed, 1 skipped이다.
+
+산출물:
+- `.docs/V4_EXPANSION_01_20260724.md`
+- `run_v4_expansion.py`, `tests/test_run_v4_expansion.py`
+- `cs_index/v4_expansion_01_spa300_*` 및 final input/result
+
+다음 단계:
+- 다음 300건 전에 pending 후보 1,586개를 반복 문구별로 묶어 기존 node
+  병합/신규 leaf 승격/기각하는 taxonomy 정리 배치를 수행한다.

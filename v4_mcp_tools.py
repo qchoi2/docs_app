@@ -28,6 +28,7 @@ class V4McpService:
         include_descendants: bool = True,
         item_absent: bool = False,
         limit: int = 50,
+        offset: int = 0,
     ) -> dict[str, Any]:
         """Search atomic propositions or safely classified absence."""
         if item_absent:
@@ -51,6 +52,7 @@ class V4McpService:
             lang=lang,
             include_descendants=include_descendants,
             limit=limit,
+            offset=offset,
         )
 
     def compare_clause_items(
@@ -92,6 +94,7 @@ def register_v4_tools(mcp: Any, out: Path, annotations: Any = None) -> V4McpServ
         include_descendants: bool = True,
         item_absent: bool = False,
         limit: int = 50,
+        offset: int = 0,
     ) -> dict[str, Any]:
         """Search approved V4 atomic items. If item_absent is true, only complete current body/annex coverage can produce confirmed_absent; all other non-matches are needs_review."""
         return service.search_clause_items(
@@ -105,6 +108,7 @@ def register_v4_tools(mcp: Any, out: Path, annotations: Any = None) -> V4McpServ
             include_descendants=include_descendants,
             item_absent=item_absent,
             limit=limit,
+            offset=offset,
         )
 
     @mcp.tool(

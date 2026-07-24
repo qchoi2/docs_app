@@ -64,6 +64,18 @@ def _bounded_int(value: object, name: str, default: int, high: int) -> int:
     return parsed
 
 
+def _offset_int(value: object) -> int:
+    if value in (None, ""):
+        return 0
+    try:
+        parsed = int(str(value))
+    except (TypeError, ValueError):
+        raise V4SearchError("'offset' must be an integer.")
+    if not 0 <= parsed <= 1_000_000:
+        raise V4SearchError("'offset' must be between 0 and 1000000.")
+    return parsed
+
+
 def _normalize(value: str) -> str:
     return " ".join(value.casefold().split())
 
@@ -301,11 +313,13 @@ def search_clause_items(
     include_descendants: bool = True,
     show_duplicates: bool = False,
     limit: int = 50,
+    offset: int = 0,
 ) -> dict:
     """Return approved atomic items and their source coordinates."""
     if polarity and polarity not in POLARITIES:
         raise V4SearchError("Unknown statement polarity.")
     limit = _bounded_int(limit, "limit", 50, MAX_LIMIT)
+    offset = _offset_int(offset)
     with closing(connect_v4_ro(out)) as conn:
         node = resolve_taxonomy(conn, taxonomy_id)
         subtree = taxonomy_descendants(
@@ -354,11 +368,15 @@ def search_clause_items(
             """,
             params,
         ).fetchall()
-        items = _dedupe_item_rows((_item_dict(row) for row in rows), show_duplicates)
-        items = items[:limit]
+        all_items = _dedupe_item_rows(
+            (_item_dict(row) for row in rows), show_duplicates
+        )
+        total_items = len(all_items)
+        total_documents = len({item["file_key"] for item in all_items})
+        stale = sum(item["freshness"] == "stale" for item in all_items)
+        items = all_items[offset: offset + limit]
         for item in items:
             item["coverage"] = _coverage_state(conn, item, str(node["family"]))
-        stale = sum(item["freshness"] == "stale" for item in items)
         return {
             "query": {
                 "taxonomy_id": node["taxonomy_id"],
@@ -374,8 +392,17 @@ def search_clause_items(
                 "ctype": ctype,
                 "lang": lang,
             },
-            "total_items": len(items),
-            "total_documents": len({item["file_key"] for item in items}),
+            "total_items": total_items,
+            "total_documents": total_documents,
+            "returned_items": len(items),
+            "offset": offset,
+            "limit": limit,
+            "has_more": offset + len(items) < total_items,
+            "next_offset": (
+                offset + len(items)
+                if offset + len(items) < total_items
+                else None
+            ),
             "stale_items": stale,
             "results": items,
             "warnings": (
@@ -610,6 +637,7 @@ def build_parser() -> argparse.ArgumentParser:
     present.add_argument("--lang")
     present.add_argument("--show-duplicates", action="store_true")
     present.add_argument("--limit", type=int, default=50)
+    present.add_argument("--offset", type=int, default=0)
     present.add_argument("--json", action="store_true", default=argparse.SUPPRESS)
     absent = sub.add_parser("absent", help="Find coverage-proved absence.")
     _add_common(absent)
@@ -644,6 +672,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 lang=args.lang,
                 show_duplicates=args.show_duplicates,
                 limit=args.limit,
+                offset=args.offset,
                 **common,
             )
         elif args.command == "absent":

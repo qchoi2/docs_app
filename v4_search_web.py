@@ -43,6 +43,7 @@ def handle_v4_item_search(app, match, query, body):
                 subject=body.get("subject") or None,
                 effective_time=body.get("effective_time") or None,
                 text=body.get("text") or None,
+                offset=body.get("offset", 0),
                 **common,
             )
         if mode == "absent":
