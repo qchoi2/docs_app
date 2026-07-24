@@ -1183,3 +1183,47 @@ README에 `--tiers T1,T2,T3` 사용법과 T3 skipped 동작을 문서화했다.
 다음 단계:
 - V4-5 CLI·웹·MCP 검색에서 atomic taxonomy 조건을 노출하고 세부 골든 질의로
   v3+부분정독 대비 recall·정독 문서 수를 비교하는 게이트 B를 실행한다.
+
+### 2026-07-24 — V4-5 원자 명제 검색·Gate B 예비 평가
+
+- `v4_search.py`를 공통 읽기 전용 서비스로 구현했다. taxonomy ID/canonical/alias
+  정규화, 하위 노드 포함 검색, polarity·주체·시점·유형·언어 필터, 원문과 ¶ 좌표,
+  본문·별지 source 및 최신성 표시를 지원한다.
+- 부재 판정은 본문 complete + 별지 complete/no_annex + 현재 해시 + source
+  complete/current + 해당 family pending 후보 없음 조건을 모두 만족한 경우만
+  `confirmed_absent`로 반환한다. 그 밖의 미검출 문서는 사유가 있는
+  `needs_review`로 분리한다.
+- 기존 `search_contracts.py`에 `--item`, `--item-absent`, `--polarity`,
+  `--subject`, `--time`, `--exact-item`을 추가했다. 독립 CLI는 2~10개 계약 비교도
+  지원한다.
+- `/v4-search` 화면과 `POST /api/v4/items/search`,
+  `POST /api/v4/items/compare`를 추가했다. taxonomy 선택지는 DB에서 동적으로
+  읽고 결과 카드에 match path·coverage·원문 좌표를 표시한다.
+- `v4_mcp_tools.py`는 기존 도구를 변경하지 않고 `search_clause_items`,
+  `compare_clause_items`를 등록하는 읽기 전용 어댑터다.
+- family별 존재 24, 부재 6, 비교 6의 총 36개 예비 골든 질의를 만들었다.
+  현재 승인 V4 item을 reference로 한 결과는 구조화 recall 1.0000, legacy
+  정확구문 후보 recall 0.3748, 정독 필요 문서 누적 24,647→12,422(49.6% 감소),
+  측정 조회시간 합계 1,163.073→466.066ms였다. 36개 모두 scored였다.
+- 이 평가는 독립 사람 검수 골드가 아니라 승인 item 기반 회귀이므로 Gate B의
+  기능 경로는 통과하되 Gate A 완전성 통과로 보지 않는다. pending 후보 190개와
+  missing source 59개는 계속 부재 판정에서 제외된다.
+
+산출물:
+- `.docs/V4_SEARCH_GATE_B_20260724.md`
+- `data/v4_gate_b_golden.json`
+- `eval_v4_gate.py`
+- `v4_search.py`, `v4_search_web.py`, `v4_mcp_tools.py`
+- `static/v4-search.html`, `static/v4-search.css`, `static/v4-search.js`
+- V4-5 테스트 5개 파일
+
+검증:
+- V4-5 대상 테스트 13 passed
+- `node --check static/v4-search.js` 통과
+- 실제 로컬 HTTP 검색 200 및 국문 원자 item 1건 확인
+- `python -m pytest -q` → 205 passed, 1 skipped
+
+다음 단계:
+- V4-6에서 SPA→SSA→SHA→ATA/BTA 순으로 제한 배치를 확장한다. Gate A가 아직
+  미통과이므로 missing source와 pending taxonomy 후보는 계속 `needs_review`로
+  보존하고, 유형별 평가 회귀를 함께 기록한다.

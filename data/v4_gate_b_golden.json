@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "scope": "V4-3 reviewed atomic items; provisional reference set",
+  "queries": [
+    {"id": "P-RW-01", "mode": "present", "taxonomy_id": "RW.AUTHORITY.NO_CONFLICT"},
+    {"id": "P-RW-02", "mode": "present", "taxonomy_id": "RW.AUTHORITY.ENFORCEABILITY"},
+    {"id": "P-RW-03", "mode": "present", "taxonomy_id": "RW.DISCLOSURE.ACCURACY"},
+    {"id": "P-RW-04", "mode": "present", "taxonomy_id": "RW.LITIGATION.NO_PENDING", "polarity": "none_exist"},
+
+    {"id": "P-CP-01", "mode": "present", "taxonomy_id": "CP.REPRESENTATIONS"},
+    {"id": "P-CP-02", "mode": "present", "taxonomy_id": "CP.GOVERNMENT_APPROVAL.GENERAL"},
+    {"id": "P-CP-03", "mode": "present", "taxonomy_id": "CP.COVENANTS"},
+    {"id": "P-CP-04", "mode": "present", "taxonomy_id": "CP.NO_PROHIBITION"},
+
+    {"id": "P-COV-01", "mode": "present", "taxonomy_id": "COV.EFFORTS_STANDARD"},
+    {"id": "P-COV-02", "mode": "present", "taxonomy_id": "COV.NOTICE_UPDATE"},
+    {"id": "P-COV-03", "mode": "present", "taxonomy_id": "COV.INFORMATION"},
+    {"id": "P-COV-04", "mode": "present", "taxonomy_id": "COV.CONFIDENTIALITY"},
+
+    {"id": "P-DEF-01", "mode": "present", "taxonomy_id": "DEF.BUSINESS_DAY"},
+    {"id": "P-DEF-02", "mode": "present", "taxonomy_id": "DEF.MAE"},
+    {"id": "P-DEF-03", "mode": "present", "taxonomy_id": "DEF.KNOWLEDGE"},
+    {"id": "P-DEF-04", "mode": "present", "taxonomy_id": "DEF.ENCUMBRANCE"},
+
+    {"id": "P-PAY-01", "mode": "present", "taxonomy_id": "PAY.CLOSING_PAYMENT"},
+    {"id": "P-PAY-02", "mode": "present", "taxonomy_id": "PAY.BASE_PRICE"},
+    {"id": "P-PAY-03", "mode": "present", "taxonomy_id": "PAY.DEPOSIT"},
+    {"id": "P-PAY-04", "mode": "present", "taxonomy_id": "PAY.EARNOUT.PAYMENT"},
+
+    {"id": "P-REM-01", "mode": "present", "taxonomy_id": "REM.INDEMNITY.RW_BREACH"},
+    {"id": "P-REM-02", "mode": "present", "taxonomy_id": "REM.INDEMNITY.COVENANT_BREACH"},
+    {"id": "P-REM-03", "mode": "present", "taxonomy_id": "REM.CAP"},
+    {"id": "P-REM-04", "mode": "present", "taxonomy_id": "REM.SURVIVAL.GENERAL"},
+
+    {"id": "A-RW-01", "mode": "absent", "taxonomy_id": "RW.LABOR.NO_VIOLATION"},
+    {"id": "A-CP-01", "mode": "absent", "taxonomy_id": "CP.NO_MAC"},
+    {"id": "A-COV-01", "mode": "absent", "taxonomy_id": "COV.NON_COMPETE"},
+    {"id": "A-DEF-01", "mode": "absent", "taxonomy_id": "DEF.DATA_ROOM"},
+    {"id": "A-PAY-01", "mode": "absent", "taxonomy_id": "PAY.EARNOUT.PAYMENT"},
+    {"id": "A-REM-01", "mode": "absent", "taxonomy_id": "REM.LIQUIDATED_DAMAGES"},
+
+    {"id": "C-RW-01", "mode": "compare", "taxonomy_id": "RW.LITIGATION.NO_PENDING"},
+    {"id": "C-CP-01", "mode": "compare", "taxonomy_id": "CP.NO_MAC"},
+    {"id": "C-COV-01", "mode": "compare", "taxonomy_id": "COV.NON_COMPETE"},
+    {"id": "C-DEF-01", "mode": "compare", "taxonomy_id": "DEF.KNOWLEDGE"},
+    {"id": "C-PAY-01", "mode": "compare", "taxonomy_id": "PAY.EARNOUT.PAYMENT"},
+    {"id": "C-REM-01", "mode": "compare", "taxonomy_id": "REM.LIQUIDATED_DAMAGES"}
+  ]
+}

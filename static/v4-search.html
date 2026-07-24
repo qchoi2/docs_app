@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>V4 원자 명제 검색</title>
+  <link rel="stylesheet" href="/static/v4-search.css">
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <p class="eyebrow">M&amp;A CONTRACT INDEX · V4</p>
+        <h1>원자 명제 검색</h1>
+        <p>진술·확약·선행조건·정의·대금·구제수단을 taxonomy 노드와 원문 좌표로 검색합니다.</p>
+      </div>
+      <nav><a href="/">기본 검색</a><a href="/taxonomy">Taxonomy 관리</a></nav>
+    </header>
+
+    <section class="panel">
+      <form id="search-form">
+        <label>Family
+          <select id="family">
+            <option value="">전체</option>
+            <option>RW</option><option>CP</option><option>COV</option>
+            <option>DEF</option><option>PAY</option><option>REM</option>
+          </select>
+        </label>
+        <label class="wide">Taxonomy 노드
+          <select id="taxonomy" required></select>
+        </label>
+        <label>검색 방식
+          <select id="mode">
+            <option value="present">존재</option>
+            <option value="absent">부재</option>
+          </select>
+        </label>
+        <label>Polarity
+          <select id="polarity">
+            <option value="">전체</option>
+            <option value="affirmative">affirmative</option>
+            <option value="negative">negative</option>
+            <option value="none_exist">none_exist</option>
+            <option value="not_applicable">not_applicable</option>
+          </select>
+        </label>
+        <label>언어
+          <select id="lang">
+            <option value="">전체</option><option>국문</option><option>영문</option><option>국영문</option>
+          </select>
+        </label>
+        <label>계약 유형<input id="ctype" placeholder="SPA"></label>
+        <label class="present-only">주체 역할<input id="subject" placeholder="대상회사"></label>
+        <label class="present-only">기준 시점<input id="effective-time" placeholder="서명일 현재"></label>
+        <label class="present-only wide">명제·원문 내 검색<input id="text" placeholder="미지급 보수"></label>
+        <label class="check"><input id="descendants" type="checkbox" checked> 하위 노드 포함</label>
+        <button type="submit">검색</button>
+      </form>
+      <p id="notice" role="status"></p>
+    </section>
+
+    <section id="summary" class="summary"></section>
+    <section id="results" class="results"></section>
+  </main>
+  <script src="/static/v4-search.js"></script>
+</body>
+</html>

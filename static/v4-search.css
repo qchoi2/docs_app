@@ -1,0 +1,43 @@
+:root {
+  color-scheme: light;
+  font-family: Inter, "Noto Sans KR", system-ui, sans-serif;
+  color: #18201d;
+  background: #eef2ec;
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+main { max-width: 1320px; margin: 0 auto; padding: 34px 24px 70px; }
+header { display: flex; justify-content: space-between; gap: 32px; align-items: flex-start; }
+h1 { margin: 5px 0 9px; font-family: Georgia, "Noto Serif KR", serif; font-size: 42px; }
+header p { margin: 0; color: #53615b; }
+.eyebrow { color: #9b4b2f; font-size: 12px; font-weight: 800; letter-spacing: .13em; }
+nav { display: flex; gap: 10px; }
+a { color: #285847; }
+.panel { margin-top: 28px; padding: 20px; background: #fff; border: 1px solid #d4dcd5; border-radius: 12px; }
+form { display: grid; grid-template-columns: repeat(4, minmax(150px, 1fr)); gap: 14px; align-items: end; }
+label { display: grid; gap: 6px; color: #58645f; font-size: 12px; font-weight: 700; }
+label.wide { grid-column: span 2; }
+input, select, button { min-height: 42px; border: 1px solid #bfcac2; border-radius: 7px; padding: 8px 10px; background: #fff; color: inherit; }
+button { border-color: #244f40; background: #244f40; color: #fff; font-weight: 800; cursor: pointer; }
+.check { display: flex; flex-direction: row; align-items: center; gap: 8px; }
+.check input { min-height: auto; width: 16px; height: 16px; }
+#notice { margin: 13px 0 0; color: #9b4b2f; }
+.summary { margin: 22px 0 12px; font-weight: 800; }
+.results { display: grid; gap: 12px; }
+article { background: #fff; border: 1px solid #d4dcd5; border-left: 5px solid #2f6b55; border-radius: 9px; padding: 17px 19px; }
+article.review { border-left-color: #b16b27; }
+.meta { display: flex; flex-wrap: wrap; gap: 7px 14px; color: #66736d; font-size: 12px; }
+.code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+.proposition { margin: 11px 0 6px; font-weight: 750; }
+blockquote { margin: 8px 0 0; padding-left: 13px; border-left: 2px solid #cad4cd; color: #414c47; }
+.badge { display: inline-block; padding: 3px 8px; border-radius: 999px; background: #e4eee8; font-size: 11px; font-weight: 800; }
+.review .badge { background: #f4e7d7; }
+@media (max-width: 850px) {
+  header { display: block; }
+  nav { margin-top: 18px; }
+  form { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 560px) {
+  form { grid-template-columns: 1fr; }
+  label.wide { grid-column: span 1; }
+}

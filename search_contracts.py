@@ -640,6 +640,15 @@ def build_parser() -> argparse.ArgumentParser:
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--present", action="store_true")
     group.add_argument("--absent", action="store_true")
+    parser.add_argument("--item", help="V4 atomic taxonomy ID or canonical label")
+    parser.add_argument("--item-absent", action="store_true",
+                        help="Return only coverage-proved V4 absence; separate needs_review")
+    parser.add_argument("--polarity",
+                        choices=["affirmative", "negative", "none_exist", "not_applicable"])
+    parser.add_argument("--subject", help="V4 atomic subject role")
+    parser.add_argument("--time", dest="effective_time", help="V4 effective-time label")
+    parser.add_argument("--exact-item", action="store_true",
+                        help="Do not include descendants of the selected V4 node")
     parser.add_argument("--json", action="store_true")
     return parser
 
@@ -649,27 +658,67 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     try:
-        result, result_count = search_contracts(
-            args.out,
-            ctype=args.ctype,
-            lang=args.lang,
-            keywords=args.kw,
-            limit=args.limit,
-            context=args.context,
-            expand=args.expand,
-            no_expand=args.no_expand,
-            exclude_drafts=args.exclude_drafts or args.exclude_draft,
-            show_duplicates=args.show_duplicates,
-            clause=args.clause,
-            clause_present=args.present,
-            clause_absent=args.absent,
-        )
+        if args.item:
+            from v4_search import search_clause_absence, search_clause_items
+
+            item_common = {
+                "polarity": args.polarity,
+                "ctype": args.ctype,
+                "lang": args.lang,
+                "include_descendants": not args.exact_item,
+                "show_duplicates": args.show_duplicates,
+                "limit": args.limit,
+            }
+            if args.item_absent:
+                result = search_clause_absence(args.out, args.item, **item_common)
+                result_count = result["confirmed_absent_count"]
+            else:
+                result = search_clause_items(
+                    args.out,
+                    args.item,
+                    subject=args.subject,
+                    effective_time=args.effective_time,
+                    **item_common,
+                )
+                result_count = result["total_items"]
+        else:
+            result, result_count = search_contracts(
+                args.out,
+                ctype=args.ctype,
+                lang=args.lang,
+                keywords=args.kw,
+                limit=args.limit,
+                context=args.context,
+                expand=args.expand,
+                no_expand=args.no_expand,
+                exclude_drafts=args.exclude_drafts or args.exclude_draft,
+                show_duplicates=args.show_duplicates,
+                clause=args.clause,
+                clause_present=args.present,
+                clause_absent=args.absent,
+            )
     except Exception as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
 
     if args.json:
         print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
+    elif args.item and args.item_absent:
+        print(
+            f"{result['query']['taxonomy_id']}: "
+            f"confirmed_absent={result['confirmed_absent_count']} "
+            f"needs_review={result['needs_review_count']}"
+        )
+        for item in result["confirmed_absent"]:
+            print(f"{item['file_key']} confirmed_absent {item['path']}")
+    elif args.item:
+        for item in result["results"]:
+            print(
+                f"{item['file_key']} {item['item_ref']} {item['taxonomy_id']} "
+                f"para {item['loc_start']}-{item['loc_end']} {item['proposition']}"
+            )
+        if not result["results"]:
+            print("No results")
     else:
         for item in result["results"]:
             print(f"{item['file_key']} {item['path']} {item['snippet']}")

@@ -53,6 +53,11 @@ from taxonomy_admin import (
     handle_taxonomy_resolve,
     handle_taxonomy_summary,
 )
+from v4_search_web import (
+    handle_v4_item_compare,
+    handle_v4_item_search,
+    handle_v4_search_page,
+)
 
 
 FILE_KEY_RE = re.compile(r"^[0-9a-f]{16}$")
@@ -1029,10 +1034,13 @@ ROUTES = [
     ("GET", re.compile(r"^/operations$"), handle_operations_page),
     ("GET", re.compile(r"^/research$"), handle_research_page),
     ("GET", re.compile(r"^/taxonomy$"), handle_taxonomy_page),
+    ("GET", re.compile(r"^/v4-search$"), handle_v4_search_page),
     ("GET", re.compile(r"^/api/v4/taxonomy/summary$"), handle_taxonomy_summary),
     ("GET", re.compile(r"^/api/v4/taxonomy/candidates$"), handle_taxonomy_candidates),
     ("GET", re.compile(r"^/api/v4/taxonomy/nodes$"), handle_taxonomy_nodes),
     ("POST", re.compile(r"^/api/v4/taxonomy/candidates/resolve$"), handle_taxonomy_resolve),
+    ("POST", re.compile(r"^/api/v4/items/search$"), handle_v4_item_search),
+    ("POST", re.compile(r"^/api/v4/items/compare$"), handle_v4_item_compare),
     ("GET", re.compile(r"^/api/settings/runtime-api$"), handle_runtime_api_settings),
     ("POST", re.compile(r"^/api/settings/anthropic-key$"), handle_anthropic_key_save),
     ("DELETE", re.compile(r"^/api/settings/anthropic-key$"), handle_anthropic_key_delete),
