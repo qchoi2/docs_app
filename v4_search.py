@@ -285,6 +285,126 @@ def _coverage_state(
     }
 
 
+def _bulk_coverage_states(
+    conn: sqlite3.Connection,
+    file_rows: Sequence[sqlite3.Row | dict],
+    family: str,
+) -> dict[str, dict]:
+    """Load family/source freshness once instead of issuing queries per item."""
+
+    requested = {str(row["file_key"]): row for row in file_rows}
+    if not requested:
+        return {}
+    coverage_by_file = {
+        str(row["file_key"]): row
+        for row in conn.execute(
+            """
+            SELECT file_key,body_status,annex_status,reason,txt_hash,
+                   taxonomy_version,reviewed_at
+            FROM v4_document_coverage
+            WHERE family=?
+            """,
+            (family,),
+        )
+        if str(row["file_key"]) in requested
+    }
+    bad_sources: dict[str, list[sqlite3.Row]] = {}
+    for row in conn.execute(
+        """
+        SELECT file_key,source_kind,status,COUNT(*) AS n
+        FROM v4_source_coverage
+        WHERE family=? AND status!='complete'
+        GROUP BY file_key,source_kind,status
+        ORDER BY file_key,source_kind,status
+        """,
+        (family,),
+    ):
+        if str(row["file_key"]) in requested:
+            bad_sources.setdefault(str(row["file_key"]), []).append(row)
+    complete_sources: dict[str, list[sqlite3.Row]] = {}
+    for row in conn.execute(
+        """
+        SELECT s.file_key,s.storage_file_key,s.txt_hash,
+               owner.content_hash AS owner_hash,
+               storage.content_hash AS storage_hash,
+               storage.status AS storage_status
+        FROM v4_source_coverage s
+        JOIN files owner ON owner.file_key=s.file_key
+        LEFT JOIN files storage ON storage.file_key=s.storage_file_key
+        WHERE s.family=? AND s.status='complete'
+        """,
+        (family,),
+    ):
+        if str(row["file_key"]) in requested:
+            complete_sources.setdefault(str(row["file_key"]), []).append(row)
+    pending = {
+        str(row["evidence_file_key"]): int(row["n"])
+        for row in conn.execute(
+            """
+            SELECT evidence_file_key,COUNT(*) AS n
+            FROM v4_taxonomy_candidate
+            WHERE family=? AND status='pending'
+            GROUP BY evidence_file_key
+            """,
+            (family,),
+        )
+        if str(row["evidence_file_key"]) in requested
+    }
+
+    states = {}
+    for file_key, file_row in requested.items():
+        content_hash = str(file_row["content_hash"] or "")
+        coverage = coverage_by_file.get(file_key)
+        if coverage is None:
+            states[file_key] = {
+                "state": "needs_review",
+                "reasons": ["family_not_evaluated"],
+                "body_status": "not_evaluated",
+                "annex_status": "not_evaluated",
+            }
+            continue
+        body_status = str(coverage["body_status"])
+        annex_status = str(coverage["annex_status"])
+        reasons = []
+        if body_status != "complete":
+            reasons.append(f"body_{body_status}")
+        if annex_status not in {"complete", "no_annex"}:
+            reasons.append(f"annex_{annex_status}")
+        if str(coverage["txt_hash"] or "") != content_hash:
+            reasons.append("coverage_stale")
+        for source in bad_sources.get(file_key, []):
+            reasons.append(
+                f"{source['source_kind']}_{source['status']}:{int(source['n'])}"
+            )
+        stale_sources = 0
+        for source in complete_sources.get(file_key, []):
+            if source["storage_file_key"]:
+                expected_hash = (
+                    str(source["storage_hash"] or "")
+                    if source["storage_status"] != "missing"
+                    else ""
+                )
+            else:
+                expected_hash = str(source["owner_hash"] or "")
+            if not expected_hash or str(source["txt_hash"] or "") != expected_hash:
+                stale_sources += 1
+        if stale_sources:
+            reasons.append(f"source_stale:{stale_sources}")
+        pending_count = pending.get(file_key, 0)
+        if pending_count:
+            reasons.append(f"pending_taxonomy_candidates:{pending_count}")
+        states[file_key] = {
+            "state": "complete" if not reasons else "needs_review",
+            "reasons": reasons,
+            "body_status": body_status,
+            "annex_status": annex_status,
+            "coverage_reason": coverage["reason"],
+            "taxonomy_version": coverage["taxonomy_version"],
+            "reviewed_at": coverage["reviewed_at"],
+        }
+    return states
+
+
 def _item_dict(row: sqlite3.Row) -> dict:
     item = dict(row)
     item["freshness"] = (
@@ -348,8 +468,7 @@ def search_clause_items(
             )
             needle = f"%{text.strip()}%"
             params.extend([needle, needle])
-        rows = conn.execute(
-            f"""
+        select_sql = f"""
             SELECT i.item_id,i.item_ref,i.file_key,i.family,i.taxonomy_id,
                    n.canonical_ko,n.canonical_en,i.proposition,
                    i.statement_polarity,i.subject_role,i.counterparty_role,
@@ -365,18 +484,45 @@ def search_clause_items(
             JOIN files f ON f.file_key=i.file_key
             WHERE {' AND '.join(clauses)}
             ORDER BY f.file_key,i.loc_start,i.item_id
-            """,
-            params,
-        ).fetchall()
-        all_items = _dedupe_item_rows(
-            (_item_dict(row) for row in rows), show_duplicates
+        """
+        if show_duplicates:
+            totals = conn.execute(
+                f"""
+                SELECT COUNT(*) AS total_items,
+                       COUNT(DISTINCT i.file_key) AS total_documents,
+                       COALESCE(SUM(
+                         CASE WHEN COALESCE(i.txt_hash,'') !=
+                                        COALESCE(f.content_hash,'')
+                              THEN 1 ELSE 0 END
+                       ),0) AS stale_items
+                FROM v4_clause_item i
+                JOIN files f ON f.file_key=i.file_key
+                WHERE {' AND '.join(clauses)}
+                """,
+                params,
+            ).fetchone()
+            total_items = int(totals["total_items"])
+            total_documents = int(totals["total_documents"])
+            stale = int(totals["stale_items"])
+            page_rows = conn.execute(
+                select_sql + " LIMIT ? OFFSET ?",
+                [*params, limit, offset],
+            ).fetchall()
+            items = [_item_dict(row) for row in page_rows]
+        else:
+            rows = conn.execute(select_sql, params).fetchall()
+            all_items = _dedupe_item_rows(
+                (_item_dict(row) for row in rows), show_duplicates
+            )
+            total_items = len(all_items)
+            total_documents = len({item["file_key"] for item in all_items})
+            stale = sum(item["freshness"] == "stale" for item in all_items)
+            items = all_items[offset: offset + limit]
+        coverage_by_file = _bulk_coverage_states(
+            conn, items, str(node["family"])
         )
-        total_items = len(all_items)
-        total_documents = len({item["file_key"] for item in all_items})
-        stale = sum(item["freshness"] == "stale" for item in all_items)
-        items = all_items[offset: offset + limit]
         for item in items:
-            item["coverage"] = _coverage_state(conn, item, str(node["family"]))
+            item["coverage"] = coverage_by_file[str(item["file_key"])]
         return {
             "query": {
                 "taxonomy_id": node["taxonomy_id"],
@@ -409,29 +555,6 @@ def search_clause_items(
                 ["stale_items_require_source_recheck"] if stale else []
             ),
         }
-
-
-def _matching_item_count(
-    conn: sqlite3.Connection,
-    file_key: str,
-    subtree: Sequence[str],
-    polarity: str | None,
-) -> int:
-    clauses = [
-        "file_key=?",
-        "review_status='approved'",
-        "taxonomy_id IN (%s)" % ",".join("?" for _ in subtree),
-    ]
-    params: list[object] = [file_key, *subtree]
-    if polarity:
-        clauses.append("statement_polarity=?")
-        params.append(polarity)
-    return int(
-        conn.execute(
-            f"SELECT COUNT(*) FROM v4_clause_item WHERE {' AND '.join(clauses)}",
-            params,
-        ).fetchone()[0]
-    )
 
 
 def search_clause_absence(
@@ -470,17 +593,38 @@ def search_clause_absence(
             params,
         ).fetchall()
         files = _dedupe_by_group((dict(row) for row in rows), show_duplicates)
+        item_clauses = [
+            "review_status='approved'",
+            "taxonomy_id IN (%s)" % ",".join("?" for _ in subtree),
+        ]
+        item_params: list[object] = [*subtree]
+        if polarity:
+            item_clauses.append("statement_polarity=?")
+            item_params.append(polarity)
+        present_counts = {
+            str(row["file_key"]): int(row["n"])
+            for row in conn.execute(
+                f"""
+                SELECT file_key,COUNT(*) AS n
+                FROM v4_clause_item
+                WHERE {' AND '.join(item_clauses)}
+                GROUP BY file_key
+                """,
+                item_params,
+            )
+        }
+        coverage_by_file = _bulk_coverage_states(
+            conn, files, str(node["family"])
+        )
         absent: list[dict] = []
         needs_review: list[dict] = []
         present_excluded = 0
         for file_row in files:
-            count = _matching_item_count(
-                conn, str(file_row["file_key"]), subtree, polarity
-            )
-            if count:
+            file_key = str(file_row["file_key"])
+            if present_counts.get(file_key, 0):
                 present_excluded += 1
                 continue
-            coverage = _coverage_state(conn, file_row, str(node["family"]))
+            coverage = coverage_by_file[file_key]
             result = {
                 **file_row,
                 "taxonomy_id": node["taxonomy_id"],

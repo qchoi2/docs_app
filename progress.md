@@ -1334,3 +1334,23 @@ README에 `--tiers T1,T2,T3` 사용법과 T3 skipped 동작을 문서화했다.
 다음 단계:
 - 47,139 item에서 Gate 조회가 약 95초로 증가했으므로 전체 결과를 매 페이지
   재구성하는 방식을 SQL count/page pagination으로 바꾼 뒤 다음 배치로 간다.
+
+### 2026-07-24 — V4 검색 성능 보강
+
+- 중복 포함 검색은 SQL에서 전체 건수와 stale 건수를 집계하고 `LIMIT/OFFSET`으로
+  필요한 페이지만 읽도록 변경했다.
+- body·annex·source·taxonomy 후보 커버리지는 family 단위 일괄 조회로 바꾸고,
+  부재 검색의 문서별 존재 여부도 단일 그룹 질의로 계산하도록 변경했다.
+- Gate B 36/36 scored, V4 recall 1.0000, legacy recall 0.3343, 정독 문서
+  56.69% 감소로 결과 의미와 정확도가 유지되었다.
+- V4 게이트 누적 검색 시간은 별지 교정 직후 약 95,064ms에서 2,043ms로
+  약 97.9% 감소했다.
+- 전체 테스트는 214 passed, 1 skipped이다.
+
+산출물:
+- `.docs/V4_SEARCH_PERFORMANCE_20260724.md`
+- `cs_index/v4_search_performance_gate.json`
+
+다음 단계:
+- 고신뢰 taxonomy 후보 정리를 수행하고, 사용자 개입이 필요하지 않으면 아직
+  평가하지 않은 SPA 300건을 다음 확장 배치로 진행한다.
