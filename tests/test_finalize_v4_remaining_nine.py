@@ -76,6 +76,27 @@ def test_assignment_and_contract_compliance_are_reclassified_by_context():
     ) == ["RW.CONTRACTS.NO_DEFAULT"]
 
 
+def test_v13_expansion_gap_classifications_are_atomic_and_reusable():
+    assert classify_text(
+        "매수인에 대하여 본건 거래를 금지하는 소송은 제기되지 아니하였다."
+    ) == ["RW.LITIGATION.NO_PENDING"]
+    assert classify_text(
+        "모든 매도인 및 대상주식 전부에 대하여 거래가 동시에 종결될 것."
+    ) == ["CP.ALL_OR_NOTHING_CLOSING"]
+    assert classify_text(
+        "대상회사의 주주총회에서 매수인이 지명한 후보자가 등기임원으로 선임되었을 것."
+    ) == ["CP.MANAGEMENT_APPOINTMENT"]
+    assert classify_text(
+        "본 계약에 따른 손해배상은 세무 목적상 매매대금의 조정으로 본다."
+    ) == ["REM.INDEMNITY.PURCHASE_PRICE_ADJUSTMENT"]
+    assert classify_text(
+        "거래종결 후 법률의 변경으로 확대된 손해는 배상책임을 지지 아니한다."
+    ) == ["REM.INDEMNITY.CHANGE_IN_LAW_EXCLUSION"]
+    assert classify_text(
+        "본건 거래는 민법상 채권자취소권의 대상이 될 사정이 존재하지 아니한다."
+    ) == ["RW.SOLVENCY.FRAUDULENT_TRANSFER"]
+
+
 def test_lead_ins_and_signature_blocks_are_rejected_as_non_atomic():
     assert reject_as_non_atomic(
         "매도인은 별지 6에 기재된 바와 같이 진술 및 보장한다."
@@ -84,3 +105,7 @@ def test_lead_ins_and_signature_blocks_are_rejected_as_non_atomic():
         "본 계약이 적법하게 체결되었음을 증명하기 위하여 당사자들은 "
         "본 계약서에 기명날인한다."
     )
+    assert reject_as_non_atomic(
+        "각 당사자는 상대방 당사자에게 아래와 같이 확약한다."
+    )
+    assert reject_as_non_atomic("Employees. Until the Closing, Purchaser shall:")

@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable
 
-from v4_schema import normalize_alias
+from v4_schema import initialize_v4_schema, normalize_alias
 
 
 FAMILIES = {"RW", "CP", "COV", "DEF", "PAY", "REM"}
@@ -41,6 +41,7 @@ def connect_admin(out: Path) -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys=ON")
     conn.execute("PRAGMA busy_timeout=10000")
+    initialize_v4_schema(conn)
     ensure_action_log(conn)
     return conn
 
@@ -323,6 +324,162 @@ def _aliases(value: object) -> list[str]:
     return rows
 
 
+NEGATIVE_ABSENCE = re.compile(
+    r"(없(?:다|으며|고|는|음)|존재하지|발생하지|해당하지|부담하지|"
+    r"제기되지|진행되고 있지|\bno\b|\bnone\b|\bwithout\b|"
+    r"\bdoes not exist\b|\bhas not\b|\bnot pending\b)",
+    re.IGNORECASE,
+)
+NEGATIVE_PROHIBITION = re.compile(
+    r"(하여서는 아니|해서는 아니|금지|제한한다|않아야|"
+    r"\bshall not\b|\bmay not\b|\bmust not\b)",
+    re.IGNORECASE,
+)
+
+
+def _resolved_polarity(text: str) -> str:
+    if NEGATIVE_ABSENCE.search(text):
+        return "none_exist"
+    if NEGATIVE_PROHIBITION.search(text):
+        return "negative"
+    return "affirmative"
+
+
+def _materialize_candidate_items(
+    conn: sqlite3.Connection,
+    rows: list[sqlite3.Row],
+    *,
+    action: str,
+    target_taxonomy_ids: list[str],
+    reason: str,
+    resolved_at: str,
+) -> dict[int, list[int]]:
+    """Create searchable items for merged/promoted evidence in the same transaction."""
+
+    targets = {}
+    for taxonomy_id in target_taxonomy_ids:
+        target = conn.execute(
+            """
+            SELECT taxonomy_id,family,canonical_ko
+            FROM v4_taxonomy_node
+            WHERE taxonomy_id=? AND status='active'
+            """,
+            (taxonomy_id,),
+        ).fetchone()
+        if target is None:
+            raise TaxonomyAdminError(404, "TAXONOMY_NOT_FOUND", "Target node not found.")
+        targets[taxonomy_id] = target
+    taxonomy_version = int(
+        conn.execute(
+            "SELECT value FROM v4_meta WHERE key='taxonomy_version'"
+        ).fetchone()[0]
+    )
+    materialized: dict[int, list[int]] = {}
+    for row in rows:
+        candidate_id = int(row["candidate_id"])
+        file_row = conn.execute(
+            "SELECT content_hash FROM files WHERE file_key=?",
+            (row["evidence_file_key"],),
+        ).fetchone()
+        current_hash = str(file_row["content_hash"] or "") if file_row else ""
+        candidate_hash = str(row["txt_hash"] or "")
+        if candidate_hash and current_hash and candidate_hash != current_hash:
+            raise TaxonomyAdminError(
+                409,
+                "STALE_CANDIDATE",
+                f"Candidate {candidate_id} was extracted from an older document version.",
+            )
+        source_kind = str(row["source_kind"] or "body")
+        source_id = row["source_id"]
+        if source_kind != "body":
+            source_exists = conn.execute(
+                """
+                SELECT 1 FROM v4_source_coverage
+                WHERE file_key=? AND family=? AND source_id=?
+                """,
+                (row["evidence_file_key"], row["family"], source_id),
+            ).fetchone()
+            if not source_id or source_exists is None:
+                raise TaxonomyAdminError(
+                    409,
+                    "SOURCE_EVIDENCE_MISSING",
+                    f"Candidate {candidate_id} has no matching annex source record.",
+                )
+        candidate_item_ids = []
+        try:
+            original_qualifier = json.loads(str(row["qualifier_json"] or "{}"))
+        except (TypeError, ValueError, json.JSONDecodeError):
+            original_qualifier = {}
+        for target_index, target_taxonomy_id in enumerate(target_taxonomy_ids, 1):
+            target = targets[target_taxonomy_id]
+            item_ref = f"{row['family']}-TC{candidate_id:06d}"
+            if len(target_taxonomy_ids) > 1:
+                item_ref += f"-{target_index:02d}"
+            qualifier = {
+                "candidate_id": candidate_id,
+                "candidate_resolution": action,
+                "distinction_reason": row["distinction_reason"],
+                "resolution_reason": reason,
+            }
+            if isinstance(original_qualifier, dict):
+                qualifier = {**original_qualifier, **qualifier}
+            normalized = {
+                "candidate_id": candidate_id,
+                "resolved_taxonomy_id": target_taxonomy_id,
+            }
+            cursor = conn.execute(
+                """
+                INSERT INTO v4_clause_item(
+                  file_key,item_ref,family,taxonomy_id,proposition,statement_polarity,
+                  subject_role,counterparty_role,action,object_type,effective_time,
+                  source_kind,source_id,source_name,source_ref,parent_clause_ref,
+                  related_item_ref,qualifier_json,verbatim,loc_start,loc_end,
+                  normalized_json,confidence,txt_hash,taxonomy_version,
+                  extractor_version,prompt_version,review_status,created_at,updated_at
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                """,
+                (
+                    row["evidence_file_key"],
+                    item_ref,
+                    row["family"],
+                    target_taxonomy_id,
+                    f"{target['canonical_ko']}: {str(row['verbatim']).strip()}",
+                    _resolved_polarity(str(row["verbatim"])),
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    source_kind,
+                    source_id,
+                    row["source_name"],
+                    row["source_ref"] or f"¶{row['loc_start']}",
+                    row["parent_clause_ref"]
+                    or str(row["proposed_ko"]).removeprefix("검토후보: ").strip()
+                    or None,
+                    None,
+                    json.dumps(qualifier, ensure_ascii=False, sort_keys=True),
+                    row["verbatim"],
+                    row["loc_start"],
+                    row["loc_end"],
+                    json.dumps(normalized, ensure_ascii=False, sort_keys=True),
+                    "high",
+                    candidate_hash
+                    or current_hash
+                    or f"unknown:{row['evidence_file_key']}",
+                    taxonomy_version,
+                    row["extractor_version"] or "taxonomy-candidate-resolution-1",
+                    row["prompt_version"] or "taxonomy-admin-resolution-1",
+                    "approved",
+                    resolved_at,
+                    resolved_at,
+                ),
+            )
+            candidate_item_ids.append(int(cursor.lastrowid))
+        materialized[candidate_id] = candidate_item_ids
+    return materialized
+
+
 def resolve_candidates(out: Path, body: dict) -> dict:
     action = body.get("action")
     if action not in {"merge", "promote", "reject"}:
@@ -346,20 +503,40 @@ def resolve_candidates(out: Path, body: dict) -> dict:
         new_version: int | None = None
 
         if action == "merge":
-            target_taxonomy_id = str(body.get("taxonomy_id") or "").strip()
-            target = conn.execute(
-                """
-                SELECT taxonomy_id,family FROM v4_taxonomy_node
-                WHERE taxonomy_id=? AND status='active'
-                """,
-                (target_taxonomy_id,),
-            ).fetchone()
-            if target is None:
-                raise TaxonomyAdminError(404, "TAXONOMY_NOT_FOUND", "Target node not found.")
-            if target["family"] != family:
+            raw_targets = body.get("taxonomy_ids")
+            if raw_targets is None:
+                raw_targets = [body.get("taxonomy_id")]
+            if not isinstance(raw_targets, list) or not raw_targets:
                 raise TaxonomyAdminError(
-                    400, "FAMILY_MISMATCH", "Target node belongs to another family."
+                    400, "VALIDATION_ERROR", "At least one target taxonomy id is required."
                 )
+            target_taxonomy_ids = []
+            for raw_target in raw_targets:
+                taxonomy_id = str(raw_target or "").strip()
+                if taxonomy_id and taxonomy_id not in target_taxonomy_ids:
+                    target_taxonomy_ids.append(taxonomy_id)
+            if not target_taxonomy_ids or len(target_taxonomy_ids) > 20:
+                raise TaxonomyAdminError(
+                    400, "VALIDATION_ERROR", "Target taxonomy ids must contain 1 to 20 values."
+                )
+            for taxonomy_id in target_taxonomy_ids:
+                target = conn.execute(
+                    """
+                    SELECT taxonomy_id,family FROM v4_taxonomy_node
+                    WHERE taxonomy_id=? AND status='active'
+                    """,
+                    (taxonomy_id,),
+                ).fetchone()
+                if target is None:
+                    raise TaxonomyAdminError(
+                        404, "TAXONOMY_NOT_FOUND", "Target node not found."
+                    )
+                if target["family"] != family:
+                    raise TaxonomyAdminError(
+                        400, "FAMILY_MISMATCH", "Target node belongs to another family."
+                    )
+            target_taxonomy_id = target_taxonomy_ids[0]
+            payload["taxonomy_ids"] = target_taxonomy_ids
             resolved_status = "merged"
         elif action == "promote":
             target_taxonomy_id = str(body.get("taxonomy_id") or "").strip().upper()
@@ -399,16 +576,6 @@ def resolve_candidates(out: Path, body: dict) -> dict:
             if parent["family"] != family:
                 raise TaxonomyAdminError(
                     400, "FAMILY_MISMATCH", "Parent belongs to another family."
-                )
-            if conn.execute(
-                "SELECT 1 FROM v4_clause_item WHERE taxonomy_id=? LIMIT 1",
-                (parent_id,),
-            ).fetchone():
-                raise TaxonomyAdminError(
-                    409,
-                    "PARENT_NODE_IN_USE",
-                    "A node already used by clause items cannot become a parent. "
-                    "Choose its current parent or migrate those items first.",
                 )
             alias_values = [canonical_ko, canonical_en, *aliases]
             normalized = [normalize_alias(value) for value in alias_values]
@@ -480,29 +647,53 @@ def resolve_candidates(out: Path, body: dict) -> dict:
                 }
             )
             resolved_status = "approved"
+            target_taxonomy_ids = [target_taxonomy_id]
         else:
             resolved_status = "rejected"
+            target_taxonomy_ids = []
 
+        resolved_at = utc_now()
+        materialized = {}
+        if target_taxonomy_id is not None:
+            materialized = _materialize_candidate_items(
+                conn,
+                rows,
+                action=action,
+                target_taxonomy_ids=target_taxonomy_ids,
+                reason=reason,
+                resolved_at=resolved_at,
+            )
         resolution = {
             "action": action,
             "taxonomy_id": target_taxonomy_id,
             "reason": reason,
-            "resolved_at": utc_now(),
+            "resolved_at": resolved_at,
         }
-        placeholders = ",".join("?" for _ in candidate_ids)
-        conn.execute(
-            f"""
-            UPDATE v4_taxonomy_candidate
-            SET status=?,resolution_json=?,updated_at=?
-            WHERE candidate_id IN ({placeholders})
-            """,
-            (
-                resolved_status,
-                json.dumps(resolution, ensure_ascii=False, sort_keys=True),
-                resolution["resolved_at"],
-                *candidate_ids,
-            ),
-        )
+        for candidate_id in candidate_ids:
+            candidate_resolution = dict(resolution)
+            if candidate_id in materialized:
+                candidate_resolution["materialized_item_ids"] = materialized[candidate_id]
+            conn.execute(
+                """
+                UPDATE v4_taxonomy_candidate
+                SET status=?,resolution_json=?,updated_at=?
+                WHERE candidate_id=?
+                """,
+                (
+                    resolved_status,
+                    json.dumps(
+                        candidate_resolution,
+                        ensure_ascii=False,
+                        sort_keys=True,
+                    ),
+                    resolution["resolved_at"],
+                    candidate_id,
+                ),
+            )
+        materialized_item_ids = [
+            item_id for item_ids in materialized.values() for item_id in item_ids
+        ]
+        payload["materialized_item_ids"] = materialized_item_ids
         cursor = conn.execute(
             """
             INSERT INTO v4_taxonomy_action_log(
@@ -526,6 +717,9 @@ def resolve_candidates(out: Path, body: dict) -> dict:
             "status": resolved_status,
             "taxonomy_id": target_taxonomy_id,
             "taxonomy_version": new_version,
+            "taxonomy_ids": target_taxonomy_ids,
+            "materialized_count": len(materialized_item_ids),
+            "materialized_item_ids": materialized_item_ids,
         }
 
 

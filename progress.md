@@ -1249,3 +1249,32 @@ README에 `--tiers T1,T2,T3` 사용법과 T3 skipped 동작을 문서화했다.
 다음 단계:
 - 다음 300건 전에 pending 후보 1,586개를 반복 문구별로 묶어 기존 node
   병합/신규 leaf 승격/기각하는 taxonomy 정리 배치를 수행한다.
+
+### 2026-07-24 — V4-6 taxonomy v13 정리 배치
+
+- 후보 병합·승격이 상태만 바꾸고 검색 item을 생성하지 않던 누락을 수정했다.
+  schema revision 1R3에서 후보의 source/hash/version을 보존하고, 해결과
+  `v4_clause_item` 생성을 하나의 트랜잭션으로 처리한다. 후보 1개를 여러 원자
+  node로 분해하는 경로와 stale/source 검증도 추가했다.
+- 처리 전 pending 1,586개 전부가 현재 txt 캐시의 해당 ¶ 원문과 일치했다.
+- 300건 확장에서 반복 확인된 동시 전부종결, 매수인 지명 임원 선임,
+  R&W 보험 발효, 개인보증, 특정 부채 정리, 규제기관 통지, 자금조달 비조건성,
+  사해행위 위험 부재, 배상금의 대금조정 처리, 법령변경 손해 배제의 10개
+  leaf를 추가해 taxonomy v13 408 nodes가 되었다.
+- dry-run 후 고신뢰 후보 294개를 병합해 approved 원자 item 294개를 만들고,
+  제목·리드인·편집주석 16개를 기각했다. 1,276개는 추측하지 않고 pending으로
+  유지했다.
+- 운영 V4 item은 17,185개다. 새 item은 원문 좌표 294/294 일치, stale 0,
+  FTS row 수 일치, integrity ok, FK violation 0이다.
+- Gate B는 36/36 scored, V4 recall 1.0000, legacy 0.3425, 정독 문서 수
+  54.23% 감소다. T1/T2 fail 0, 전체 회귀 212 passed, 1 skipped다.
+
+산출물:
+- `.docs/V4_TAXONOMY_V13_20260724.md`
+- `review_v4_candidates.py`, `tests/test_review_v4_candidates.py`
+- `cs_index/v4_candidate_review_v13_dry_run.json`
+- `cs_index/v4_candidate_review_v13_applied.json`
+
+다음 단계:
+- 차단 이슈가 없으므로 남은 pending은 보존한 채 taxonomy v13과 schema 1R3로
+  다음 300건 확장 배치를 진행한다.

@@ -111,9 +111,19 @@ def classify_text(text: str) -> list[str]:
         ids.append("CP.REPRESENTATIONS")
     if has(text, r"covenants?.*(?:performed|complied)", r"확약.*(?:이행|준수)", r"의무.*(?:이행|준수).*선행조건"):
         ids.append("CP.COVENANTS")
-    if has(text, r"material adverse effect.*(?:shall not|not have)", r"shall not.*material adverse effect", r"중대한 부정적.*(?:발생하지|없어야)"):
+    if has(
+        text,
+        r"material adverse effect.*(?:shall not|not have|has not)",
+        r"shall not.*material adverse effect",
+        r"중대(?:하게|한)\s*부정적(?:인)?\s*영향.*(?:발생하지|발견되지|없어야|없을)",
+    ):
         ids.append("CP.NO_MAC")
-    if has(text, r"no (?:injunction|order|law).*(?:prohibit|restrain)", r"금지.*(?:가처분|명령|법령).*(?:없|존재하지)"):
+    if has(
+        text,
+        r"no (?:injunction|order|law).*(?:prohibit|restrain)",
+        r"(?:법령|명령|판결|가처분|금지령).*(?:거래|종결).*(?:금지|제한|방해).*(?:없|아니)",
+        r"(?:거래|종결).*(?:금지|제한|방해).*(?:법령|명령|판결|가처분|금지령).*(?:없|아니)",
+    ):
         ids.append("CP.NO_PROHIBITION")
     if has(text, r"(?:government|regulatory).*(?:approval|consent).*(?:obtained|received)", r"정부기관.*(?:승인|인가|허가).*(?:취득|완료)"):
         ids.append("CP.GOVERNMENT_APPROVAL.GENERAL")
@@ -143,6 +153,12 @@ def classify_text(text: str) -> list[str]:
         ids.append("CP.APPROVAL")
     if has(
         text,
+        r"(?:organizational documents?|board|shareholders?).*(?:approval|resolution).*(?:completed|obtained)",
+        r"(?:조직문서|이사회|주주총회).*(?:결의|승인|절차).*(?:완료|이행)",
+    ):
+        ids.append("CP.APPROVAL")
+    if has(
+        text,
         r"(?:condition precedent|condition to (?:closing|completion)).*(?:waiv|waiver)",
         r"(?:waiv|waiver).*(?:condition precedent|condition to (?:closing|completion))",
         r"선행조건.*면제",
@@ -154,12 +170,14 @@ def classify_text(text: str) -> list[str]:
         r"(?:may|must|shall)\s+not\s+rely\s+on.*failure.*condition",
         r"failure.*condition.*caused by.*(?:breach|failure)",
         r"선행조건.*(?:충족|성취).*(?:방해|귀책).*(?:원용|주장).*(?:못|아니)",
+        r"자신의 의무불이행.*(?:종결|거래종결).*(?:거부|주장).*(?:수 없다|못)",
     ):
         ids.append("CP.SELF_CAUSED_FAILURE")
     if has(
         text,
         r"(?:governmental|required) approvals?.*(?:obtained|completed)",
         r"필요적 (?:정부)?승인.*(?:완료|취득)|(?:정부승인|필요적 승인).*(?:받거나|완료)",
+        r"(?:필요적 )?(?:인허가|정부 인허가).*(?:취득|이행|완료)",
     ):
         ids.append("CP.GOVERNMENT_APPROVAL.GENERAL")
     if has(
@@ -171,16 +189,36 @@ def classify_text(text: str) -> list[str]:
     if has(
         text,
         r"(?:ancillary|related).*(?:agreement|transaction).*(?:executed|closed|completion)",
-        r"(?:소수지분|연계|관련).*(?:매매계약|거래).*(?:체결|종결)",
+        r"(?:소수지분|다수지분|연계|관련).*(?:매매계약|거래).*(?:체결|종결)",
         r"(?:share purchase agreement|investment agreement).*(?:executed|closed)",
+        r"기존 투자자.*(?:동시에|전부).*(?:종결|완료)",
+        r"(?:주식매매계약|지분인수계약|연계거래).{0,120}(?:동시에|이전).{0,80}(?:종결|완료)",
     ):
         ids.append("CP.ANCILLARY.TRANSACTION_CLOSING")
+    if has(
+        text,
+        r"(?:all sellers?|all of the shares).*(?:simultaneously|all).*(?:close|closing|completion)",
+        r"(?:모든 매도인|대상주식 전부).*(?:동시에|전부).*(?:종결|완료)",
+    ):
+        ids.append("CP.ALL_OR_NOTHING_CLOSING")
     if has(
         text,
         r"purchase price adjustment.*(?:completed|final)",
         r"매매대금 조정.*(?:완료|최종|확정)|최종 매매대금.*확정",
     ):
         ids.append("CP.PURCHASE_PRICE_ADJUSTMENT")
+    if has(
+        text,
+        r"(?:buyer|purchaser).*(?:nominee|designat).*(?:director|officer).*(?:appointed|elected)",
+        r"매수인.*지명.*(?:이사|감사|임원).*(?:선임|취임)",
+    ):
+        ids.append("CP.MANAGEMENT_APPOINTMENT")
+    if has(
+        text,
+        r"(?:representation|warranty).{0,20}insurance.*(?:effective|in effect|bound)",
+        r"진술보장\s*보험.*(?:체결|발효|효력)",
+    ):
+        ids.append("CP.RWI_POLICY_EFFECTIVE")
 
     # Representations and warranties.
     if has(text, r"(?:duly )?(?:organized|incorporated).*(?:validly existing|존속)", r"적법하게 설립.*유효하게 존속"):
@@ -213,7 +251,7 @@ def classify_text(text: str) -> list[str]:
     if has(
         text,
         r"\b(?:there (?:is|are) )?no (?:pending |threatened )?(?:litigation|actions?|proceedings?)\b",
-        r"(?:소송|분쟁|절차)(?:가|은|는| 등은)?.{0,100}(?:존재하지|진행되고 있지|제기된 바 없)",
+        r"(?:소송|쟁송|분쟁|절차|금지소송등)(?:가|은|는| 등은)?.{0,140}(?:존재하지|진행되고 있지|계류 중이지|제기된 바 없|제기되지 아니)",
     ):
         ids.append("RW.LITIGATION.NO_PENDING")
     if has(text, r"tax returns?.*(?:filed|timely)", r"세무신고.*(?:기한|제출|이행)"):
@@ -222,6 +260,12 @@ def classify_text(text: str) -> list[str]:
         ids.append("RW.TAX.PAID")
     if has(text, r"withhold.*tax|원천징수"):
         ids.append("RW.TAX.WITHHOLDING")
+    if has(
+        text,
+        r"(?:tax|income tax).*(?:resident|residency)",
+        r"(?:소득세법|세법)상\s*거주자|대한민국.*(?:국민|거주).*(?:소득세법|세법)상",
+    ):
+        ids.append("RW.TAX.RESIDENCY")
     if has(text, r"no subsidiary other than|자회사.*(?:없|제외)"):
         ids.append("RW.CAPITALIZATION.SUBSIDIARIES")
     if has(text, r"(?:shares|stock).*(?:duly authorized|validly issued)", r"주식.*적법.*유효.*발행"):
@@ -260,8 +304,16 @@ def classify_text(text: str) -> list[str]:
         text,
         r"sufficient (?:available )?funds|funds (?:sufficient|available).*purchase price",
         r"매매대금.*지급.*충분한 자금|충분한 자금.*매매대금.*지급",
+        r"매매대금.*(?:지급|의무).*(?:자금을 보유|동원할 수 있는 능력)",
     ):
         ids.append("RW.BUYER.SUFFICIENT_FUNDS")
+    if has(
+        text,
+        r"financing.*(?:is not|shall not be).*(?:condition|condition to closing)",
+        r"(?:condition|condition to closing).*(?:not subject to|not conditioned on).*financing",
+        r"자금조달.*(?:종결|거래종결).*(?:조건이 아니|조건으로 하지)",
+    ):
+        ids.append("RW.BUYER.NO_FINANCING_CONDITION")
     if has(
         text,
         r"independent (?:investigation|review|evaluation)|own (?:investigation|assessment)",
@@ -281,6 +333,18 @@ def classify_text(text: str) -> list[str]:
         r"다른 진술.*보장.*없|진술.*보장.*전부.*이외.*(?:하지|없)",
     ):
         ids.append("RW.DISCLOSURE.NO_OTHER_REPRESENTATIONS")
+    if has(
+        text,
+        r"(?:books|records).*(?:accurate|correct|consisten).*(?:accounting|law)",
+        r"(?:장부|기록).*(?:법령|회계원칙|회계기준).*(?:정확|일관).*(?:작성|유지)",
+    ):
+        ids.append("RW.FINANCIAL.BOOKS_RECORDS")
+    if has(
+        text,
+        r"fraudulent (?:transfer|conveyance)|creditor.*avoid",
+        r"(?:채권자취소권|사해행위|부인권).*(?:대상|사정).*(?:아니|없|존재하지)",
+    ):
+        ids.append("RW.SOLVENCY.FRAUDULENT_TRANSFER")
     if has(
         text,
         r"material adverse change",
@@ -319,7 +383,12 @@ def classify_text(text: str) -> list[str]:
         ids.append("PAY.INTEREST")
     if has(text, r"deposit|계약금|중도금"):
         ids.append("PAY.DEPOSIT")
-    if has(text, r"closing.*(?:pay|payment|wire|송금)", r"거래종결.*(?:지급|송금)"):
+    if has(
+        text,
+        r"closing.*(?:pay|payment|wire|송금)",
+        r"(?:funds?|amount).*(?:bank account|wire transfer instructions)",
+        r"거래종결.*(?:지급|송금)",
+    ):
         ids.append("PAY.CLOSING_PAYMENT")
     if has(text, r"escrow.*(?:release|distribution)|에스크로.*(?:해제|분배|인출)"):
         ids.append("PAY.ESCROW.RELEASE")
@@ -360,6 +429,12 @@ def classify_text(text: str) -> list[str]:
         ids.append("COV.NON_COMPETE")
     if has(text, r"non.?solicit|유인.*금지"):
         ids.append("COV.NON_SOLICIT")
+    if has(
+        text,
+        r"(?:shall not|may not).*(?:solicit|initiate|enter into|negotiate).*(?:acquisition|competing transaction)",
+        r"(?:제3자|매수인 이외).*(?:유사|배치되는) 거래.*(?:협상|제안|협의|약정|논의|체결).*(?:하지|않)",
+    ):
+        ids.append("COV.EXCLUSIVITY")
     if has(text, r"notice.*(?:breach|change)", r"(?:위반|변경).*통지"):
         ids.append("COV.NOTICE_UPDATE")
     if has(text, r"personal information|privacy", r"개인정보.*(?:통지|공고|조치)"):
@@ -370,13 +445,29 @@ def classify_text(text: str) -> list[str]:
         ids.append("COV.TAX.CONSISTENT_REPORTING")
     if has(text, r"(?:permit|license|approval).*(?:maintain|comply)", r"인허가.*(?:취득|유지).*규제"):
         ids.append("COV.REGULATORY.COMPLIANCE")
+    if has(
+        text,
+        r"(?:notify|file).{0,40}\bwith (?:a |the )?(?:government|authority|municipal)",
+        r"(?:정부기관(?:에|에게)|서울특별시(?:에|에게)|지방자치단체(?:에|에게)).*(?:경영권 변동|거래).*(?:통지|신고)",
+    ):
+        ids.append("COV.REGULATORY.NOTIFICATION")
     if has(text, r"release.*(?:liabilit|claim)|면책|청구.*포기"):
         ids.append("COV.RELEASE")
     if has(text, r"transfer.*shares?.*(?:restricted|consent|prohibited)", r"주식.*양도.*(?:제한|동의|금지)"):
         ids.append("COV.SHA.TRANSFER.RESTRICTION")
     if has(text, r"transfer to key personnel|permitted transfer", r"(?:핵심인력|임직원).*(?:주식|지분).*(?:양도|이전)"):
         ids.append("COV.SHA.PERMITTED_TRANSFER")
-    if has(text, r"board.*nomina|designate.*director", r"이사.*지명"):
+    if has(
+        text,
+        r"board.*nomina|designate.*director",
+        r"(?:이사|감사).*지명.*(?:권리|하여야|할 수)",
+    ):
+        ids.append("COV.SHA.BOARD_NOMINATION")
+    if has(
+        text,
+        r"(?:shareholders? meeting).*(?:buyer|purchaser).*(?:nominee|designat).*(?:director|officer).*(?:appoint|elect)",
+        r"주주총회.*매수인.*지명.*(?:이사|감사|임원).*(?:선임|결의).*(?:하여야|되도록|교부하여야)",
+    ):
         ids.append("COV.SHA.BOARD_NOMINATION")
     if has(text, r"tag.along|동반매도참여"):
         ids.append("COV.SHA.TAG_ALONG")
@@ -422,6 +513,24 @@ def classify_text(text: str) -> list[str]:
         ids.append("COV.TRANSITION")
     if has(
         text,
+        r"(?:employee|employment).*(?:maintain|continue|not terminate).*(?:closing|year|period)",
+        r"거래종결일 이후.*(?:근로관계|근로조건).*(?:해지|변경|중단|유지)",
+    ):
+        ids.append("COV.EMPLOYEE_BENEFITS_CONTINUATION")
+    if has(
+        text,
+        r"(?:chairman|shareholder|affiliate).*(?:guarantee|guaranty).*(?:obligations?|performance)",
+        r"(?:회장|주주|계열회사).*(?:의무|채무).*(?:보증|연대보증)",
+    ):
+        ids.append("COV.PERSONAL_GUARANTEE")
+    if has(
+        text,
+        r"(?:cleanup|settle|eliminate).*(?:liabilit|provision)",
+        r"(?:충당부채|특정 채무).*(?:정리|상환|제거).*(?:완료|하여야)",
+    ):
+        ids.append("COV.LIABILITY_CLEANUP")
+    if has(
+        text,
         r"(?:intellectual property).*(?:shall not).*(?:develop|produce|commercialize)",
         r"지식재산.*(?:개발|생산|상업화).*(?:하지 않아야|금지)",
     ):
@@ -439,6 +548,8 @@ def classify_text(text: str) -> list[str]:
         r"(?:merge|consolidate|liquidate|dissolve|wind up)",
         r"enter into any contract.*foregoing",
         r"(?:사전 서면 동의|prior written consent).*(?:하지|shall not|must not)",
+        r"주식의 (?:병합|분할|종류의 변경|감자|소각)",
+        r"(?:합병|분할|분할합병|주식의 포괄적 교환|영업 전부.*양도)",
     ):
         ids.append("COV.RESTRICTED_ACTIONS")
 
@@ -533,6 +644,18 @@ def classify_text(text: str) -> list[str]:
         ids.append("REM.MITIGATION")
     if has(text, r"indemnif.*(?:breach|obligation)", r"(?:진술.*보장|확약|의무).*위반.*(?:손해|배상)"):
         ids.extend(("REM.INDEMNITY.RW_BREACH", "REM.INDEMNITY.COVENANT_BREACH"))
+    if has(
+        text,
+        r"(?:indemnity|indemnification|damages?).*(?:tax purposes?).*(?:purchase price adjustment|adjustment to the purchase price)",
+        r"(?:손해배상|배상금액).*(?:조세|세무|매매대금).*(?:매매대금의? 조정|조정되는 것으로)",
+    ):
+        ids.append("REM.INDEMNITY.PURCHASE_PRICE_ADJUSTMENT")
+    if has(
+        text,
+        r"(?:change in law|change in.*interpretation).*(?:loss|damage).*(?:exclude|not liable|no liability)",
+        r"(?:법률|법령|정부기관.*입장|해석).*(?:개정|변경).*(?:손해).*(?:배상책임을 지지|제외)",
+    ):
+        ids.append("REM.INDEMNITY.CHANGE_IN_LAW_EXCLUSION")
 
     return list(dict.fromkeys(ids))
 
@@ -566,6 +689,10 @@ def reject_as_non_atomic(text: str) -> bool:
         r"조항들의 제목.*(?:참고용|편의용)",
         r"본 조에서 규정하는 조건과 제한을 전제로[,\s]*$",
         r"다음의 제한을 전제로 한다[.\s]*$",
+        r"(?:각 당사자|당사자들|매도인들과 매수인).*(?:아래|다음)와 같이.*(?:확약|의무를 부담)한다[.:\s]*$",
+        r"^\s*\[note to (?:seller|buyer).*]\s*$",
+        r"^[^.]{0,80}\.\s*(?:prior to|until|from).{0,120}\bshall(?:\s+not)?\s*:?\s*$",
+        r"^[^.]{0,120}\.\s*(?:seller|purchaser|buyer|company)\s+shall(?:\s+not)?\s*:?\s*$",
     )
 
 
@@ -603,13 +730,22 @@ def candidate_item(candidate: dict, taxonomy_id: str, item_ref: str, family: str
         "action": None,
         "object_type": term if family == "DEF" else None,
         "effective_time": None,
-        "source_kind": "body",
-        "source_id": None,
-        "source_name": None,
-        "source_ref": f"¶{candidate['loc_start']}",
-        "parent_clause_ref": str(candidate.get("proposed_ko") or "").removeprefix("검토후보: ").strip() or None,
+        "source_kind": candidate.get("source_kind", "body"),
+        "source_id": candidate.get("source_id"),
+        "source_name": candidate.get("source_name"),
+        "source_ref": candidate.get("source_ref") or f"¶{candidate['loc_start']}",
+        "parent_clause_ref": candidate.get("parent_clause_ref")
+        or str(candidate.get("proposed_ko") or "").removeprefix("검토후보: ").strip()
+        or None,
         "related_item_ref": None,
-        "qualifier": {"review_method": "V4-2 후보 문맥 직접 검수"},
+        "qualifier": {
+            **(
+                candidate.get("qualifier")
+                if isinstance(candidate.get("qualifier"), dict)
+                else {}
+            ),
+            "review_method": "V4-2 후보 문맥 직접 검수",
+        },
         "verbatim": text,
         "loc_start": int(candidate["loc_start"]),
         "loc_end": int(candidate["loc_end"]),

@@ -1,3 +1,4 @@
+import json
 import sqlite3
 from contextlib import closing
 
@@ -28,8 +29,11 @@ def database(tmp_path):
             """
         )
         conn.executemany(
-            "INSERT INTO files(file_key,path) VALUES (?,?)",
-            [("a" * 16, "one.docx"), ("b" * 16, "two.docx")],
+            "INSERT INTO files(file_key,path,content_hash) VALUES (?,?,?)",
+            [
+                ("a" * 16, "one.docx", "hash-a"),
+                ("b" * 16, "two.docx", "hash-b"),
+            ],
         )
         initialize_v4_schema(conn)
         now = "2026-07-24T00:00:00+00:00"
@@ -106,6 +110,17 @@ def test_merge_is_transactional_and_logged(tmp_path):
         assert conn.execute(
             "SELECT action,target_taxonomy_id FROM v4_taxonomy_action_log"
         ).fetchone() == ("merge", "RW.LABOR.NO_VIOLATION")
+        items = conn.execute(
+            """
+            SELECT item_ref,taxonomy_id,review_status,qualifier_json
+            FROM v4_clause_item ORDER BY item_ref
+            """
+        ).fetchall()
+        assert [row[0] for row in items] == ["RW-TC000001", "RW-TC000002"]
+        assert {row[1] for row in items} == {"RW.LABOR.NO_VIOLATION"}
+        assert {row[2] for row in items} == {"approved"}
+        assert all(json.loads(row[3])["candidate_resolution"] == "merge" for row in items)
+        assert result["materialized_count"] == 2
 
 
 def test_promote_creates_node_aliases_and_increments_version(tmp_path):
@@ -140,6 +155,12 @@ def test_promote_creates_node_aliases_and_increments_version(tmp_path):
             WHERE taxonomy_id='RW.LABOR.NEW_PILOT_RULE'
             """
         ).fetchone()[0] == 3
+        assert conn.execute(
+            """
+            SELECT COUNT(*) FROM v4_clause_item
+            WHERE taxonomy_id='RW.LABOR.NEW_PILOT_RULE'
+            """
+        ).fetchone()[0] == 2
 
 
 def test_reject_requires_reason_and_resolved_candidates_cannot_repeat(tmp_path):
@@ -160,6 +181,58 @@ def test_reject_requires_reason_and_resolved_candidates_cannot_repeat(tmp_path):
             },
         )
     assert exc.value.status == 409
+    with closing(sqlite3.connect(out / "catalog.sqlite")) as conn:
+        assert conn.execute("SELECT COUNT(*) FROM v4_clause_item").fetchone()[0] == 0
+
+
+def test_stale_candidate_rolls_back_resolution(tmp_path):
+    out = database(tmp_path)
+    with closing(sqlite3.connect(out / "catalog.sqlite")) as conn:
+        conn.execute(
+            "UPDATE v4_taxonomy_candidate SET txt_hash='old-hash' WHERE candidate_id=1"
+        )
+        conn.commit()
+    with pytest.raises(TaxonomyAdminError) as exc:
+        resolve_candidates(
+            out,
+            {
+                "action": "merge",
+                "candidate_ids": [1],
+                "taxonomy_id": "RW.LABOR.NO_VIOLATION",
+                "reason": "기존 노드와 동일",
+            },
+        )
+    assert exc.value.code == "STALE_CANDIDATE"
+    with closing(sqlite3.connect(out / "catalog.sqlite")) as conn:
+        assert conn.execute(
+            "SELECT status FROM v4_taxonomy_candidate WHERE candidate_id=1"
+        ).fetchone()[0] == "pending"
+        assert conn.execute("SELECT COUNT(*) FROM v4_clause_item").fetchone()[0] == 0
+
+
+def test_merge_can_atomize_one_candidate_into_multiple_taxonomy_items(tmp_path):
+    out = database(tmp_path)
+    result = resolve_candidates(
+        out,
+        {
+            "action": "merge",
+            "candidate_ids": [1],
+            "taxonomy_ids": [
+                "RW.LABOR.NO_VIOLATION",
+                "RW.LABOR.WORKING_CONDITIONS",
+            ],
+            "reason": "한 문단에 독립된 두 명제가 포함됨",
+        },
+    )
+    assert result["materialized_count"] == 2
+    with closing(sqlite3.connect(out / "catalog.sqlite")) as conn:
+        rows = conn.execute(
+            "SELECT item_ref,taxonomy_id FROM v4_clause_item ORDER BY item_ref"
+        ).fetchall()
+        assert rows == [
+            ("RW-TC000001-01", "RW.LABOR.NO_VIOLATION"),
+            ("RW-TC000001-02", "RW.LABOR.WORKING_CONDITIONS"),
+        ]
 
 
 def test_alias_collision_rolls_back_promotion(tmp_path):

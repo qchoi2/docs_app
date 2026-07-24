@@ -471,6 +471,12 @@ def build_result(payload: dict, nodes: dict[str, Node]) -> dict:
                     "loc_end": evidence_para,
                     "verbatim": evidence,
                     "nearest_taxonomy_id": nearest.taxonomy_id,
+                    "source_kind": "body",
+                    "source_id": None,
+                    "source_name": "계약서 본문",
+                    "source_ref": f"¶{evidence_para}",
+                    "parent_clause_ref": proposed or None,
+                    "qualifier": {"proposal_pass": True},
                 }
             )
 

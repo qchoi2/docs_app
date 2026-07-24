@@ -155,7 +155,7 @@ def test_seed_taxonomy_and_fts_are_initialized():
     }
     assert conn.execute(
         "SELECT value FROM v4_meta WHERE key='schema_revision'"
-    ).fetchone()[0] == "1R2"
+    ).fetchone()[0] == "1R3"
     now = "2026-07-16T00:00:00+00:00"
     conn.execute(
         """

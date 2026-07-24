@@ -12,8 +12,8 @@ from review_rw_leaf_gaps import LEAVES as RW_REFINEMENT_LEAVES
 
 
 V4_SCHEMA_VERSION = 4
-V4_SCHEMA_REVISION = "1R2"
-DEFAULT_TAXONOMY_VERSION = 12
+V4_SCHEMA_REVISION = "1R3"
+DEFAULT_TAXONOMY_VERSION = 13
 FAMILIES = ("RW", "CP", "COV", "DEF", "PAY", "REM")
 CONFIDENCE_VALUES = ("low", "med", "high")
 POLARITY_VALUES = ("affirmative", "negative", "none_exist", "not_applicable")
@@ -678,6 +678,20 @@ SEED_TAXONOMY += (
     TaxonomySeed("RW.DISCLOSURE.NO_OTHER_REPRESENTATIONS", "RW.DISCLOSURE", "RW", "명시된 것 외 진술보장 부인", "No other representations", "계약에 명시된 진술보장이 전부이고 그 밖의 명시적·묵시적 진술보장은 제공되지 않는다는 진술", 2, ("no other representations", "exclusive representations and warranties", "no implied representation", "다른 진술 및 보장 없음", "명시된 진술보장 외에는")),
 )
 
+# v13 recurring gaps confirmed by the first 300-document expansion.
+SEED_TAXONOMY += (
+    TaxonomySeed("COV.PERSONAL_GUARANTEE", "COV", "COV", "개인·주주 지급보증", "Personal or shareholder guarantee", "회장·주주·계열회사 등 제3자가 매도인 또는 다른 당사자의 계약상 의무를 보증하는 확약", 1, ("personal guarantee", "shareholder guarantee", "회장 보증", "주주 지급보증")),
+    TaxonomySeed("COV.LIABILITY_CLEANUP", "COV", "COV", "특정 부채·충당부채 정리", "Specified liability cleanup", "종결 전 특정 채무·충당부채를 상환·제거·정리하도록 하는 확약", 1, ("liability cleanup", "provision cleanup", "충당부채 정리", "특정 채무 정리")),
+    TaxonomySeed("COV.REGULATORY.NOTIFICATION", "COV.REGULATORY", "COV", "규제기관 신고·통지", "Regulatory filing or notification", "거래 또는 경영권 변동에 관하여 정부기관·지방자치단체에 신고하거나 통지할 의무", 2, ("regulatory notification", "change of control filing", "경영권 변동 통지", "정부기관 신고")),
+    TaxonomySeed("CP.MANAGEMENT_APPOINTMENT", "CP", "CP", "매수인 지명 임원 선임", "Appointment of buyer nominees", "종결 전 또는 종결 시 매수인이 지명한 이사·감사·임원이 적법하게 선임될 것을 요구하는 조건", 1, ("appointment of buyer nominees", "buyer-designated directors", "매수인 지명 임원 선임", "등기임원 선임")),
+    TaxonomySeed("CP.ALL_OR_NOTHING_CLOSING", "CP", "CP", "전 대상주식 동시종결", "All-or-nothing simultaneous closing", "복수 매도인 또는 대상주식 전부에 관한 거래가 일부만 종결되지 않고 동시에 전부 종결될 것을 요구하는 조건", 1, ("all-or-nothing closing", "all shares close simultaneously", "전 대상주식 동시종결", "모든 매도인 동시종결")),
+    TaxonomySeed("CP.RWI_POLICY_EFFECTIVE", "CP", "CP", "진술보장보험 발효", "R&W insurance policy effective", "진술보장보험 계약 또는 증권이 체결·교부되고 효력이 발생할 것을 요구하는 조건", 1, ("R&W insurance effective", "representation warranty insurance condition", "진술보장보험 발효", "진술보장보험 체결")),
+    TaxonomySeed("RW.BUYER.NO_FINANCING_CONDITION", "RW.BUYER", "RW", "자금조달 비조건성", "No financing condition", "매수인의 거래종결 의무가 자금조달의 성사·가용성에 의존하거나 이를 조건으로 하지 않는다는 진술", 2, ("no financing condition", "not subject to financing", "financing is not a condition", "자금조달 비조건성")),
+    TaxonomySeed("RW.SOLVENCY.FRAUDULENT_TRANSFER", "RW.SOLVENCY", "RW", "사해행위·채권자취소 위험 부재", "No fraudulent-transfer risk", "거래가 사해행위·부인권·채권자취소권의 대상이 될 사정이 없다는 진술", 3, ("fraudulent transfer", "creditor avoidance", "채권자취소권", "사해행위 부재")),
+    TaxonomySeed("REM.INDEMNITY.PURCHASE_PRICE_ADJUSTMENT", "REM.INDEMNITY", "REM", "배상금의 매매대금 조정 처리", "Indemnity treated as purchase-price adjustment", "손해배상금의 지급을 세무상 또는 계약상 매매대금 조정으로 취급하는 조항", 2, ("indemnity purchase price adjustment", "indemnity payment treated as adjustment", "손해배상 매매대금 조정", "세무 목적상 매매대금 조정")),
+    TaxonomySeed("REM.INDEMNITY.CHANGE_IN_LAW_EXCLUSION", "REM.INDEMNITY", "REM", "법령·해석 변경 손해 배제", "Change-in-law loss exclusion", "종결 후 법령·정부입장·해석의 변경으로 발생하거나 확대된 손해를 배상범위에서 제외하는 조항", 2, ("change in law exclusion", "post-closing law change", "법률 변경 손해 배제", "정부기관 해석 변경 손해")),
+)
+
 
 DDL = """
 CREATE TABLE IF NOT EXISTS v4_meta (
@@ -803,6 +817,17 @@ CREATE TABLE IF NOT EXISTS v4_taxonomy_candidate (
   verbatim TEXT NOT NULL,
   document_count INTEGER NOT NULL DEFAULT 1,
   nearest_taxonomy_id TEXT REFERENCES v4_taxonomy_node(taxonomy_id),
+  source_kind TEXT NOT NULL DEFAULT 'body'
+    CHECK (source_kind IN ('body','schedule','disclosure_schedule','annex','exhibit')),
+  source_id TEXT,
+  source_name TEXT,
+  source_ref TEXT,
+  parent_clause_ref TEXT,
+  qualifier_json TEXT NOT NULL DEFAULT '{}',
+  txt_hash TEXT,
+  taxonomy_version INTEGER,
+  extractor_version TEXT,
+  prompt_version TEXT,
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','merged','rejected')),
   resolution_json TEXT NOT NULL DEFAULT '{}',
   created_at TEXT NOT NULL,
@@ -917,6 +942,24 @@ def initialize_v4_schema(
         _ensure_column(conn, "v4_clause_item", name, "TEXT")
     _ensure_column(conn, "v4_clause_item", "related_item_ref", "TEXT")
     _ensure_column(conn, "v4_clause_item", "item_ref", "TEXT")
+    _ensure_column(
+        conn,
+        "v4_taxonomy_candidate",
+        "source_kind",
+        "TEXT NOT NULL DEFAULT 'body' CHECK (source_kind IN ('body','schedule','disclosure_schedule','annex','exhibit'))",
+    )
+    for name in ("source_id", "source_name", "source_ref", "parent_clause_ref"):
+        _ensure_column(conn, "v4_taxonomy_candidate", name, "TEXT")
+    _ensure_column(
+        conn,
+        "v4_taxonomy_candidate",
+        "qualifier_json",
+        "TEXT NOT NULL DEFAULT '{}'",
+    )
+    _ensure_column(conn, "v4_taxonomy_candidate", "txt_hash", "TEXT")
+    _ensure_column(conn, "v4_taxonomy_candidate", "taxonomy_version", "INTEGER")
+    _ensure_column(conn, "v4_taxonomy_candidate", "extractor_version", "TEXT")
+    _ensure_column(conn, "v4_taxonomy_candidate", "prompt_version", "TEXT")
     conn.execute(
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_v4_item_ref "
         "ON v4_clause_item(file_key,item_ref)"
@@ -1157,6 +1200,44 @@ def validate_v4_result(data: Mapping[str, object], *, file_key: str, known_taxon
             in ("not_evaluated", "unreadable")
         ):
             raise V4SchemaError(f"{path} cannot exist when {family} body is not evaluated")
+
+    candidates = data.get("taxonomy_candidates") or []
+    if not isinstance(candidates, list):
+        raise V4SchemaError("taxonomy_candidates must be an array")
+    for index, raw in enumerate(candidates):
+        path = f"taxonomy_candidates[{index}]"
+        if not isinstance(raw, dict):
+            raise V4SchemaError(f"{path} must be an object")
+        family = raw.get("family")
+        if family not in FAMILIES:
+            raise V4SchemaError(f"{path}.family is invalid")
+        for field in (
+            "proposed_ko",
+            "recommended_parent_id",
+            "distinction_reason",
+            "verbatim",
+        ):
+            if not isinstance(raw.get(field), str) or not str(raw[field]).strip():
+                raise V4SchemaError(f"{path}.{field} must be a non-empty string")
+        for field in ("recommended_parent_id", "nearest_taxonomy_id"):
+            taxonomy_id = raw.get(field)
+            if taxonomy_id not in known_taxonomy:
+                raise V4SchemaError(f"{path}.{field} is unknown: {taxonomy_id}")
+            if known_taxonomy[taxonomy_id] != family:
+                raise V4SchemaError(f"{path}.{field} belongs to another family")
+        source_kind = raw.get("source_kind", "body")
+        if source_kind not in SOURCE_KIND_VALUES:
+            raise V4SchemaError(f"{path}.source_kind is invalid")
+        if source_kind != "body":
+            source_id = raw.get("source_id")
+            if not source_id or (str(family), str(source_id)) not in seen_sources:
+                raise V4SchemaError(
+                    f"{path}.source_id must reference source_coverage for annex candidates"
+                )
+        qualifier = raw.get("qualifier", {})
+        if not isinstance(qualifier, dict):
+            raise V4SchemaError(f"{path}.qualifier must be an object")
+        _location(raw, path)
     return data
 
 
@@ -1290,9 +1371,11 @@ def replace_v4_result(
             INSERT INTO v4_taxonomy_candidate(
               proposed_ko,proposed_en,family,recommended_parent_id,
               distinction_reason,evidence_file_key,loc_start,loc_end,verbatim,
-              document_count,nearest_taxonomy_id,status,resolution_json,
+              document_count,nearest_taxonomy_id,source_kind,source_id,
+              source_name,source_ref,parent_clause_ref,qualifier_json,txt_hash,
+              taxonomy_version,extractor_version,prompt_version,status,resolution_json,
               created_at,updated_at
-            ) VALUES (?,?,?,?,?,?,?,?,?,1,?,'pending','{}',?,?)
+            ) VALUES (?,?,?,?,?,?,?,?,?,1,?,?,?,?,?,?,?,?,?,?,?,'pending','{}',?,?)
             """,
             (
                 candidate["proposed_ko"],
@@ -1305,6 +1388,20 @@ def replace_v4_result(
                 candidate["loc_end"],
                 candidate["verbatim"],
                 candidate["nearest_taxonomy_id"],
+                candidate.get("source_kind", "body"),
+                candidate.get("source_id"),
+                candidate.get("source_name"),
+                candidate.get("source_ref") or f"¶{candidate['loc_start']}",
+                candidate.get("parent_clause_ref"),
+                json.dumps(
+                    candidate.get("qualifier") or {},
+                    ensure_ascii=False,
+                    sort_keys=True,
+                ),
+                txt_hash,
+                taxonomy_version,
+                extractor_version,
+                prompt_version,
                 now,
                 now,
             ),
