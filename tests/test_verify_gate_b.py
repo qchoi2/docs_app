@@ -2,7 +2,25 @@ import json
 
 from eval_v4_gate import evaluate_pooled
 from tests.test_v4_search import make_index
-from verify_gate_b import build_cards, ingest, parse_worksheet
+from verify_gate_b import _auto_verdict, build_cards, ingest, parse_worksheet
+
+
+def test_auto_verdict_is_bias_safe():
+    # existence: text shows clause -> correct; miss -> leave for human
+    assert _auto_verdict("present", True)[0] == "correct"
+    assert _auto_verdict("present", False)[0] is None
+    # absence: text shows clause -> flag false absence; miss -> NOT auto-confirmed
+    assert _auto_verdict("absent", True)[0] == "incorrect"
+    assert _auto_verdict("absent", False)[0] is None
+
+
+def test_parse_worksheet_ignores_auto_comment():
+    text = (
+        "## Q1 — x  [mode: present]\n"
+        "### aaaaaaaaaaaaaaaa  [SPA 국문] f.docx\n"
+        "- verdict: correct   # auto: 원문에 조항 확인\n"
+    )
+    assert parse_worksheet(text)["Q1"]["correct"] == ["aaaaaaaaaaaaaaaa"]
 
 
 def test_parse_worksheet_maps_verdicts():

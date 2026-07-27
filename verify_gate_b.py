@@ -24,7 +24,12 @@ from pathlib import Path
 
 from lib.console import configure_utf8_stdio
 from eval_v4_gate import aliases, evaluate_pooled
-from v4_search import connect_v4_ro, resolve_taxonomy, taxonomy_descendants
+from v4_search import (
+    connect_v4_ro,
+    resolve_taxonomy,
+    search_clause_absence,
+    taxonomy_descendants,
+)
 
 VERDICT_MAP = {
     "correct": "correct", "o": "correct", "맞음": "correct", "yes": "correct", "y": "correct",
@@ -56,14 +61,29 @@ def _read_paras(out: Path, txt_path) -> list:
     return paras
 
 
-def _raw_snippet(paras: list, terms: list) -> str:
+def _raw_match(paras: list, terms: list):
+    """Return (matched, snippet). matched=True if a topic term appears in text."""
     low_terms = [t.lower() for t in terms if len(t) >= 2]
     for no, text in paras:
         low = text.lower()
         if any(t in low for t in low_terms):
             body = text if len(text) <= 90 else text[:90] + "…"
-            return f'¶{no}: "{body}"'
-    return "(원문에서 관련 표현 미검출)"
+            return True, f'¶{no}: "{body}"'
+    return False, "(원문에서 관련 표현 미검출)"
+
+
+def _auto_verdict(mode: str, matched: bool):
+    """Conservative, bias-safe provisional verdict from raw text only.
+
+    Only fills a verdict when the contract's own text *clearly shows* the
+    clause; otherwise leaves it blank for the owner. Never auto-confirms an
+    absence from mere keyword miss (shared blind spot risk).
+    """
+    if mode == "absent":
+        # Text clearly shows the clause -> V4's absence claim is wrong.
+        return ("incorrect", "원문에 조항 있음 → 부재판정 오류") if matched else (None, None)
+    # existence / compare: text confirms the clause is present.
+    return ("correct", "원문에 조항 확인") if matched else (None, None)
 
 
 def _v4_evidence(conn: sqlite3.Connection, subtree: list, file_key: str) -> str:
@@ -90,7 +110,14 @@ _HINT = {
 }
 
 
-def build_cards(out: Path, seed_path: Path, depth: int, only: str | None) -> str:
+def build_cards(
+    out: Path,
+    seed_path: Path,
+    depth: int,
+    only: str | None,
+    auto: bool = False,
+    types: set | None = None,
+) -> str:
     report = evaluate_pooled(out, seed_path, pool_depth=depth)
     seed_by_id = {
         q["id"]: q
@@ -120,20 +147,39 @@ def build_cards(out: Path, seed_path: Path, depth: int, only: str | None) -> str
             node = resolve_taxonomy(conn, str(detail["taxonomy"]))
             subtree = taxonomy_descendants(conn, str(node["taxonomy_id"]), True)
             terms = aliases(conn, str(node["taxonomy_id"]))
+            note = ""
+            if detail.get("mode") == "absent":
+                # Only V4's *confirmed* absences need checking for precision;
+                # needs_review items are already flagged uncertain by V4.
+                absent = search_clause_absence(
+                    out, str(detail["taxonomy"]), show_duplicates=True, limit=depth
+                )
+                confirmed = {str(r["file_key"]) for r in absent["confirmed_absent"]}
+                items = [fk for fk in items if fk in confirmed]
+                note = " (V4 confirmed_absent만 — needs_review 제외)"
+                if not items:
+                    continue
             lines.append(
-                f"## {qid} — {q.get('query','')}  [mode: {detail.get('mode')}]"
+                f"## {qid} — {q.get('query','')}  [mode: {detail.get('mode')}]{note}"
             )
             lines.append(f"검증법: {_HINT.get(intent, '')}")
             lines.append("")
             for fk in items:
                 m = meta.get(fk, {})
+                if types and str(m.get("ctype", "")) not in types:
+                    continue
                 paras = _read_paras(out, m.get("txt_path"))
+                matched, snippet = _raw_match(paras, terms)
                 lines.append(
                     f"### {fk}  [{m.get('ctype','?')} {m.get('lang','?')}]  {m.get('filename','')}"
                 )
                 lines.append(f"- V4 판단: {_v4_evidence(conn, subtree, fk)}")
-                lines.append(f"- 원문 근처: {_raw_snippet(paras, terms)}")
-                lines.append("- verdict: ")
+                lines.append(f"- 원문 근처: {snippet}")
+                verdict, basis = _auto_verdict(detail.get("mode"), matched) if auto else (None, None)
+                if verdict:
+                    lines.append(f"- verdict: {verdict}   # auto: {basis}")
+                else:
+                    lines.append("- verdict: ")
                 lines.append("")
     return "\n".join(lines) + "\n"
 
@@ -156,7 +202,7 @@ def parse_worksheet(text: str) -> dict:
             continue
         mv = re.match(r"-\s*verdict:\s*(.*)", s)
         if mv and qid and fk:
-            raw = mv.group(1).strip().lower()
+            raw = mv.group(1).split("#", 1)[0].strip().lower()  # drop "# auto:" note
             v = VERDICT_MAP.get(raw)
             if v:
                 verdicts[qid][v].append(fk)
@@ -196,6 +242,18 @@ def main(argv=None) -> int:
     c.add_argument("--pool-depth", type=int, default=25)
     c.add_argument("--query", help="only this query id (e.g. V4A07)")
     c.add_argument(
+        "--auto",
+        action="store_true",
+        help="Pre-fill a conservative provisional verdict when the contract text "
+        "clearly shows the clause (existence->correct, absence->incorrect). "
+        "Bias-safe: never auto-confirms an absence from a keyword miss.",
+    )
+    c.add_argument(
+        "--types",
+        help="Comma-separated ctypes to keep (e.g. SPA,SSA,SHA,ATA/BTA). "
+        "Drops off-scope docs (MOU/LOI) to cut volume without judging.",
+    )
+    c.add_argument(
         "--worksheet", type=Path, default=Path("cs_index/gate_b_worksheet.md")
     )
 
@@ -212,10 +270,20 @@ def main(argv=None) -> int:
 
     args = parser.parse_args(argv)
     if args.cmd == "cards":
-        text = build_cards(args.out, args.seed, args.pool_depth, args.query)
+        types = (
+            {t.strip() for t in args.types.split(",") if t.strip()}
+            if args.types
+            else None
+        )
+        text = build_cards(
+            args.out, args.seed, args.pool_depth, args.query, auto=args.auto, types=types
+        )
         args.worksheet.parent.mkdir(parents=True, exist_ok=True)
         args.worksheet.write_text(text, encoding="utf-8")
+        filled = text.count("# auto:")
         print(f"wrote {args.worksheet}")
+        if args.auto:
+            print(f"auto-filled {filled} provisional verdicts (owner reviews/overrides)")
     else:
         summary = ingest(args.seed, args.worksheet, args.verdicts)
         print(json.dumps(summary, ensure_ascii=False, indent=2))
