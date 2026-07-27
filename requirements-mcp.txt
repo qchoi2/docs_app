@@ -1,0 +1,4 @@
+# Optional local MCP adapter dependencies (Python 3.10+).
+# Kept separate so the web app and CLI retain their minimal base install.
+-r requirements.txt
+mcp==1.28.1
