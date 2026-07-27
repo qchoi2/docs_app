@@ -99,6 +99,75 @@ def test_v13_expansion_gap_classifications_are_atomic_and_reusable():
     ) == ["RW.SOLVENCY.FRAUDULENT_TRANSFER"]
 
 
+def test_repeated_general_and_indemnity_terms_are_atomized():
+    assert classify_text(
+        "본 계약의 준거법은 대한민국 법률로 한다."
+    ) == ["REM.GOVERNING_LAW"]
+    assert classify_text(
+        "본 계약은 거래종결 전에 당사자들의 서면 합의에 따라 해제될 수 있다."
+    ) == ["REM.TERMINATION"]
+    assert classify_text(
+        "본 계약의 어느 규정이 무효이거나 집행이 불가능한 경우에도 "
+        "다른 규정의 효력 또는 집행가능성에 영향을 주지 아니한다."
+    ) == ["REM.SEVERABILITY"]
+    assert classify_text(
+        "본 계약은 서면 합의로만 수정될 수 있다. 권리를 행사하지 않는 "
+        "경우에도 해당 권리의 포기로 간주되지 않는다."
+    ) == ["REM.AMENDMENT", "REM.WAIVER"]
+    assert classify_text(
+        "This Agreement shall be binding upon and inure to the benefit of "
+        "the Parties and their respective successors and permitted assigns. "
+        "Nothing in this Agreement shall create any third party beneficiary rights."
+    ) == ["REM.NO_THIRD_PARTY_BENEFICIARY", "REM.BINDING_EFFECT"]
+    assert classify_text(
+        "The Indemnified Party shall not recover more than once in respect "
+        "of the same Loss."
+    ) == ["REM.NO_DOUBLE_RECOVERY"]
+    assert classify_text(
+        "The Indemnifying Party shall indemnify in full all Losses caused by fraud "
+        "or willful misconduct."
+    ) == ["REM.FRAUD_CARVEOUT"]
+    assert classify_text(
+        "The Indemnified Party shall not recover Losses that would not have "
+        "arisen but for any voluntary act, omission or transaction."
+    ) == ["REM.INDEMNITY.VOLUNTARY_ACT_EXCLUSION"]
+    assert "REM.SPECIFIC_PERFORMANCE" not in classify_text(
+        "Nothing in this Agreement shall require Purchaser to seek specific "
+        "performance of the Financing Sources."
+    )
+    assert "REM.SEVERABILITY" not in classify_text(
+        "No Governmental Body shall enter any Law making the Transaction "
+        "illegal or otherwise prohibiting the Closing."
+    )
+    assert "REM.NO_THIRD_PARTY_BENEFICIARY" not in classify_text(
+        "No third party has rights to any Company Intellectual Property."
+    )
+    assert "REM.INDEMNITY.VOLUNTARY_ACT_EXCLUSION" not in classify_text(
+        "The Buyer voluntarily enters into the Transaction and waives any "
+        "claim for damages."
+    )
+    assert "REM.NO_THIRD_PARTY_BENEFICIARY" not in classify_text(
+        "Nothing in this Note confers upon the Purchaser any rights as a stockholder."
+    )
+    assert "REM.AMENDMENT" not in classify_text(
+        "The counterparty notified the Company in writing that it requested "
+        "a material modification of a Material Contract."
+    )
+
+
+def test_unquoted_korean_definitions_and_definition_lead_ins_are_indexed():
+    assert classify_text(
+        "계열회사라 함은 공정거래법상의 계열회사를 의미한다."
+    ) == ["DEF.AFFILIATE"]
+    assert classify_text(
+        "손해라 함은 일체의 손실, 채무 및 비용을 의미한다."
+    ) == ["DEF.LOSSES"]
+    assert classify_text(
+        "본 계약에서 사용되는 용어들은 본 계약에서 달리 정의되지 않는 한 "
+        "별지 1에서 정한 의미를 가진다."
+    ) == ["DEF.CONTRACT_TERM"]
+
+
 def test_lead_ins_and_signature_blocks_are_rejected_as_non_atomic():
     assert reject_as_non_atomic(
         "매도인은 별지 6에 기재된 바와 같이 진술 및 보장한다."

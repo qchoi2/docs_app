@@ -4,6 +4,7 @@ from contextlib import closing
 
 import pytest
 
+from apply_v4_taxonomy_promotions import apply_plan
 from taxonomy_admin import (
     TaxonomyAdminError,
     list_candidate_clusters,
@@ -233,6 +234,178 @@ def test_merge_can_atomize_one_candidate_into_multiple_taxonomy_items(tmp_path):
             ("RW-TC000001-01", "RW.LABOR.NO_VIOLATION"),
             ("RW-TC000001-02", "RW.LABOR.WORKING_CONDITIONS"),
         ]
+
+
+def test_merge_can_explicitly_reassign_body_candidate_family(tmp_path):
+    out = database(tmp_path)
+    result = resolve_candidates(
+        out,
+        {
+            "action": "merge",
+            "candidate_ids": [1],
+            "taxonomy_id": "REM.GOVERNING_LAW",
+            "allow_family_reassignment": True,
+            "reason": "본문 제목 범위보다 명제의 실제 법적 기능을 우선",
+        },
+    )
+    assert result["materialized_count"] == 1
+    with closing(sqlite3.connect(out / "catalog.sqlite")) as conn:
+        candidate = conn.execute(
+            """
+            SELECT family,nearest_taxonomy_id,status,resolution_json
+            FROM v4_taxonomy_candidate WHERE candidate_id=1
+            """
+        ).fetchone()
+        assert candidate[:3] == (
+            "REM",
+            "REM.GOVERNING_LAW",
+            "merged",
+        )
+        assert json.loads(candidate[3])["taxonomy_id"] == "REM.GOVERNING_LAW"
+        assert conn.execute(
+            """
+            SELECT family,taxonomy_id FROM v4_clause_item
+            WHERE item_ref='REM-TC000001'
+            """
+        ).fetchone() == ("REM", "REM.GOVERNING_LAW")
+
+
+def test_cross_family_merge_requires_explicit_reassignment(tmp_path):
+    out = database(tmp_path)
+    with pytest.raises(TaxonomyAdminError) as exc:
+        resolve_candidates(
+            out,
+            {
+                "action": "merge",
+                "candidate_ids": [1],
+                "taxonomy_id": "REM.GOVERNING_LAW",
+                "reason": "missing explicit permission",
+            },
+        )
+    assert exc.value.code == "FAMILY_MISMATCH"
+
+
+def test_promote_can_explicitly_reassign_body_candidate_family(tmp_path):
+    out = database(tmp_path)
+    result = resolve_candidates(
+        out,
+        {
+            "action": "promote",
+            "candidate_ids": [1],
+            "taxonomy_id": "REM.SEVERABILITY",
+            "canonical_ko": "분리가능성",
+            "canonical_en": "Severability",
+            "definition": "일부 조항의 무효가 나머지 조항의 효력에 영향을 주지 않음",
+            "parent_id": "REM",
+            "aliases": ["invalid provision"],
+            "allow_family_reassignment": True,
+            "reason": "반복 확인된 일반조항",
+        },
+    )
+    assert result["resolved_count"] == 1
+    assert result["materialized_count"] == 1
+    with closing(sqlite3.connect(out / "catalog.sqlite")) as conn:
+        assert conn.execute(
+            """
+            SELECT family,recommended_parent_id,nearest_taxonomy_id,status
+            FROM v4_taxonomy_candidate WHERE candidate_id=1
+            """
+        ).fetchone() == (
+            "REM",
+            "REM",
+            "REM",
+            "approved",
+        )
+        assert conn.execute(
+            """
+            SELECT family,taxonomy_id FROM v4_clause_item
+            WHERE file_key=?
+            """,
+            ("a" * 16,),
+        ).fetchone() == ("REM", "REM.SEVERABILITY")
+
+
+def test_reviewed_promotion_plan_is_applied_through_admin_path(tmp_path):
+    out = database(tmp_path)
+    plan = tmp_path / "promotions.json"
+    plan.write_text(
+        json.dumps(
+            [
+                {
+                    "action": "promote",
+                    "candidate_ids": [1],
+                    "taxonomy_id": "RW.LABOR.NEW_ATOMIC_TERM",
+                    "canonical_ko": "신규 원자 노무 명제",
+                    "canonical_en": "New atomic labor proposition",
+                    "definition": "반복 검토를 거쳐 승격된 테스트 명제",
+                    "parent_id": "RW.LABOR",
+                    "reason": "검토 완료",
+                }
+            ],
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    result = apply_plan(out, plan)
+
+    assert result["action_count"] == 1
+    assert result["resolved_candidate_count"] == 1
+    assert result["materialized_item_count"] == 1
+    with closing(sqlite3.connect(out / "catalog.sqlite")) as conn:
+        assert conn.execute(
+            """
+            SELECT canonical_ko,origin FROM v4_taxonomy_node
+            WHERE taxonomy_id='RW.LABOR.NEW_ATOMIC_TERM'
+            """
+        ).fetchone() == ("신규 원자 노무 명제", "promoted")
+
+
+def test_promotion_plan_preflight_prevents_partial_apply(tmp_path):
+    out = database(tmp_path)
+    plan = tmp_path / "invalid-promotions.json"
+    plan.write_text(
+        json.dumps(
+            [
+                {
+                    "action": "promote",
+                    "candidate_ids": [1],
+                    "taxonomy_id": "RW.LABOR.FIRST_NEW_TERM",
+                    "canonical_ko": "첫 신규 명제",
+                    "canonical_en": "First new proposition",
+                    "definition": "첫 번째 명제",
+                    "parent_id": "RW.LABOR",
+                    "reason": "검토 완료",
+                },
+                {
+                    "action": "promote",
+                    "candidate_ids": [2],
+                    "taxonomy_id": "RW.LABOR.COLLIDING_TERM",
+                    "canonical_ko": "노무 관련 위반사항 없음",
+                    "canonical_en": "Colliding proposition",
+                    "definition": "기존 alias와 충돌",
+                    "parent_id": "RW.LABOR",
+                    "reason": "검토 완료",
+                },
+            ],
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="alias collides"):
+        apply_plan(out, plan)
+
+    with closing(sqlite3.connect(out / "catalog.sqlite")) as conn:
+        assert conn.execute(
+            """
+            SELECT COUNT(*) FROM v4_taxonomy_node
+            WHERE taxonomy_id='RW.LABOR.FIRST_NEW_TERM'
+            """
+        ).fetchone()[0] == 0
+        assert conn.execute(
+            "SELECT COUNT(*) FROM v4_taxonomy_candidate WHERE status='pending'"
+        ).fetchone()[0] == 2
 
 
 def test_alias_collision_rolls_back_promotion(tmp_path):

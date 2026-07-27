@@ -13,6 +13,7 @@ contract_docs/
 
 # --- Temp / probe / editor artifacts ---
 .tmp_pytest*/
+.pytest_tmp*/
 tmp_doc_convert_probe/
 tmp_*/
 *.tmp

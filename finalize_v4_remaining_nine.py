@@ -21,8 +21,8 @@ from v4_schema import initialize_v4_schema, taxonomy_ids, validate_v4_result
 
 
 DEFINITION_RE = re.compile(
-    r'"([^"\n]{1,120})"\s*(?:(?:shall\s+)?(?:mean|means|has\s+the\s+meaning|have\s+the\s+meaning)|이란|란|이라\s*함은|이라\s*한다)'
-    r"|([가-힣A-Za-z0-9·\s]{1,50})(?:이라\s*함은|이란|이라\s*한다)",
+    r'"([^"\n]{1,120})"\s*(?:(?:shall\s+)?(?:mean|means|has\s+the\s+meaning|have\s+the\s+meaning)|이란|란|(?:이)?라\s*함은|이라\s*한다)'
+    r"|([가-힣A-Za-z0-9·\s]{1,50})(?:(?:이)?라\s*함은|이란|이라\s*한다)",
     re.IGNORECASE,
 )
 
@@ -102,7 +102,12 @@ def classify_text(text: str) -> list[str]:
         text,
         r"terms?.*(?:have|has).*(?:meaning).*(?:other agreement|set forth)",
         r"본 계약.*용어.*(?:계약|문서)에 정의된 의미",
+        r"본 계약.*(?:용어|다음의 용어).*(?:별지|아래).*(?:정한|규정된)\s*의미",
+        r"unless otherwise defined.*following terms.*(?:meanings?|ascribed)",
         r'"include,".*without limitation',
+        r"\binclude\b.*\bincluding\b.*without limitation",
+        r"singular noun.*plural|singular.*include.*plural",
+        r"references? to this agreement.*(?:amended|modified|supplemented)",
     ):
         ids.append("DEF.CONTRACT_TERM")
 
@@ -609,7 +614,7 @@ def classify_text(text: str) -> list[str]:
     if has(
         text,
         r"(?:may|shall have the right to) terminate|may be terminated|shall terminate|upon termination|termination rights?|section .*termination",
-        r"(?:계약을|본 계약을).{0,40}(?:해제|해지)할 수|본 계약.*(?:해지되|해제된 경우)|해제권|해지권",
+        r"(?:계약을|본 계약을|본 계약은).{0,60}(?:해제|해지)(?:할 수|될 수)|본 계약.*(?:해지되|해제된 경우)|해제권|해지권",
         r"정부기관.*거래종결.*금지.*서면 통지",
     ):
         ids.append("REM.TERMINATION")
@@ -636,7 +641,12 @@ def classify_text(text: str) -> list[str]:
         r"본 계약.{0,50}(?:효력이 발생|효력을 발생|효력발생)",
     ):
         ids.append("REM.EFFECTIVE_DATE")
-    if has(text, r"governed by.*laws?|governing law", r"(?:대한민국|한국).*(?:법률|법규).*(?:해석|규율|집행)"):
+    if has(
+        text,
+        r"governed by.*laws?|governing law",
+        r"(?:대한민국|한국).*(?:법률|법규).*(?:해석|규율|집행)",
+        r"준거법.*(?:대한민국|한국).*(?:법률|법규)",
+    ):
         ids.append("REM.GOVERNING_LAW")
     if has(
         text,
@@ -650,8 +660,96 @@ def classify_text(text: str) -> list[str]:
         ids.append("REM.DISPUTE_RESOLUTION")
     if has(text, r"entire agreement|supersedes?.*prior", r"(?:최종적|완전한).*(?:합의).*(?:종전|대체)"):
         ids.append("REM.ENTIRE_AGREEMENT")
-    if has(text, r"(?:amend|modif).*(?:writing|signed)", r"(?:수정|개정|변경).*(?:서면|서명)"):
+    if has(
+        text,
+        r"(?:this agreement|this instrument|provision|term).{0,100}(?:amend|modif).{0,100}(?:writing|signed)",
+        r"(?:writing|signed).{0,100}(?:amend|modif).{0,100}(?:this agreement|this instrument|provision|term)",
+        r"(?:본 계약|계약의 조항).{0,80}(?:수정|개정|변경).{0,80}(?:서면|서명)",
+        r"(?:서면 합의|서명한 서면).{0,80}(?:수정|개정|변경)",
+    ):
         ids.append("REM.AMENDMENT")
+    if has(
+        text,
+        r"(?:failure|delay|omission).*(?:exercise|exercising).*(?:not|no).*(?:waiver|operate as a waiver)",
+        r"no (?:delay|omission).*(?:operate|construed).*(?:waiver)",
+        r"권리.*행사하지.*포기로 간주되지",
+        r"권리.*포기.*다른.*(?:권리|조항).*포기로 간주되지",
+    ):
+        ids.append("REM.WAIVER")
+    if has(
+        text,
+        r"(?:invalid|illegal|unenforceable).{0,160}(?:remaining|other)\s+provisions?.{0,120}(?:valid|force|effect|enforceable)",
+        r"(?:provision|term).{0,120}(?:invalid|illegal|unenforceable).{0,160}(?:remaining|other)\s+(?:provisions?|terms?)",
+        r"severability",
+        r"(?:무효|위법|집행이 불가능).*(?:다른|나머지).*(?:효력|집행가능성).*(?:영향을 주지|유효)",
+    ):
+        ids.append("REM.SEVERABILITY")
+    if has(
+        text,
+        r"nothing.*(?:confer|create).*(?:third.party beneficiar|(?:any )?third part).*(?:rights?|remed)",
+        r"nothing.*(?:confer|give).*(?:any other person|person who is not a party).*(?:rights?|remed)",
+        r"(?:not intended|shall not be construed).*(?:confer|give).*(?:rights?|remed)",
+        r"no third.party beneficiar",
+        r"(?:agreement|instrument).{0,120}(?:solely|only) for the benefit of.{0,120}(?:no|not).{0,80}(?:benefit|claim|right|remed)",
+        r"제3자에게.*(?:권리|구제수단).*(?:부여하지|부여하는 것으로 해석되지|발생시키지)",
+    ):
+        ids.append("REM.NO_THIRD_PARTY_BENEFICIARY")
+    if has(
+        text,
+        r"(?:agreement|provisions?).*(?:binding (?:upon|on)|shall be binding).*(?:successors?|assigns?)",
+        r"(?:inure|enure) to the benefit.*(?:successors?|assigns?)",
+        r"본 계약.*당사자.*구속.*효력",
+    ):
+        ids.append("REM.BINDING_EFFECT")
+    if has(
+        text,
+        r"(?:specific performance|injunctive relief|irreparable harm)",
+        r"(?:회복할 수 없는 손해|가압류|가처분).*(?:이행을 강제|청구할 권리)",
+    ) and not has(
+        text,
+        r"nothing.*(?:require|obligat).*(?:seek|pursue).*specific performance",
+        r"not (?:entitled|permitted) to (?:seek|obtain).*specific performance",
+    ):
+        ids.append("REM.SPECIFIC_PERFORMANCE")
+    if has(
+        text,
+        r"more than once.*(?:same loss|same damages?)",
+        r"(?:same loss|same damages?).*more than once",
+        r"(?:동일한|같은).*(?:손해|사실).*(?:중복|두 번 이상).*(?:배상|회수)",
+    ):
+        ids.append("REM.NO_DOUBLE_RECOVERY")
+    if has(
+        text,
+        r"indemnif.{0,120}\bin full\b.*(?:fraud|willful misconduct)",
+        r"(?:fraud|willful misconduct).{0,120}\bindemnif.{0,120}\bin full\b",
+        r"limitations?.*(?:shall not|do not|does not).*apply.*(?:fraud|willful misconduct)",
+        r"(?:fraud|willful misconduct).*(?:not subject to|excluded from).*limitations?",
+        r"(?:사기|고의).*(?:책임제한).*(?:적용하지|제외)",
+        r"(?:책임제한).*(?:적용하지|제외).*(?:사기|고의)",
+        r"(?:사기|고의).*(?:손해배상|배상책임).*(?:전액|제한 없이)",
+    ):
+        ids.append("REM.FRAUD_CARVEOUT")
+    if has(
+        text,
+        r"(?:punitive|exemplary) damages?.*(?:not liable|exclude|in no event)",
+        r"in no event.*(?:punitive|exemplary) damages?",
+        r"(?:징벌적|제재적) 손해.*(?:배제|책임을 지지)",
+    ):
+        ids.append("REM.CONSEQUENTIAL.PUNITIVE")
+    if has(
+        text,
+        r"(?:lost profits?|loss of profits?).*(?:not liable|exclude|in no event)",
+        r"in no event.*(?:lost profits?|loss of profits?)",
+        r"일실이익.*(?:배제|책임을 지지)",
+    ):
+        ids.append("REM.CONSEQUENTIAL.LOST_PROFITS")
+    if has(
+        text,
+        r"losses?.*would not have arisen but for.*voluntary (?:act|omission|transaction)",
+        r"voluntary (?:act|omission|transaction).*(?:loss|recover|indemnif)",
+        r"자발적(?:인)?\s*(?:행위|부작위|거래).*(?:손해|배상)",
+    ):
+        ids.append("REM.INDEMNITY.VOLUNTARY_ACT_EXCLUSION")
     if has(text, r"rights? and remedies?.*cumulative", r"권리와 구제수단.*(?:중첩|배제하지)"):
         ids.append("REM.CUMULATIVE_REMEDIES")
     if has(text, r"reasonable steps?.*mitigat", r"손해.*최소화.*합리적인 조치"):

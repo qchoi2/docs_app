@@ -519,6 +519,7 @@ def resolve_candidates(out: Path, body: dict) -> dict:
                 raise TaxonomyAdminError(
                     400, "VALIDATION_ERROR", "Target taxonomy ids must contain 1 to 20 values."
                 )
+            target_families: set[str] = set()
             for taxonomy_id in target_taxonomy_ids:
                 target = conn.execute(
                     """
@@ -531,10 +532,50 @@ def resolve_candidates(out: Path, body: dict) -> dict:
                     raise TaxonomyAdminError(
                         404, "TAXONOMY_NOT_FOUND", "Target node not found."
                     )
-                if target["family"] != family:
+                target_families.add(str(target["family"]))
+            if len(target_families) != 1:
+                raise TaxonomyAdminError(
+                    400,
+                    "FAMILY_MISMATCH",
+                    "All target nodes must belong to one family.",
+                )
+            target_family = next(iter(target_families))
+            if target_family != family:
+                if not bool(body.get("allow_family_reassignment")):
                     raise TaxonomyAdminError(
-                        400, "FAMILY_MISMATCH", "Target node belongs to another family."
+                        400,
+                        "FAMILY_MISMATCH",
+                        "Target node belongs to another family.",
                     )
+                if any(str(row["source_kind"] or "body") != "body" for row in rows):
+                    raise TaxonomyAdminError(
+                        400,
+                        "FAMILY_REASSIGNMENT_UNSAFE",
+                        "Only body candidates can be reassigned across families.",
+                    )
+                source_family = family
+                conn.execute(
+                    f"""
+                    UPDATE v4_taxonomy_candidate
+                    SET family=?,recommended_parent_id=?,
+                        nearest_taxonomy_id=?
+                    WHERE candidate_id IN (
+                      {','.join('?' for _ in candidate_ids)}
+                    )
+                    """,
+                    (
+                        target_family,
+                        target_taxonomy_ids[0],
+                        target_taxonomy_ids[0],
+                        *candidate_ids,
+                    ),
+                )
+                rows = _load_pending_candidates(conn, candidate_ids)
+                family = target_family
+                payload["family_reassignment"] = {
+                    "from": source_family,
+                    "to": target_family,
+                }
             target_taxonomy_id = target_taxonomy_ids[0]
             payload["taxonomy_ids"] = target_taxonomy_ids
             resolved_status = "merged"
@@ -548,10 +589,6 @@ def resolve_candidates(out: Path, body: dict) -> dict:
             if not TAXONOMY_ID_RE.fullmatch(target_taxonomy_id):
                 raise TaxonomyAdminError(
                     400, "VALIDATION_ERROR", "Invalid canonical taxonomy id."
-                )
-            if not target_taxonomy_id.startswith(f"{family}."):
-                raise TaxonomyAdminError(
-                    400, "FAMILY_MISMATCH", "Taxonomy id must start with the family."
                 )
             if not canonical_ko or not canonical_en or not definition or not parent_id:
                 raise TaxonomyAdminError(
@@ -573,10 +610,47 @@ def resolve_candidates(out: Path, body: dict) -> dict:
             ).fetchone()
             if parent is None:
                 raise TaxonomyAdminError(404, "TAXONOMY_NOT_FOUND", "Parent node not found.")
-            if parent["family"] != family:
+            target_family = str(parent["family"])
+            if not target_taxonomy_id.startswith(f"{target_family}."):
                 raise TaxonomyAdminError(
-                    400, "FAMILY_MISMATCH", "Parent belongs to another family."
+                    400,
+                    "FAMILY_MISMATCH",
+                    "Taxonomy id must start with the parent family.",
                 )
+            if target_family != family:
+                if not bool(body.get("allow_family_reassignment")):
+                    raise TaxonomyAdminError(
+                        400, "FAMILY_MISMATCH", "Parent belongs to another family."
+                    )
+                if any(str(row["source_kind"] or "body") != "body" for row in rows):
+                    raise TaxonomyAdminError(
+                        400,
+                        "FAMILY_REASSIGNMENT_UNSAFE",
+                        "Only body candidates can be reassigned across families.",
+                    )
+                source_family = family
+                conn.execute(
+                    f"""
+                    UPDATE v4_taxonomy_candidate
+                    SET family=?,recommended_parent_id=?,
+                        nearest_taxonomy_id=?
+                    WHERE candidate_id IN (
+                      {','.join('?' for _ in candidate_ids)}
+                    )
+                    """,
+                    (
+                        target_family,
+                        parent_id,
+                        parent_id,
+                        *candidate_ids,
+                    ),
+                )
+                rows = _load_pending_candidates(conn, candidate_ids)
+                family = target_family
+                payload["family_reassignment"] = {
+                    "from": source_family,
+                    "to": target_family,
+                }
             alias_values = [canonical_ko, canonical_en, *aliases]
             normalized = [normalize_alias(value) for value in alias_values]
             placeholders = ",".join("?" for _ in normalized)

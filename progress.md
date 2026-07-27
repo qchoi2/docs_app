@@ -20,22 +20,23 @@
   리서치 UI(UI-3), 온보딩/진행률(UI-0.2/0.3), Runtime API Settings, one-writer job 큐,
   taxonomy 후보 관리(UI-5), 도움말 페이지.
 - **MCP** (`mcp_server.py`, `v4_mcp_tools.py`): 읽기전용 도구 7개 + V4 검색/비교 도구 2개.
-- **V4 (세부 원자 항목 계층)**: taxonomy **v14 / 409 nodes**, 6-family(RW·CP·COV·DEF·PAY·REM),
+- **V4 (세부 원자 항목 계층)**: taxonomy **v19 / 414 nodes**, 6-family(RW·CP·COV·DEF·PAY·REM),
   본문·별지 분리 coverage, 별지 물리문단 완전성 감사, 하이브리드 검색(구조화+FTS+문단폴백),
   안전한 부재 판정. SPA·SSA·ATA/BTA·SHA뿐 아니라 CBSA·NPA·BWSA·WPA·EBSA를
-  전 항목 추출 범위에 포함한다. 누적 V4 item **98,904개**, 평가 문서 **968건**,
-  pending taxonomy 후보 **31,083개**.
+  전 항목 추출 범위에 포함한다. 누적 V4 item **100,207개**, 평가 문서 **968건**,
+  pending taxonomy 후보 **29,807개**.
 
 **진행 중 / 다음 단계**
 - **V4-6 확장 배치 계속**: 기존 600건 재처리와 증권계약 포함 300건 적재 완료.
   다음 순서는 남은 SSA→ATA/BTA→SHA이며, 이후 미처리 증권계약을 포함해 계속 확장한다.
   pending taxonomy 후보와 partial source는 부재 판정에서 제외하고 `needs_review`로 보존.
-- **taxonomy 후보 검수**: 31,083개 후보의 반복 문구를 군집화해 기존 leaf 병합과
-  신규 leaf 승격을 검토한다. 현재 결정 규칙으로 안전한 자동 병합·기각은 0건이다.
+- **taxonomy 후보 검수**: 31,083개 후보의 반복 문구 군집화를 완료하고 신규 leaf
+  5개를 승격했으며, 고신뢰 후보 1,245건을 1,272개 원자 item으로 병합했다.
+  남은 29,807건은 다음 family별 tranche에서 계속 검수한다.
 - **Gate B 정식화**: 현재 recall 평가는 승인 item 기반 회귀이므로 독립 사람검수 골드 필요.
 - **T4 (벡터 하이브리드)**: 미착수. V4-5 게이트 통과·coverage 안정 후 시작(Phase 4).
 
-**테스트**: `python -m pytest` → **228 passed, 1 skipped**.
+**테스트**: `python -m pytest` → **238 passed, 1 skipped**.
 - ⚠️ 환경 주의: `AppData\Local\Temp\pytest-of-<user>` 폴더 권한 문제로 pytest가 대량
   `PermissionError`를 낼 수 있다. 이때는 `python -m pytest --basetemp=<쓰기가능경로>`로 우회한다.
   (과거 세션이 이를 우회하려고 repo 안에 `.tmp_pytest_*/`를 만든 흔적이 있었고, 이번에 정리·gitignore 처리했다.)
@@ -926,3 +927,29 @@ python webapp.py --out cs_index      # 또는 run_webapp.bat [색인경로]
 - 적재 전 WAL-safe 백업:
   `.backups/v4_scope_body_corrections_pre_store_20260727/cs_index_backup_20260727_155517`
 - 상세 보고: `.docs/V4_SCOPE_EXPANSION_CB_BW_EB_20260727.md`
+
+### 2026-07-27 — V4 taxonomy 반복 후보 군집 검수·v19 운영 반영
+
+- pending 31,083건을 21,794개 정규화 군집으로 묶었고, 2건 이상 반복되는
+  4,837개 군집(후보 14,126건)을 우선 검수했다.
+- `REM.SEVERABILITY`, `REM.WAIVER`,
+  `REM.NO_THIRD_PARTY_BENEFICIARY`, `REM.BINDING_EFFECT`,
+  `REM.INDEMNITY.VOLUNTARY_ACT_EXCLUSION` 5개 leaf를 승격해 taxonomy v19,
+  활성 노드 414개가 되었다.
+- 정의·계열회사·손해 정의, 종료, 이중배상, 사기 예외, 특정이행, 징벌손해,
+  일실이익, 준거법, 수정 등 고신뢰 후보 1,245건을 기존·신규 leaf로 병합해
+  1,272개 원자 item을 적재했다. 이 중 body 55건은 실제 법적 기능에 맞춰
+  명시적 교차 family 재분류를 수행했다.
+- 신규 승격 직접 item 31개를 포함해 운영 DB는 item/FTS 각 100,207개다.
+  후보 상태는 approved 31, merged 1,540, rejected 16, pending 29,807이다.
+- Annex·Schedule의 교차 family 후보는 자동 재분류하지 않고 pending으로
+  유지했다. 오탐 표본을 통해 분리가능성·제3자 수익자 배제·사기 예외·
+  특정이행·자발행위 손해 제외 규칙을 조항 고유 문형으로 좁혔다.
+- integrity ok, FK 0, stale 0, taxonomy/family 불일치 0, FTS row 일치,
+  resolution reference 1,598건 중 missing 0이다. 적용 후 같은 규칙을 다시
+  실행한 결과 추가 merge·item이 모두 0으로 멱등성도 확인했다.
+- 전체 테스트 238 passed, 1 skipped. T1/T2 fail 0, V4 Gate B 36/36,
+  recall 1.0000, 정독 문서 수 58.76% 감소다.
+- Gate B V4 측정시간은 100,207 item 기준 약 20.3초로 반복 측정되어,
+  다음 단계에서 SQL 실행계획·인덱스 성능을 재점검한다.
+- 상세 보고: `.docs/V4_TAXONOMY_CANDIDATE_REVIEW_20260727.md`

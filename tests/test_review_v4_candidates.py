@@ -1,6 +1,7 @@
+import json
 import sqlite3
 
-from review_v4_candidates import analyze_candidates, apply_analysis
+from review_v4_candidates import analyze_candidates, apply_analysis, main
 from v4_schema import initialize_v4_schema
 
 
@@ -92,3 +93,30 @@ def test_candidate_review_dry_run_and_apply(tmp_path):
         assert conn.execute(
             "SELECT taxonomy_id FROM v4_clause_item"
         ).fetchone()[0] == "RW.LITIGATION.NO_PENDING"
+
+
+def test_review_cli_can_apply_a_current_dry_run_report(tmp_path):
+    out = database(tmp_path)
+    dry_path = tmp_path / "dry-run.json"
+    dry_path.write_text(
+        json.dumps({"mode": "dry_run", "analysis": analyze_candidates(out)}),
+        encoding="utf-8",
+    )
+    applied_path = tmp_path / "applied.json"
+
+    assert main(
+        [
+            "--out",
+            str(out),
+            "--analysis-file",
+            str(dry_path),
+            "--apply",
+            "--report",
+            str(applied_path),
+            "--quiet",
+        ]
+    ) == 0
+
+    payload = json.loads(applied_path.read_text(encoding="utf-8"))
+    assert payload["result"]["resolved_candidate_count"] == 2
+    assert payload["result"]["pending_after"] == 1
