@@ -1098,3 +1098,22 @@ CORE_RW_SUBDOMAINS(조세·소송·준법·중요계약·노무·IP·환경·인
   게이팅 해제 검토.
 
 다음: 실제 RW 재추출 배치 실행(AI 클라이언트, manifest 순). rep→covenant 오분류 corpus 진단.
+
+### 2026-07-28 — rep→covenant 오분류 진단 + 권고 이행 현황 (Claude, opus)
+
+- **rep→covenant 진단**(권고 ④): COV.NON_COMPETE 승인 item 440건 중 rep 패턴(중요계약 열거
+  진술) ~140(31%), 명백한 확약 77(17%), 모호 223(50%). E03 표본(7/14 rep)과 일치. 재분류는
+  extract_prompt_v4_rw_addendum의 rep/covenant 규칙으로 재추출 배치에 포함(별도 대량 재분류 불요).
+
+**§9 권고 이행 현황 (2026-07-28)**
+- [x] 전량 확장 중단 — §9 결정(소유자 승인).
+- [x] coverage 정직화 — audit_rw_coverage --apply(733 partial 강등, 백업).
+- [x] 축소판 운영 — RW 부재 게이팅(CLI/웹/MCP 전파 확인).
+- [x] 추출 교정 설계 — extract_prompt_v4_rw_addendum(하위영역 전수·rep/covenant 규칙),
+      plan_rw_reextraction 매니페스트(733, 우선순위).
+- [x] rep→covenant 진단 — 재추출 프롬프트에 교정 반영.
+- [x] T4 보류 유지.
+- [ ] **RW 재추출 배치 실행**(733개, AI 클라이언트 파일 하네스, 소유자 감독) — manifest 준비 완료.
+- [ ] 재추출 후 Gate B 재측정 → RW 게이팅 해제 검토 → 확장 재개 판정.
+
+전체 회귀 확인 후 세션 마무리. 남은 대량 재추출은 운영 DB 대량 기록이라 소유자 감독하에 진행 권장.
