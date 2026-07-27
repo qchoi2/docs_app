@@ -69,8 +69,13 @@ python -m py_compile ...
 - `cs_index/`는 PC 로컬 디스크에 둔다.
 - 색인 중 원본을 이동/수정/삭제하지 않는다.
 - API 실호출은 사용자가 명시적으로 허용하기 전까지 금지한다.
-- Haiku/Sonnet/Opus 런타임 API 경로(G1.5/A9/A10/G2)는 사용자의 ANTHROPIC_API_KEY와 api_budget.yaml 상한이 모두 있을 때만 동작한다.
+- 웹앱/CLI가 Haiku/Sonnet/Opus를 직접 호출하는 G1.5/A9/A10/G2 경로는 사용자의 ANTHROPIC_API_KEY와 api_budget.yaml 상한이 모두 있을 때만 동작한다. MCP AI 클라이언트 답변에는 적용하지 않는다.
 - Codex 사용을 위해 OpenAI API key를 입력받거나 저장하지 않는다. Codex는 ChatGPT 구독계정 로그인 기반 도구로만 다룬다.
+- MCP는 기본 웹앱과 분리된 선택 의존성·로컬 stdio read-only 어댑터로 유지한다.
+- MCP 도구는 file_key만 문서 식별자로 받고 임의 경로, txt_path, 원문 전체를 노출하지 않는다.
+- MCP 프로세스에 별도 SQLite writer 또는 두 번째 색인 JobQueue를 만들지 않는다.
+- AI 클라이언트가 MCP 결과로 답변하는 경로에서는 프로그램 직접 API key를 요구·호출하지 않는다.
+- Sampling은 클라이언트 capability와 사용자 승인을 확인하고, 실패 시 유료 API로 자동 폴백하지 않는다.
 
 ## 8. UI coding rules
 

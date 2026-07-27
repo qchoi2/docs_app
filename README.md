@@ -125,6 +125,30 @@ python enrich_contracts.py --out C:\cs_index --limit 10
 
 결과 JSON 필수 키: `file_key`, `meta_schema_version`, `parties_json`, `deal_type_detail`, `consideration_json`, `clause_map_json`, `special_notes`, `definitions_json`, `confidence`. 현재 하네스 스키마는 `meta_schema_version=2`입니다. `clause_map_json`의 각 평가 조항은 `present`를 반드시 true/false로 담고, `loc_start`, `loc_end`, `summary`를 담아 이후 `read_contract.py`가 문단 좌표로 부분 정독할 수 있게 합니다. `손해배상`이 `present=true`이면 `cap_verbatim`, `basket_verbatim`, `de_minimis_verbatim`, `survival_verbatim`도 필수이며, 원문에서 확인하지 못한 값은 null 대신 `"not confirmed"`로 씁니다.
 
+### 5.5.1 T3 v3 정밀 보강 파일럿
+
+v3는 기존 v2를 덮어쓰지 않고 별도 폴더에서 당사자·대금·정규화 수치·유형별 조항을 검증합니다.
+
+```powershell
+# 유형·언어·Draft·기존 신뢰도를 섞은 60건 표본과 입력 생성
+python plan_t3_v3_pilot.py --out C:\cs_index --limit 60 --write-inputs
+
+# AI 클라이언트 결과를 DB 저장 전에 형식·위치·원문·수치 기준으로 감사
+python audit_t3_v3.py --manifest C:\cs_index\t3_v3_pilot_manifest.json
+
+# 사람 검수 승인 후에만 v3 결과 저장
+python enrich_contracts.py --out C:\cs_index --meta-schema-version 3 --limit 60
+```
+
+- 입력: `C:\cs_index\enrich_inputs_v3\<file_key>.json`
+- 결과: `C:\cs_index\enrich_results_v3\<file_key>.json`
+- 추출 지침: `.docs/extract_prompt_v3.md`
+- 파일럿 계획·승인 기준: `.docs/T3_V3_PILOT.md`
+
+v3 구조화 검색은 CLI·웹 API·MCP에서 당사자명/역할, 지급 방식·대금 범위,
+손해배상 상한 비율, 존속기간, 준거법, 법원·중재기관 조건을 지원합니다.
+v3가 없는 기존 문서는 조건 불일치나 부재로 단정하지 않고 `needs_review`에 미평가로 분리합니다.
+
 ## 5.6 T3 조항 단위 부분 읽기
 
 `read_contract.py`는 `doc_meta.clause_map_json`에 저장된 문단 범위를 좌표로 사용해 txt 캐시에서 해당 조항만 출력합니다.
@@ -249,3 +273,32 @@ python webapp.py --out C:\cs_index          # 브라우저에서 http://127.0.0.
 
 웹 UI 화면(검색 화면, 색인 대시보드, Agent Setup Wizard, Runtime API Settings)과
 job queue·AI 답변은 **후속 단계**입니다. `.docs/UI_ROADMAP.md` 순서(UI-0 ~ UI-4)로 진행합니다.
+
+## 11. MCP 어댑터 (선택)
+
+기존 웹앱과 함께 로컬 AI 클라이언트에서 계약 검색 도구를 사용할 수 있습니다. MCP는
+별도 선택 설치이며, 설치하지 않아도 웹앱과 CLI는 그대로 동작합니다. Python 3.10 이상에서:
+
+```powershell
+python -m pip install -r requirements-mcp.txt
+python mcp_server.py --out C:\cs_index --check
+```
+
+AI 클라이언트에는 로컬 stdio 서버로 다음 command/args를 등록합니다. 실제 Python 실행 파일과
+프로젝트·색인 경로는 PC 환경에 맞게 절대경로로 바꾸세요.
+
+```json
+{
+  "command": "C:\\path\\to\\.venv\\Scripts\\python.exe",
+  "args": [
+    "C:\\path\\to\\docs_app\\mcp_server.py",
+    "--out",
+    "C:\\cs_index"
+  ]
+}
+```
+
+제공 도구: 계약 검색, 조항 단위 부분 정독, 문단 주변 읽기, 파일 상태 점검, 중복·버전 확인,
+코퍼스 상태와 필터 조회. 모두 읽기 전용이며 색인 시작·설정 변경·저장 검색 등 쓰기 작업은
+기존 웹앱이 담당합니다. MCP 사용 시 최종 요약·비교 답변은 연결된 AI 클라이언트가 작성하므로
+별도의 답변 API key가 필요하지 않습니다. 단, MCP 클라이언트의 구독 사용량·한도는 적용됩니다.

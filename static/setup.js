@@ -46,6 +46,11 @@ function announce(message) { $("live").textContent = message; }
 /* ---------- init ---------- */
 document.addEventListener("DOMContentLoaded", () => {
   $("validate-button").addEventListener("click", validatePath);
+  $("use-project-folder").addEventListener("click", () => {
+    $("root-path").value = "contract_docs";
+    validatePath();
+  });
+  $("index-mode").addEventListener("change", renderModeHelp);
   $("root-path").addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
       if (event.isComposing || event.keyCode === 229) return;
@@ -58,7 +63,19 @@ document.addEventListener("DOMContentLoaded", () => {
   $("cancel-button").addEventListener("click", cancelJob);
   $("log-button").addEventListener("click", toggleLog);
   loadJobs();
+  renderModeHelp();
 });
+
+function renderModeHelp() {
+  const mode = $("index-mode").value;
+  const text = {
+    update: "일반 갱신은 새 파일과 바뀐 파일만 처리합니다. 처음 사용하는 경우에도 이 방식을 선택하면 됩니다.",
+    sample: "시험 색인은 무작위 20건만 처리합니다. 폴더와 추출 상태를 빠르게 확인할 때 사용하세요.",
+    full: "전체 새로 만들기는 파일 목록과 본문 검색 색인을 비우고 모든 문서를 다시 처리합니다.",
+  }[mode];
+  $("mode-help").textContent = text;
+  $("full-warning").hidden = mode !== "full";
+}
 
 /* ---------- 1단계: 경로 검증 ---------- */
 async function validatePath() {
@@ -97,6 +114,15 @@ async function startIndexJob() {
   const root = $("root-path").value.trim();
   const batch = $("batch-label").value.trim();
   const body = { root };
+  const mode = $("index-mode").value;
+  if (mode === "sample") { body.sample = 20; body.sample_seed = 42; }
+  if (mode === "full") {
+    if (!window.confirm("기존 파일 목록과 검색 색인을 비우고 전체를 다시 만들까요?")) {
+      $("start-button").disabled = false;
+      return;
+    }
+    body.full = true;
+  }
   if (batch) body.batch_label = batch;
   $("start-button").disabled = true;
   try {

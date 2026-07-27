@@ -1,5 +1,12 @@
 # CHANGELOG_20260708 — 이번 세션 반영 사항
 
+## 2026-07-16 — T3 v3 정밀 보강 파일럿 준비
+
+- 기존 v2를 보존하는 v3 별도 추출·검증 경로를 추가했다.
+- `.docs/extract_prompt_v3.md`와 `.docs/T3_V3_PILOT.md`를 추가했다.
+- 60건 층화 표본, AI 입력, 사람 검수표, 자동 감사 보고서를 생성할 수 있게 했다.
+- CLI·웹 API·MCP에 v3 구조화 조건을 추가하고 v2 미평가를 부재로 오판하지 않도록 했다.
+
 ## 충돌 정리
 - `--include-drafts`를 제거하고 `--exclude-drafts`를 표준 옵션으로 통일했다.
 - `--exclude-draft`는 하위호환 alias로만 허용한다.
@@ -142,3 +149,22 @@ Windows PC 특유 함정 (Brief §4에 추가):
 - 비교 목록은 MVP에서도 `ui_state.sqlite`의 이름 없는 기본 비교 목록으로 영속 저장하도록 했다.
 - UI-0 산출물에 `STACK_DECISION.md`를 추가해 코딩 에이전트가 임의로 무거운 프론트엔드 스택을 선택하지 않도록 했다.
 - 접근성 보강: aria-live 진행률/검색 완료 알림, split view 포커스 이동, 검색창 포커스 중 전역 단축키 비활성화.
+
+## 2026-07-16 — 웹앱 병행 MCP 사용 기획 반영
+
+- `MCP_INTEGRATION.md`를 추가해 웹앱과 MCP의 역할, 로컬 stdio/read-only 경계,
+  도구 7개, 데이터 노출 제한, AI 비용 라우팅, Sampling 후속 조건, DoD를 확정했다.
+- 웹앱은 색인·설정·운영·수동 검수 UX를 계속 담당하고, MCP는 동일 검색 코어를 사용하는
+  AI 클라이언트용 선택 인터페이스로 정의했다.
+- MCP 대화의 기본 답변은 AI 클라이언트의 현재 모델이 작성하므로 프로그램의 별도 답변
+  API key가 필요하지 않음을 명시했다. 단, 클라이언트 구독·조직 사용량 한도는 적용된다.
+- 웹앱 단독 G1.5/G2, 무인 배치, 고정 모델·독립 교차검증은 Anthropic 직접 API 폴백으로
+  유지하며 Runtime API Settings와 비용 가드레일을 적용한다.
+- Sampling은 클라이언트 capability와 사용자 승인 후에만 사용하고, 미지원·거부 시 유료
+  API로 자동 전환하지 않도록 했다.
+- MCP 프로세스에는 별도 SQLite writer/job queue를 만들지 않고, file_key 기반 부분 읽기만
+  제공하며 txt_path·원문 전체·secret을 반환하지 않도록 했다.
+- `IMPLEMENTATION_BRIEF.md`, `docs_progress_v2.md`, `CODING_SEQUENCE.md`,
+  `BACKEND_REVIEW_PC.md`, `UI_PRODUCT_SPEC.md`, `UI_ROADMAP.md`,
+  `UI_REVIEW_PC.md`, `AGENT_SETUP_AND_MODEL_OPTIONS.md`, `CODING_AGENT_RULES.md`,
+  `MANIFEST.txt`를 함께 갱신했다.

@@ -20,6 +20,7 @@ from docx import Document
 from docx.document import Document as DocumentObject
 from docx.oxml.table import CT_Tbl
 from docx.oxml.text.paragraph import CT_P
+from docx.oxml.ns import qn
 from docx.table import Table
 from docx.text.paragraph import Paragraph
 from docx.opc.exceptions import PackageNotFoundError
@@ -70,6 +71,7 @@ class ExistingRecord:
 class IndexOptions:
     include_misc: bool = False
     full: bool = False
+    force: bool = False
     batch_label: Optional[str] = None
     file_list: Optional[Path] = None
     sample: Optional[int] = None
@@ -382,6 +384,44 @@ def iter_docx_body_blocks(document: DocumentObject):
             yield Table(child, document)
 
 
+def paragraph_text_with_revisions(paragraph: Paragraph) -> str:
+    """Return the current DOCX paragraph text, including tracked insertions.
+
+    ``python-docx``'s ``Paragraph.text`` omits text nested in ``w:ins``.  That
+    made heavily redlined contracts look truncated even though the accepted
+    text remained in the OOXML.  Read text nodes in document order, include
+    insertions/move destinations, and exclude tracked deletions/move sources.
+    """
+
+    excluded_ancestors = {qn("w:del"), qn("w:moveFrom")}
+    text_tags = {qn("w:t"), qn("w:delText")}
+    parts: List[str] = []
+    for node in paragraph._p.iter():
+        if node.tag in text_tags and node.text:
+            ancestor = node.getparent()
+            excluded = False
+            while ancestor is not None and ancestor is not paragraph._p:
+                if ancestor.tag in excluded_ancestors:
+                    excluded = True
+                    break
+                ancestor = ancestor.getparent()
+            if not excluded:
+                parts.append(node.text)
+        elif node.tag == qn("w:tab"):
+            parts.append("\t")
+        elif node.tag in {qn("w:br"), qn("w:cr")}:
+            parts.append("\n")
+    return "".join(parts)
+
+
+def table_cell_text_with_revisions(cell) -> str:
+    return " ".join(
+        normalize(paragraph_text_with_revisions(paragraph))
+        for paragraph in cell.paragraphs
+        if normalize(paragraph_text_with_revisions(paragraph))
+    )
+
+
 def normalize_paragraphs(paragraphs: List[str]) -> List[str]:
     normalized: List[str] = []
     for paragraph in paragraphs:
@@ -405,10 +445,10 @@ def extract_docx(path: Path) -> ExtractedDocument:
     try:
         for block in iter_docx_body_blocks(document):
             if isinstance(block, Paragraph):
-                paragraphs.append(block.text)
+                paragraphs.append(paragraph_text_with_revisions(block))
             elif isinstance(block, Table):
                 for row in block.rows:
-                    cell_text = [normalize(cell.text) for cell in row.cells]
+                    cell_text = [table_cell_text_with_revisions(cell) for cell in row.cells]
                     paragraphs.append(" | ".join(text for text in cell_text if text))
     except Exception as exc:
         return ExtractedDocument([], "error", "docx_extract_failed", [str(exc)])
@@ -416,11 +456,13 @@ def extract_docx(path: Path) -> ExtractedDocument:
     try:
         for section in document.sections:
             for paragraph in section.header.paragraphs:
-                if normalize(paragraph.text):
-                    paragraphs.append(f"[머리글] {paragraph.text}")
+                text = paragraph_text_with_revisions(paragraph)
+                if normalize(text):
+                    paragraphs.append(f"[머리글] {text}")
             for paragraph in section.footer.paragraphs:
-                if normalize(paragraph.text):
-                    paragraphs.append(f"[바닥글] {paragraph.text}")
+                text = paragraph_text_with_revisions(paragraph)
+                if normalize(text):
+                    paragraphs.append(f"[바닥글] {text}")
     except Exception as exc:
         warnings.append(f"header_footer_extract_skipped: {exc}")
 
@@ -939,6 +981,7 @@ def index_contracts(
                 and existing_at_path.size == stat.st_size
                 and existing_at_path.mtime == stat.st_mtime
                 and not options.full
+                and not options.force
             ):
                 skipped += 1
                 changes.skipped.append(rel_path)
@@ -1125,6 +1168,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--out", required=True, help="Output cs_index folder.")
     parser.add_argument("--include-misc", action="store_true")
     parser.add_argument("--full", action="store_true")
+    parser.add_argument("--force", action="store_true", help="Re-extract selected unchanged files without clearing the catalog.")
     parser.add_argument("--batch-label")
     parser.add_argument("--file-list", type=Path)
     parser.add_argument("--sample", type=int)
@@ -1149,6 +1193,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             IndexOptions(
                 include_misc=args.include_misc,
                 full=args.full,
+                force=args.force,
                 batch_label=args.batch_label,
                 file_list=args.file_list,
                 sample=args.sample,

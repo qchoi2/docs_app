@@ -75,6 +75,57 @@ def insert_doc_meta(conn, file_key, clause_map, confidence="high", txt_hash=None
     )
 
 
+def insert_v3_meta(conn, file_key, *, party, role, cap_pct, law="대한민국"):
+    parties = {
+        "evaluated": True,
+        "items": [{"name": party, "role": role, "loc_start": 1, "loc_end": 1, "confidence": "high"}],
+        "confidence": "high",
+        "confidence_reason": None,
+    }
+    consideration = {
+        "evaluated": True,
+        "amount_value": 10000000000,
+        "payment_methods": ["현금"],
+        "confidence": "high",
+        "confidence_reason": None,
+    }
+    clause_map = {
+        "손해배상": {
+            "present": True,
+            "loc_start": 2,
+            "loc_end": 2,
+            "summary": "상한",
+            "verbatim": "10%",
+            "normalized": {"cap_pct_of_price": cap_pct},
+            "confidence": "high",
+        },
+        "준거법": {
+            "present": True,
+            "loc_start": 3,
+            "loc_end": 3,
+            "summary": law,
+            "verbatim": law,
+            "normalized": {"law": law},
+            "confidence": "high",
+        },
+    }
+    conn.execute(
+        """
+        INSERT INTO doc_meta(
+          file_key,meta_schema_version,txt_hash,extracted_at,
+          parties_json,consideration_json,clause_map_json,json,confidence
+        ) VALUES (?,3,?,'2026-07-16',?,?,?,'{}','high')
+        """,
+        (
+            file_key,
+            file_key,
+            json.dumps(parties, ensure_ascii=False),
+            json.dumps(consideration, ensure_ascii=False),
+            json.dumps(clause_map, ensure_ascii=False),
+        ),
+    )
+
+
 def test_exact_search_ranks_above_expanded_search(tmp_path):
     out, db_path = make_search_db(tmp_path)
     with closing(sqlite3.connect(db_path)) as conn:
@@ -342,3 +393,41 @@ def test_clause_filter_composes_with_existing_keyword_search(tmp_path):
     assert count == 1
     assert result["results"][0]["file_key"] == "both"
     assert result["results"][0]["score_breakdown"]["exact_rank"] == 1
+
+
+def test_v3_structured_filters_match_party_cap_and_law(tmp_path):
+    out, db_path = make_search_db(tmp_path)
+    with closing(sqlite3.connect(db_path)) as conn:
+        insert_doc(conn, "match", "match.docx", "손해배상\n준거법")
+        insert_doc(conn, "other", "other.docx", "손해배상\n준거법")
+        insert_v3_meta(conn, "match", party="알파 주식회사", role="매수인", cap_pct=10)
+        insert_v3_meta(conn, "other", party="베타 주식회사", role="매도인", cap_pct=20, law="뉴욕주")
+        conn.commit()
+
+    result, count = search_contracts(
+        out,
+        party_name="알파",
+        party_role="매수인",
+        cap_pct_max=10,
+        governing_law="대한민국",
+    )
+
+    assert count == 1
+    assert result["results"][0]["file_key"] == "match"
+    assert result["results"][0]["structured"]["손해배상"]["normalized"]["cap_pct_of_price"] == 10
+    assert result["query"]["structured"]["filters"]["party_name"] == "알파"
+
+
+def test_v3_structured_filter_reports_v2_as_unevaluated(tmp_path):
+    out, db_path = make_search_db(tmp_path)
+    with closing(sqlite3.connect(db_path)) as conn:
+        insert_doc(conn, "legacy", "legacy.docx", "손해배상")
+        insert_doc_meta(conn, "legacy", {"손해배상": {"present": True}})
+        conn.commit()
+
+    result, count = search_contracts(out, cap_pct_max=10)
+
+    assert count == 0
+    structured = result["query"]["structured"]
+    assert structured["needs_review_count"] == 1
+    assert structured["needs_review"][0]["file_key"] == "legacy"

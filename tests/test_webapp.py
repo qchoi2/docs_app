@@ -181,6 +181,96 @@ def test_static_ui_is_served(tmp_path):
     status, headers, payload = call(app, "GET", "/static/app.css")
     assert status == 200 and "text/css" in headers["Content-Type"]
 
+    status, headers, payload = call(app, "GET", "/help")
+    assert status == 200 and "text/html" in headers["Content-Type"]
+    help_text = payload.decode("utf-8")
+    assert "T1~T4" in help_text and "아직 제공되지 않음" in help_text
+    assert 'href="/setup"' in help_text and 'href="/"' in help_text
+
+
+def test_web_search_supports_t3_clause_filters(tmp_path):
+    app = make_app(tmp_path)
+    out = tmp_path / "cs_index"
+    clause_map = json.dumps({
+        "손해배상": {"present": True, "loc_start": 2, "loc_end": 2, "summary": "상한 규정"}
+    }, ensure_ascii=False)
+    with closing(sqlite3.connect(out / "catalog.sqlite")) as conn:
+        conn.execute(
+            "INSERT INTO doc_meta(file_key, clause_map_json, confidence) VALUES (?, ?, ?)",
+            ("a" * 16, clause_map, "high"),
+        )
+        conn.commit()
+
+    status, data = get_json(app, "POST", "/api/search", body={
+        "clause": "손해배상", "clause_present": True,
+    })
+    assert status == 200 and data["total"] == 1
+    assert data["results"][0]["clause"]["status"] == "present"
+
+    status, data = get_json(app, "POST", "/api/search", body={"clause_present": True})
+    assert status == 400 and data["error"]["code"] == "VALIDATION_ERROR"
+
+
+def test_web_search_accepts_v3_structured_filters(tmp_path):
+    app = make_app(tmp_path)
+    out = tmp_path / "cs_index"
+    parties = {
+        "evaluated": True,
+        "items": [{"name": "알파 주식회사", "role": "매수인", "loc_start": 1, "loc_end": 1, "confidence": "high"}],
+        "confidence": "high",
+        "confidence_reason": None,
+    }
+    consideration = {
+        "evaluated": True,
+        "amount_value": 10000000000,
+        "payment_methods": ["현금"],
+        "confidence": "high",
+        "confidence_reason": None,
+    }
+    clause_map = {
+        "손해배상": {
+            "present": True, "loc_start": 2, "loc_end": 2,
+            "summary": "10% 상한", "verbatim": "매매대금의 10%",
+            "normalized": {"cap_pct_of_price": 10}, "confidence": "high",
+        }
+    }
+    with closing(sqlite3.connect(out / "catalog.sqlite")) as conn:
+        conn.execute(
+            """
+            INSERT INTO doc_meta(file_key,meta_schema_version,txt_hash,parties_json,
+              consideration_json,clause_map_json,confidence)
+            VALUES (?,3,?,?,?,?, 'high')
+            """,
+            (
+                "a" * 16,
+                "a" * 16,
+                json.dumps(parties, ensure_ascii=False),
+                json.dumps(consideration, ensure_ascii=False),
+                json.dumps(clause_map, ensure_ascii=False),
+            ),
+        )
+        conn.commit()
+
+    status, data = get_json(app, "POST", "/api/search", body={
+        "party_name": "알파", "party_role": "매수인", "cap_pct_max": 10,
+    })
+
+    assert status == 200 and data["total"] == 1
+    assert data["results"][0]["structured"]["손해배상"]["normalized"]["cap_pct_of_price"] == 10
+
+    status, data = get_json(app, "POST", "/api/search", body={"cap_pct_min": 20, "cap_pct_max": 10})
+    assert status == 400 and data["error"]["code"] == "VALIDATION_ERROR"
+
+
+def test_setup_exposes_gui_index_modes():
+    from pathlib import Path
+    static_dir = Path(__file__).resolve().parent.parent / "static"
+    html = (static_dir / "setup.html").read_text(encoding="utf-8")
+    js = (static_dir / "setup.js").read_text(encoding="utf-8")
+    assert 'id="use-project-folder"' in html
+    assert 'value="sample"' in html and 'value="full"' in html
+    assert "body.sample = 20" in js and "body.full = true" in js
+
 
 def test_static_traversal_and_unknown_files_blocked(tmp_path):
     app = make_app(tmp_path)

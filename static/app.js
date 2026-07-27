@@ -5,6 +5,7 @@
 const state = {
   kw: [], type: "", lang: "", expand: "normal",
   excludeDrafts: false, showDuplicates: false,
+  clause: "", clauseMode: "",
   limit: 20, offset: 0, total: 0,
 };
 
@@ -133,6 +134,8 @@ function bindEvents() {
   }
   $("filter-drafts").addEventListener("change", (e) => { state.excludeDrafts = e.target.checked; submitSearch(); });
   $("filter-dups").addEventListener("change", (e) => { state.showDuplicates = e.target.checked; submitSearch(); });
+  $("filter-clause").addEventListener("change", (e) => { state.clause = e.target.value.trim(); submitSearch(); });
+  $("filter-clause-mode").addEventListener("change", (e) => { state.clauseMode = e.target.value; submitSearch(); });
   $("more-button").addEventListener("click", () => { state.offset += state.limit; runSearch(true); });
   $("export-md").addEventListener("click", () => exportResults("markdown", "search_export.md"));
   $("export-csv").addEventListener("click", () => exportResults("csv", "search_export.csv"));
@@ -169,6 +172,10 @@ function updateUrl() {
   if (state.expand !== "normal") params.set("expand", state.expand);
   if (state.excludeDrafts) params.set("exclude_drafts", "1");
   if (state.showDuplicates) params.set("show_duplicates", "1");
+  if (state.clause && state.clauseMode) {
+    params.set("clause", state.clause);
+    params.set("clause_mode", state.clauseMode);
+  }
   const search = params.toString();
   history.pushState(null, "", search ? `/?${search}` : "/");
 }
@@ -181,6 +188,8 @@ function restoreFromUrl() {
   state.expand = ["strict", "normal", "broad"].includes(params.get("expand")) ? params.get("expand") : "normal";
   state.excludeDrafts = params.get("exclude_drafts") === "1";
   state.showDuplicates = params.get("show_duplicates") === "1";
+  state.clause = params.get("clause") || "";
+  state.clauseMode = ["present", "absent"].includes(params.get("clause_mode")) ? params.get("clause_mode") : "";
   state.offset = 0;
   $("search-input").value = state.kw.join(", ");
   $("filter-type").value = state.type;
@@ -188,6 +197,8 @@ function restoreFromUrl() {
   $("filter-expand").value = state.expand;
   $("filter-drafts").checked = state.excludeDrafts;
   $("filter-dups").checked = state.showDuplicates;
+  $("filter-clause").value = state.clause;
+  $("filter-clause-mode").value = state.clauseMode;
 }
 
 /* ---------- 검색 ---------- */
@@ -196,6 +207,9 @@ function searchBody() {
     kw: state.kw, type: state.type || null, lang: state.lang || null,
     expand: state.expand, exclude_drafts: state.excludeDrafts,
     show_duplicates: state.showDuplicates, limit: state.limit, offset: state.offset,
+    clause: state.clause && state.clauseMode ? state.clause : null,
+    clause_present: state.clauseMode === "present",
+    clause_absent: state.clauseMode === "absent",
   };
 }
 
@@ -230,6 +244,10 @@ function renderChips() {
   });
   if (state.excludeDrafts) chips.push({ label: "Draft 제외", undo: () => { state.excludeDrafts = false; $("filter-drafts").checked = false; } });
   if (state.showDuplicates) chips.push({ label: "중복본 펼침", undo: () => { state.showDuplicates = false; $("filter-dups").checked = false; } });
+  if (state.clause && state.clauseMode) chips.push({
+    label: `T3 ${state.clause}: ${state.clauseMode === "present" ? "있음" : "평가 후 없음"}`,
+    undo: () => { state.clause = ""; state.clauseMode = ""; $("filter-clause").value = ""; $("filter-clause-mode").value = ""; },
+  });
 
   const box = $("filter-chips");
   box.innerHTML = "";
@@ -291,6 +309,8 @@ function resultCard(item) {
   if (item.is_draft === 1) badges.push('<span class="badge draft">Draft</span>');
   if (item.is_draft == null) badges.push('<span class="badge draft">Draft 판별불가</span>');
   if (item.dup_count > 1) badges.push(`<span class="badge">중복 ${item.dup_count}건 중 대표본</span>`);
+  if (item.clause && item.clause.status)
+    badges.push(`<span class="badge exact">T3 조항 ${esc(item.clause.status === "present" ? "있음" : "없음")}</span>`);
 
   const whyItems = (item.why || []).map((reason) => `<li>${esc(reason)}</li>`).join("");
   const scoreText = `exact_rank=${score.exact_rank ?? "—"} · expanded_rank=${score.expanded_rank ?? "—"}` +
@@ -492,6 +512,7 @@ function describeHistoryItem(item) {
   if (item.expand_mode && item.expand_mode !== "normal")
     parts.push({ strict: "정확하게", broad: "넓게" }[item.expand_mode] || item.expand_mode);
   if (filters.exclude_drafts) parts.push("Draft 제외");
+  if (filters.clause) parts.push(`T3 ${filters.clause}`);
   return parts.join(" · ") || "(빈 검색)";
 }
 
@@ -503,6 +524,8 @@ function applyHistoryItem(item) {
   state.expand = ["strict", "normal", "broad"].includes(item.expand_mode) ? item.expand_mode : "normal";
   state.excludeDrafts = Boolean(filters.exclude_drafts);
   state.showDuplicates = Boolean(filters.show_duplicates);
+  state.clause = filters.clause || "";
+  state.clauseMode = filters.clause_present ? "present" : filters.clause_absent ? "absent" : "";
   state.offset = 0;
   $("search-input").value = state.kw.join(", ");
   $("filter-type").value = state.type;
@@ -510,6 +533,8 @@ function applyHistoryItem(item) {
   $("filter-expand").value = state.expand;
   $("filter-drafts").checked = state.excludeDrafts;
   $("filter-dups").checked = state.showDuplicates;
+  $("filter-clause").value = state.clause;
+  $("filter-clause-mode").value = state.clauseMode;
   runSearch(false);   // updateUrl()이 URL도 복원한다
 }
 

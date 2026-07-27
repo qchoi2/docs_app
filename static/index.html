@@ -15,6 +15,7 @@
   <a class="nav-link" href="/research">리서치</a>
   <a class="nav-link" href="/setup">색인/설정</a>
   <a class="nav-link" href="/settings">API 설정</a>
+  <a class="nav-link" href="/help">도움말</a>
 </header>
 
 <div id="corpus-banner" class="corpus-banner" hidden></div>
@@ -46,6 +47,17 @@
       </label>
       <label class="check"><input id="filter-drafts" type="checkbox"> Draft 제외</label>
       <label class="check"><input id="filter-dups" type="checkbox"> 중복본 펼치기</label>
+      <label>조항 이름 (T3)
+        <input id="filter-clause" class="text-input" type="text" placeholder="예: 손해배상, 경업금지">
+      </label>
+      <label>조항 상태 (T3)
+        <select id="filter-clause-mode" class="text-input">
+          <option value="">사용 안 함</option>
+          <option value="present">있는 문서</option>
+          <option value="absent">평가 결과 없는 문서</option>
+        </select>
+      </label>
+      <p class="filter-help">T3 메타데이터가 만들어진 문서에만 적용됩니다. “없는 문서”는 단순 키워드 미검출이 아니라 조항을 평가한 결과가 없는 경우입니다.</p>
     </div>
 
     <div id="filter-chips" class="chips" aria-label="적용된 필터"></div>

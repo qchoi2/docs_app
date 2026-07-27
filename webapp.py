@@ -158,9 +158,48 @@ def validated_search_params(body: Dict[str, object]) -> Dict[str, object]:
             raise ApiError(400, "VALIDATION_ERROR", f"'{name}' must be between {low} and {high}.")
         return value
 
+    def opt_number(name):
+        value = body.get(name)
+        if value is None or value == "":
+            return None
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ApiError(400, "VALIDATION_ERROR", f"'{name}' must be a number.")
+        if value < 0:
+            raise ApiError(400, "VALIDATION_ERROR", f"'{name}' must not be negative.")
+        return value
+
+    def opt_optional_int(name):
+        value = body.get(name)
+        if value is None or value == "":
+            return None
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise ApiError(400, "VALIDATION_ERROR", f"'{name}' must be an integer.")
+        if value < 0:
+            raise ApiError(400, "VALIDATION_ERROR", f"'{name}' must not be negative.")
+        return value
+
     expand = body.get("expand", "normal")
     if expand not in EXPAND_MODES:
         raise ApiError(400, "VALIDATION_ERROR", "'expand' must be strict|normal|broad.")
+
+    clause_present = opt_bool("clause_present")
+    clause_absent = opt_bool("clause_absent")
+    clause = opt_str("clause")
+    if clause_present and clause_absent:
+        raise ApiError(400, "VALIDATION_ERROR", "Choose only one clause state.")
+    if (clause_present or clause_absent) and not clause:
+        raise ApiError(400, "VALIDATION_ERROR", "'clause' is required for a clause state filter.")
+
+    for low_name, high_name in (
+        ("amount_min", "amount_max"),
+        ("cap_pct_min", "cap_pct_max"),
+        ("survival_months_min", "survival_months_max"),
+    ):
+        low_value = body.get(low_name)
+        high_value = body.get(high_name)
+        if low_value is not None and high_value is not None:
+            if isinstance(low_value, (int, float)) and isinstance(high_value, (int, float)) and low_value > high_value:
+                raise ApiError(400, "VALIDATION_ERROR", f"'{low_name}' must not exceed '{high_name}'.")
 
     return {
         "keywords": keywords,
@@ -170,6 +209,20 @@ def validated_search_params(body: Dict[str, object]) -> Dict[str, object]:
         "no_expand": opt_bool("no_expand"),
         "exclude_drafts": opt_bool("exclude_drafts"),
         "show_duplicates": opt_bool("show_duplicates"),
+        "clause": clause,
+        "clause_present": clause_present,
+        "clause_absent": clause_absent,
+        "party_name": opt_str("party_name"),
+        "party_role": opt_str("party_role"),
+        "payment_method": opt_str("payment_method"),
+        "amount_min": opt_number("amount_min"),
+        "amount_max": opt_number("amount_max"),
+        "cap_pct_min": opt_number("cap_pct_min"),
+        "cap_pct_max": opt_number("cap_pct_max"),
+        "survival_months_min": opt_optional_int("survival_months_min"),
+        "survival_months_max": opt_optional_int("survival_months_max"),
+        "governing_law": opt_str("governing_law"),
+        "forum": opt_str("forum"),
         "context": opt_int("context", 1, 0, 5),
         "limit": opt_int("limit", 20, 1, MAX_LIMIT),
         "offset": opt_int("offset", 0, 0, 10000),
@@ -191,6 +244,20 @@ def run_search(out: Path, params: Dict[str, object]) -> Dict[str, object]:
         exclude_drafts=params["exclude_drafts"],
         show_duplicates=params["show_duplicates"],
         read_only=True,
+        clause=params["clause"],
+        clause_present=params["clause_present"],
+        clause_absent=params["clause_absent"],
+        party_name=params["party_name"],
+        party_role=params["party_role"],
+        payment_method=params["payment_method"],
+        amount_min=params["amount_min"],
+        amount_max=params["amount_max"],
+        cap_pct_min=params["cap_pct_min"],
+        cap_pct_max=params["cap_pct_max"],
+        survival_months_min=params["survival_months_min"],
+        survival_months_max=params["survival_months_max"],
+        governing_law=params["governing_law"],
+        forum=params["forum"],
     )
     result["results"] = result["results"][offset:offset + limit]
     result["limit"] = limit
@@ -527,7 +594,14 @@ def handle_search(app, match, query, body):
     result = run_search(app.out, params)
     # 최근 검색은 ui_state.sqlite(사용자 UI 상태)에 기록한다.
     # query_log.jsonl은 search_contracts가 남기는 운영 로그로, 여기서 겸용하지 않는다.
-    if params["keywords"] or params["ctype"] or params["lang"]:
+    structured_names = (
+        "party_name", "party_role", "payment_method", "amount_min", "amount_max",
+        "cap_pct_min", "cap_pct_max", "survival_months_min", "survival_months_max",
+        "governing_law", "forum",
+    )
+    if params["keywords"] or params["ctype"] or params["lang"] or params["clause"] or any(
+        params[name] is not None for name in structured_names
+    ):
         try:
             record_search(
                 app.out,
@@ -538,6 +612,10 @@ def handle_search(app, match, query, body):
                     "lang": params["lang"],
                     "exclude_drafts": params["exclude_drafts"],
                     "show_duplicates": params["show_duplicates"],
+                    "clause": params["clause"],
+                    "clause_present": params["clause_present"],
+                    "clause_absent": params["clause_absent"],
+                    **{name: params[name] for name in structured_names},
                 },
                 expand_mode=params["expand"],
                 result_count=result["total"],
@@ -1023,6 +1101,10 @@ def handle_research_page(app, match, query, body):
     return _serve_static("research.html")
 
 
+def handle_help_page(app, match, query, body):
+    return _serve_static("help.html")
+
+
 def handle_static(app, match, query, body):
     return _serve_static(match.group("name"))
 
@@ -1033,6 +1115,7 @@ ROUTES = [
     ("GET", re.compile(r"^/settings$"), handle_settings_page),
     ("GET", re.compile(r"^/operations$"), handle_operations_page),
     ("GET", re.compile(r"^/research$"), handle_research_page),
+    ("GET", re.compile(r"^/help$"), handle_help_page),
     ("GET", re.compile(r"^/taxonomy$"), handle_taxonomy_page),
     ("GET", re.compile(r"^/v4-search$"), handle_v4_search_page),
     ("GET", re.compile(r"^/api/v4/taxonomy/summary$"), handle_taxonomy_summary),

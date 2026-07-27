@@ -203,6 +203,22 @@ AGENT_LOGIN_UNKNOWN
 
 각 오류는 사용자 메시지와 개발자 로그를 분리한다.
 
+### 2.10 MCP 로컬 프로세스 경계
+
+MCP 상세 설계는 `MCP_INTEGRATION.md`를 따른다. PC 로컬 백엔드 관점의 필수사항:
+
+- 1차 MCP는 `stdio` 전용 별도 프로세스로 실행하며 네트워크 포트를 열지 않는다.
+- MCP와 웹앱은 같은 read-only 검색 코어를 사용하되 서로의 HTTP/MCP 어댑터를 호출하지 않는다.
+- MCP는 catalog를 짧은 read-only connection으로 조회한다.
+- 색인·설정·ui_state 쓰기는 웹앱 단일 writer에 남긴다. MCP 프로세스가 독립 JobQueue를
+  생성하거나 `has_active` 확인 후 별도 enqueue하는 구조는 프로세스 간 race를 만들므로 금지한다.
+- MCP 입력은 file_key, 검색 필터, ¶번호, 조항명으로 제한한다. 임의 절대경로를 받지 않는다.
+- 응답에서 `txt_path`, API key, 로컬 secret, 원문 전체를 제거한다.
+- stdout은 MCP 프로토콜 전용이며 로그·진단 출력은 stderr만 사용한다.
+- AI 클라이언트가 최종 답변을 작성하는 기본 MCP 경로는 Runtime API Settings와 분리한다.
+- Sampling은 capability negotiation과 사용자 승인 후에만 사용하며 직접 API 자동 폴백을 금지한다.
+- 원격 Streamable HTTP는 OAuth·사용자 권한·감사 로그가 설계되기 전까지 제공하지 않는다.
+
 ## 3. PC 기준으로 문서에서 걷어낼 표현
 
 다음 표현은 기본 경로에서 제거하거나 고급 운영 메모로 내려야 한다.
@@ -220,12 +236,14 @@ PC 로컬 웹앱 기준으로는 아래 순서가 가장 안전하다.
 1. CLI MVP 색인/검색 안정화
 2. `cs_index` 로컬 경로 강제와 SQLite 백업 루틴
 3. 검색 read-only API
-4. Runtime API Settings와 Anthropic key 저장/마스킹/삭제
-5. 예산·캐시·레저 중앙화
-6. Job Queue 기반 색인 실행 UI
-7. Agent Setup Wizard read-only 진단
-8. AI 답변 UI
-9. v2에서 파일 감시/자동 설치/원문 직접 열기 검토
+4. 로컬 stdio MCP read-only 어댑터와 선택 의존성 분리
+5. 실제 AI 클라이언트 MCP 스모크
+6. Runtime API Settings와 Anthropic key 저장/마스킹/삭제
+7. 예산·캐시·레저 중앙화
+8. Job Queue 기반 색인 실행 UI
+9. Agent Setup Wizard read-only 진단
+10. AI 답변 UI 및 선택적 MCP Sampling 검토
+11. v2에서 파일 감시/자동 설치/원문 직접 열기 검토
 
 ## 5. 즉시 반영할 DoD
 
@@ -243,6 +261,10 @@ PC 로컬 웹앱 기준으로는 아래 순서가 가장 안전하다.
 - [ ] UI 상태 테이블은 `ui_state.sqlite`로 분리되어 `--full` 재색인에서 보호된다.
 - [ ] 3자 미만 질의어(2음절 국문 용어, CP/DD/IP/RW 등)가 LIKE 폴백으로 검색된다.
 - [ ] 대량 색인 후 WAL checkpoint가 실행된다.
+- [ ] MCP는 stdio/read-only이며 웹앱과 별도 SQLite writer/job queue를 만들지 않는다.
+- [ ] MCP가 임의 경로·txt_path·원문 전체·secret을 입력/출력으로 노출하지 않는다.
+- [ ] MCP AI 클라이언트 경로와 Runtime API Settings 직접 API 경로가 명확히 분리된다.
+- [ ] Sampling 미지원·거부가 유료 API 자동 호출로 이어지지 않는다.
 
 
 ## 6. UI 접점 추가 계약 — 2026-07-09

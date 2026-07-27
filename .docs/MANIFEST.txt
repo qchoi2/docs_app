@@ -1,17 +1,23 @@
 ./CHANGELOG_20260708.md
 ./AGENT_SETUP_AND_MODEL_OPTIONS.md
+./BACKEND_REVIEW_PC.md
 ./CLAUDE_v2.md
 ./CODING_AGENT_RULES.md
 ./CODING_SEQUENCE.md
 ./DESIGN_INTEGRATION.md
 ./IMPLEMENTATION_BRIEF.md
+./MCP_INTEGRATION.md
+./T3_V3_PILOT.md
+./V4_PLAN.md
 ./MANIFEST.txt
 ./PILOT_ROLLOUT.md
 ./UI_PRODUCT_SPEC.md
+./UI_REVIEW_PC.md
 ./UI_ROADMAP.md
 ./api_budget.yaml
 ./docs_progress_v2.md
 ./extract_prompt_v1.md
+./extract_prompt_v4.md
 ./golden_queries.yaml
 ./manual_overrides.yaml
 ./term_dict.yaml
@@ -29,6 +35,10 @@ BACKEND_REVIEW_PC.md — Windows PC 로컬 실행 기준 백엔드 개선사항 
 
 - UI_REVIEW_PC.md — PC 로컬 실행 기준 UI 개선 검토 및 MVP/v2 반영 우선순위
 - 2026-07-09 2차 백엔드 리뷰 반영: FTS 폴백/이스케이프, --full 의미론, 캐시 키 통일, Windows 함정(§4), job 영속화, ui_state.sqlite 분리. 상세는 CHANGELOG 참조.
+
+2026-07-16 update: V4_PLAN.md 추가 — 세부 조항 원자 항목 계층 확정 계획(SHA 포함 4개 유형 전 항목, 하이브리드 검색, coverage 본문/별지 분리, UI-5 버튼 기반 taxonomy 승격, v3+에이전트 대비 비교 게이트). UI_ROADMAP.md에 UI-5 추가, T3_V3_PILOT.md에 다음 단계 포인터 추가.
+
+2026-07-16 V4-0/V4-1 update: v3 파일럿 60건 승인·DB 저장 완료. V4 additive schema, 2단계 seed taxonomy, item FTS, body/annex coverage, 후보 큐, extract_prompt_v4, audit_t3_v4, term_dict↔v4 매핑 검증 추가.
 
 2026-07-09 frontend hardening: UI-0 산출물에 STACK_DECISION.md 추가.
 2026-07-09 frontend hardening: UI_PRODUCT_SPEC/UI_ROADMAP/IMPLEMENTATION_BRIEF/CODING_SEQUENCE/CODING_AGENT_RULES/BACKEND_REVIEW_PC/DESIGN_INTEGRATION/UI_REVIEW_PC 갱신.

@@ -25,7 +25,7 @@ _2026-07-08 · 이 문서는 코딩을 수행할 AI(또는 사람)를 위한 단
 ## 1. 프로젝트 한 줄 요약과 파일 매니페스트
 
 개인 PC 또는 읽기 전용 원본 폴더의 M&A 계약서 샘플 **2,245개(855MB, .docx 위주+일부 .pdf)**를
-색인해 자연어로 검색·질의하는 PC 로컬 시스템. 개발·대량 배치 작업은 주로 구독제 Claude Code(무료)가 수행하고, **Codex 구독요금제는 선택적 보조 작업자**로 활용할 수 있다. 반면 `answer_quick.py`의 G1.5 Haiku, A9/A10, G2 답변은 웹앱/CLI 런타임에서 Anthropic API를 직접 호출하는 별도 경로이며, 사용자 제공 `ANTHROPIC_API_KEY`와 예산 가드레일 하에서만 사용한다.
+색인해 자연어로 검색·질의하는 PC 로컬 시스템. 웹앱/CLI를 기본으로 유지하면서 동일한 검색 코어를 로컬 MCP `stdio` 어댑터로도 제공한다. 개발·대량 배치 작업은 주로 구독제 Claude Code가 수행하고, **Codex 구독요금제는 선택적 보조 작업자 및 MCP AI 클라이언트**로 활용할 수 있다. MCP 대화에서는 연결된 AI 클라이언트가 최종 답변을 작성하므로 별도 답변 API key가 필요하지 않다. 웹앱 단독 G1.5/G2, 고정 모델 배치·교차검증은 사용자 제공 `ANTHROPIC_API_KEY`와 예산 가드레일을 사용하는 선택적 직접 API 경로로 유지한다.
 
 | 동봉 파일 | 역할 | 코더가 할 일 |
 |---|---|---|
@@ -46,13 +46,15 @@ _2026-07-08 · 이 문서는 코딩을 수행할 AI(또는 사람)를 위한 단
 | `UI_ROADMAP.md` | UI-0~UI-4 구현 순서 | CLI MVP 이후 UI 확장 순서 |
 | `BACKEND_REVIEW_PC.md` | PC 로컬 실행 기준 백엔드 개선사항 | 백엔드/API/UI 설정 구현 시 필수 점검 |
 | `UI_REVIEW_PC.md` | PC 로컬 실행 기준 UI 개선사항 | 첫 실행 온보딩, 작업 진행률, 설정/검색 UX 구현 시 필수 점검 |
+| `MCP_INTEGRATION.md` | 웹앱 병행 MCP 아키텍처·비용·보안 계약 | MCP 구현·AI 클라이언트 연결 전 필독 |
 
 ## 2. 확정 기술 결정 (변경 금지)
 
 - **언어/버전**: PC 로컬 실행 기준 Python **3.10+ 권장**, 다만 **3.9 호환** 하한은 유지한다.
   3.10+ 전용 문법(match 등)은 금지해 이식성을 확보한다.
 - **의존성 화이트리스트**: `python-docx`, `pdfminer.six`, `PyYAML`,
-  표준 라이브러리. `answer_quick.py`만 `anthropic` 추가. 그 외 금지
+  표준 라이브러리. `answer_quick.py`만 `anthropic` 추가. MCP 어댑터만 공식 `mcp`
+  SDK를 별도 `requirements-mcp.txt`에서 추가한다. 그 외 금지
   (pandas·chroma 등 불필요). requirements.txt 작성 — **반드시 버전 고정(pin)**.
   python-docx·pdfminer.six 버전이 바뀌면 문단 분리 결과가 달라져
   ¶번호 결정성(불변식 3)이 깨질 수 있다.
@@ -63,6 +65,7 @@ _2026-07-08 · 이 문서는 코딩을 수행할 AI(또는 사람)를 위한 단
 contract-search/
   index_contracts.py   search_contracts.py   stats_contracts.py   eval_search.py
   inspect_file.py      open_text.py        plan_extract.py     answer_quick.py
+  webapp.py            mcp_server.py       requirements-mcp.txt
   lib/  normalize.py  catalog.py  termdict.py  budget.py  extract.py
   data/ term_dict.yaml  type_rules.yaml  golden_queries.yaml  api_budget.yaml
   data/manual_overrides.yaml
@@ -77,7 +80,7 @@ contract-search/
 
 ### 2.0 PC 로컬 백엔드 운영 원칙 — 필수
 
-기본 실행 환경은 **Windows PC 로컬 웹앱/CLI**다. NAS, Docker, DSM, tmux, cron/inotify는 기본 경로가 아니라 v2 또는 고급 운영 메모로만 취급한다.
+기본 실행 환경은 **Windows PC 로컬 웹앱/CLI + 선택적 MCP stdio**다. NAS, Docker, DSM, tmux, cron/inotify는 기본 경로가 아니라 v2 또는 고급 운영 메모로만 취급한다.
 
 - 웹앱 기본 바인딩은 `127.0.0.1`로 제한한다.
 - 계약서 원본은 PC 로컬 폴더 또는 네트워크 드라이브에서 읽을 수 있으나, `catalog.sqlite`, `txt/`, `api_cache/`, `api_ledger.jsonl`은 반드시 PC 로컬 `cs_index/`에 둔다.
@@ -296,7 +299,7 @@ python3 search_contracts.py --out ./cs_index
   구성 → Haiku 1회 호출 → 2~3문장 답 + file_key 인용 출력.
 - `lib/budget.py` 경유 필수: `data/api_budget.yaml` 로드 (**동봉 파일
   그대로 사용** — 사용자 입력란 2개: per_call/per_run 상한. 값이 null이면
-  모든 API 도구는 실행 거부 + 입력 안내). 런타임에 `ANTHROPIC_API_KEY`가 없으면 G1.5/A9/A10/G2는 disabled/설정필요로 처리한다. 호출 전 토큰 추산·견적 출력,
+  모든 직접 API 도구는 실행 거부 + 입력 안내). 런타임에 `ANTHROPIC_API_KEY`가 없으면 웹앱/CLI 직접 API G1.5/A9/A10/G2만 disabled/설정필요로 처리한다. MCP AI 클라이언트 답변에는 적용하지 않는다. 호출 전 토큰 추산·견적 출력,
   상한 검사, `cs_index/api_ledger.jsonl` 기록(추적용, atomic append),
   응답 캐시(`cs_index/api_cache/`) — **캐시 키 =
   sha256(model_id + prompt_version + 프롬프트 + 입력 + budget_version)**
@@ -526,6 +529,26 @@ DELETE /api/compare/default/items/{id}
 - 진행률/검색 완료 메시지는 화면에서 aria-live 영역에 반영한다.
 - SSE/WebSocket은 v2 이후 최적화로 미루고 MVP에서는 폴링만 구현한다.
 
+### 2.13 MCP 어댑터 계약(웹앱 병행)
+
+상세 기준은 `MCP_INTEGRATION.md`를 따른다. 핵심 계약은 다음과 같다.
+
+- MCP는 웹앱을 대체하지 않고 `search_contracts.py`, `read_contract.py`,
+  `open_text.py`, `inspect_file.py`를 공유하는 별도 어댑터다.
+- 1차 transport는 PC 로컬 `stdio`만 허용한다. 원격 HTTP는 별도 보안 설계 전 금지한다.
+- 1차 도구는 검색·조항 정독·문단 읽기·파일 점검·중복 확인·코퍼스 상태·facets의
+  7개 읽기 전용 도구로 제한한다.
+- 색인·설정·저장 검색·비교 목록 등 쓰기 기능은 웹앱의 단일 writer/job queue가 담당한다.
+  MCP 프로세스에 독립 writer 또는 두 번째 job queue를 만들지 않는다.
+- 모든 문서 접근은 `file_key`로만 수행하고, 계약서 전체나 `txt_path` 절대경로를 반환하지 않는다.
+- 검색 결과의 `why`, `score_breakdown`, `snippet_paras`, `warnings`, clause evidence를 보존한다.
+- MCP 대화의 최종 답변은 AI 클라이언트가 작성한다. 이 경로는 `ANTHROPIC_API_KEY`를
+  요구하지 않으며, 클라이언트의 구독 사용량·한도는 별도로 적용된다.
+- Sampling은 클라이언트 capability 확인과 사용자 승인 흐름을 갖춘 후속 선택 기능이다.
+  미지원 또는 거부 시 직접 API로 자동 전환하지 않는다.
+- 공식 MCP SDK는 Python 3.10+ 선택 requirements로 분리한다. MCP 미설치가 기본 웹앱/CLI를
+  깨뜨려서는 안 된다.
+
 ## 5. 구현 범위와 추천 구현 순서 (Phase 0~1)
 한 번에 전체를 구현하지 말고 아래 순서대로 모듈을 나누어 진행한다. 각 단계가 끝나면 테스트와 실행 예시 1개를 남긴 뒤 다음 단계로 넘어간다. 더 자세한 코딩 명령은 `CODING_SEQUENCE.md`를 따른다.
 
@@ -548,6 +571,14 @@ DELETE /api/compare/default/items/{id}
 14. `answer_quick.py`: search --json 상위 후보 기반 2~3문장 답변, API cache/ledger, `agent_log.jsonl`
 15. `plan_extract.py`: Phase 2 추출 우선순위 목록만 생성(API 호출·doc_meta 기록 금지)
 
+### Phase MCP — 웹앱 병행 어댑터
+
+16. `mcp_server.py`: 로컬 stdio 읽기 전용 도구 7개, 서버 instructions, 입력 상한,
+    로컬 캐시 경로 제거
+17. `requirements-mcp.txt`: 공식 안정판 MCP SDK를 기본 requirements와 분리·pin
+18. 실제 AI 클라이언트 스모크: tools/list → 검색 → 조항 정독 → file_key 인용 답변
+19. 선택적 Sampling은 capability detection·사용자 승인·미지원 처리 설계 후 별도 구현
+
 
 
 ### Phase UI — CLI MVP 이후 웹 UI 확장
@@ -557,7 +588,7 @@ Phase UI는 Phase 1A 검색 MVP가 안정화된 뒤 시작한다. `UI_PRODUCT_SP
 1. **UI-0 디자인 인수**: `getdesign.md`를 읽고 `DESIGN_AUDIT.md` 및 `STACK_DECISION.md` 작성. 디자인 자산이 없으면 기능 우선 MVP로 진행하되, 프론트엔드 스택을 임의로 무겁게 선택하지 않는다.
 2. **UI-0.4 PC Backend Foundation**: `BACKEND_REVIEW_PC.md` 기준으로 로컬 설정 저장소, 관리자 인증, job queue, 표준 오류 코드, SQLite one-writer 원칙, file_key 기반 파일 접근을 먼저 확정한다.
 3. **UI-0.5 Agent Setup Wizard**: 관리자용 `설정 > AI 코딩 에이전트` 화면. Claude Code/Codex 설치·로그인 상태를 진단하고, 복사 가능한 설치/로그인 명령과 [다시 검사] UX를 제공한다. 로그인 토큰은 수집하지 않는다. Codex는 API key를 가져오지 않는 구조로 유지한다.
-4. **UI-0.6 Runtime API Settings**: 관리자용 `설정 > API 예산 및 키` 화면. 이 화면에 `ANTHROPIC_API_KEY` 입력창을 만든다. G1.5 Haiku/A9/A10/G2는 백엔드가 Anthropic API를 직접 호출하는 기능이므로, 사용자가 UI에서 `ANTHROPIC_API_KEY`와 `api_budget.yaml`의 per_call/per_run 상한을 설정해야 enabled가 된다. 저장 후 키 전문은 다시 표시하지 않고 마지막 4자리만 표시하며, [저장] [연결 테스트] [삭제/교체]를 제공한다. 이 화면은 Agent Setup Wizard와 분리한다.
+4. **UI-0.6 Runtime API Settings**: 관리자용 `설정 > API 예산 및 키` 화면. 이 화면에 `ANTHROPIC_API_KEY` 입력창을 만든다. 웹앱 단독 G1.5/G2와 A9/A10 직접 API 경로를 켤 때만 `ANTHROPIC_API_KEY`와 `api_budget.yaml`의 per_call/per_run 상한이 필요하다. MCP AI 클라이언트가 현재 대화 모델로 답변하는 경로에는 이 설정을 요구하지 않는다. 저장 후 키 전문은 다시 표시하지 않고 마지막 4자리만 표시하며, [저장] [연결 테스트] [삭제/교체]를 제공한다. 이 화면은 Agent Setup Wizard와 분리한다.
 5. **UI-0.7 PC UI Foundation**: `UI_REVIEW_PC.md` 기준으로 첫 실행 온보딩, split view 문단 보기, 작업 진행률, 빈/부분 성공 상태, 로컬 데이터 관리 UI를 먼저 확정한다.
 6. **UI-1 읽기 전용 검색 UI**: 검색창, catalog facets 기반 고급 필터, 필터 칩, 결과 카드, 문단 주변 보기, 중복본 보기, 최근 검색, URL 상태 복원, Markdown/CSV(utf-8-sig) 내보내기, 한글 IME 보호.
 7. **UI-2 운영 UI**: 색인 상태 대시보드, 실패 파일 목록, saved searches, result feedback, manual_overrides 후보 export.
@@ -572,7 +603,7 @@ UI 금지 원칙:
 - 검색 히스토리를 `query_log.jsonl`만으로 대체하지 않는다. 사용자가 보는 최근 검색/저장된 검색은 별도 UI 상태로 관리한다.
 - Agent Setup Wizard는 계정 비밀번호, OAuth/세션 토큰, 로그인 코드를 저장하지 않는다.
 - Codex 구독요금제 활용을 OpenAI API key 입력 방식으로 구현하지 않는다.
-- Haiku/Sonnet/Opus API 경로는 사용자의 Anthropic API key가 필요하며, 별도 Runtime API Settings UI의 `ANTHROPIC_API_KEY` 입력창에서 받는다. 서버 `.env` 직접 설정은 고급/수동 백업 경로로만 둔다.
+- 웹앱/CLI가 Haiku/Sonnet/Opus를 직접 호출하는 경로는 사용자의 Anthropic API key가 필요하며, 별도 Runtime API Settings UI의 `ANTHROPIC_API_KEY` 입력창에서 받는다. MCP AI 클라이언트 답변 경로와 혼동하지 않는다. 서버 `.env` 직접 설정은 고급/수동 백업 경로로만 둔다.
 
 참고: `update_contracts.py`(색인→추출→임베딩→eval 체인 오케스트레이터)는
 **Phase 2 산출물**이다 — 지금은 만들지 마라. 단, 위의 변경분 처리 규칙과
@@ -611,6 +642,11 @@ UI 금지 원칙:
 - [ ] 비교 목록이 `ui_state.sqlite`의 기본 비교 목록에 영속 저장되어 새로고침 후에도 유지됨
 - [ ] query/filters/expand_mode가 URL query parameter로 복원됨
 - [ ] 진행률·검색 완료가 aria-live로 전달되고 split view 포커스 이동 규칙이 구현됨
+- [ ] MCP 선택 의존성이 기본 requirements와 분리되어 MCP 미설치 상태의 웹앱/CLI 테스트가 통과함
+- [ ] MCP 7개 도구가 read-only annotation을 가지며 file_key 외 임의 경로 입력을 받지 않음
+- [ ] MCP 검색이 웹앱/CLI와 같은 file_key·순위·warnings를 반환하고 `txt_path`를 노출하지 않음
+- [ ] 실제 AI 클라이언트 1개 이상에서 stdio 연결→검색→조항 정독→file_key 인용 스모크 통과
+- [ ] MCP 경로가 직접 답변 API를 호출하지 않으며, Sampling 미지원/거부 시 유료 API 자동 폴백이 없음
 
 ## 7. 하지 말 것
 - T3/T4 구현(임베딩, 벡터DB, reranker, doc_meta 기록) — 스키마 예약까지만
@@ -618,6 +654,9 @@ UI 금지 원칙:
 - term_dict/type_rules 내용 "개선" — 데이터는 소유자 관할
 - 실 API 호출, 외부 네트워크 의존 테스트
 - CLAUDE.md 수정
+- MCP를 웹앱 대체물로 만들기, MCP 프로세스에 별도 SQLite writer/job queue 만들기
+- 계약서 전체 원문·txt 캐시 절대경로를 MCP resource/tool 결과로 노출하기
+- Sampling capability 확인 없이 서버가 AI 클라이언트 모델을 호출하기
 
 ## 8. 소유자 제공값 (확정 답변 반영, 2026-07-08)
 | 항목 | 확정 내용 |

@@ -119,8 +119,8 @@ def apply_analysis(out: Path, analysis: dict) -> dict:
                         "candidate_ids": candidate_ids,
                         "taxonomy_ids": group["taxonomy_ids"],
                         "reason": (
-                            "taxonomy v13 300건 확장 후보의 반복 문구를 "
-                            "검증된 문맥 규칙으로 원자 분류"
+                            "현재 taxonomy의 기존 leaf와 일치하는 반복 문구를 "
+                            "검증된 결정 규칙으로 원자 분류"
                         ),
                     },
                 )

@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>처음 사용하는 분을 위한 안내 — 계약서 검색</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header class="nav-bar">
+  <span class="wordmark">사용 안내</span>
+  <span class="mono-eyebrow">BEGINNER GUIDE</span>
+  <span class="spacer"></span>
+  <a class="nav-link" href="/">검색</a>
+  <a class="nav-link" href="/setup">색인/설정</a>
+  <a class="nav-link" href="/operations">운영</a>
+  <a class="nav-link" href="/research">리서치</a>
+</header>
+
+<main class="container guide-layout">
+  <section class="guide-hero">
+    <p class="mono-eyebrow">처음이라면 여기부터</p>
+    <h1>계약서를 미리 정리해 두고<br>필요한 근거를 빠르게 찾는 도구입니다</h1>
+    <p>원본 계약서를 수정하지 않습니다. 별도의 검색용 색인을 만들고, 검색 결과에는 문서 식별키와 근거 문단을 함께 보여줍니다.</p>
+    <div class="card-actions">
+      <a class="button-primary-sm button-link" href="/setup">1. 계약서 색인하기</a>
+      <a class="button-ghost-sm button-link" href="/">2. 검색 시작하기</a>
+    </div>
+  </section>
+
+  <section class="feature-card guide-card">
+    <h2>먼저 알아둘 세 가지</h2>
+    <div class="three-grid">
+      <div><strong>원본</strong><p>Word·PDF 계약서입니다. 프로그램은 원본을 읽기만 합니다.</p></div>
+      <div><strong>색인</strong><p>책의 찾아보기처럼 파일 정보와 본문 문단을 검색하기 좋게 정리한 복사본입니다.</p></div>
+      <div><strong>근거</strong><p>결과의 <span class="mono">[file_key] ¶문단번호</span>는 어느 문서의 어느 부분인지 알려주는 좌표입니다.</p></div>
+    </div>
+  </section>
+
+  <section class="feature-card guide-card">
+    <h2>처음부터 검색까지</h2>
+    <ol class="step-list">
+      <li><span>1</span><div><strong>색인/설정으로 이동</strong><p>계약서 폴더를 입력하거나 “이 프로젝트의 계약서 사용”을 누릅니다.</p></div></li>
+      <li><span>2</span><div><strong>경로 확인</strong><p>읽을 수 있는 파일 수를 확인합니다. 처음에는 “시험 색인 20건”으로 점검해도 좋습니다.</p></div></li>
+      <li><span>3</span><div><strong>일반 갱신 실행</strong><p>처음에는 모두 처리하고, 다음부터는 새 파일과 바뀐 파일만 처리합니다.</p></div></li>
+      <li><span>4</span><div><strong>검색</strong><p>예: <em>손해배상</em>. 여러 조건은 쉼표로 구분하며 모두 들어 있는 문서만 찾습니다.</p></div></li>
+      <li><span>5</span><div><strong>근거 확인</strong><p>“문단 주변 보기”로 앞뒤 문맥을 읽고, 중요한 결과는 북마크나 비교 목록에 넣습니다.</p></div></li>
+    </ol>
+  </section>
+
+  <section class="guide-section">
+    <div class="section-intro">
+      <p class="mono-eyebrow">검색 단계</p>
+      <h2>T1~T4는 무엇이 다른가요?</h2>
+      <p>T가 높을수록 무조건 더 좋은 것이 아니라, 질문의 종류에 맞춰 더 많은 분석을 더하는 단계입니다.</p>
+    </div>
+    <div class="tier-grid">
+      <article class="tier-card available">
+        <div class="tier-head"><span>T1</span><strong>바로 사용 가능</strong></div>
+        <h3>목록에서 조건으로 좁히기</h3>
+        <p>계약 유형, 언어, 초안 여부처럼 문서의 이름표를 이용합니다. 본문 의미는 읽지 않습니다.</p>
+        <dl><dt>질문 예</dt><dd>“국문 SPA를 보여줘”</dd><dt>결과물</dt><dd>조건에 맞는 계약서 목록</dd><dt>사용법</dt><dd>검색 화면의 고급 필터에서 계약 유형과 언어 선택</dd></dl>
+      </article>
+      <article class="tier-card available">
+        <div class="tier-head"><span>T2</span><strong>바로 사용 가능</strong></div>
+        <h3>본문과 동의어 검색</h3>
+        <p>문단 색인에서 검색어를 찾고, 용어사전으로 비슷한 표현도 함께 찾습니다. 정확 매칭을 더 높게 평가합니다.</p>
+        <dl><dt>질문 예</dt><dd>“earn-out과 손해배상이 함께 있는 계약”</dd><dt>결과물</dt><dd>순위가 있는 문서 목록과 근거 문단</dd><dt>사용법</dt><dd>검색창에 입력. 여러 조건은 쉼표, 검색 범위는 정확하게·보통·넓게 중 선택</dd></dl>
+      </article>
+      <article class="tier-card partial">
+        <div class="tier-head"><span>T3</span><strong>메타데이터가 있는 문서에서 사용</strong></div>
+        <h3>조항을 구조적으로 확인</h3>
+        <p>미리 분석한 조항 지도에서 조항의 존재 여부, 위치, 요약을 확인합니다. 키워드가 안 보인다는 이유만으로 “없음”이라 하지 않습니다.</p>
+        <dl><dt>질문 예</dt><dd>“경업금지 조항이 평가 결과 없는 계약”</dd><dt>결과물</dt><dd>조항 있음·없음·미평가 구분과 조항 근거</dd><dt>사용법</dt><dd>고급 필터의 “조항 이름(T3)”과 “조항 상태(T3)” 선택</dd></dl>
+        <p class="callout">T3 정보가 아직 만들어지지 않은 문서는 “미평가”이며, “조항 없음”과 다릅니다.</p>
+      </article>
+      <article class="tier-card planned">
+        <div class="tier-head"><span>T4</span><strong>아직 제공되지 않음</strong></div>
+        <h3>뜻이 비슷한 문장까지 찾기</h3>
+        <p>향후 벡터 검색과 재순위를 결합하는 단계입니다. 표현이 크게 달라도 의미가 비슷한 조항을 찾는 것이 목표입니다.</p>
+        <dl><dt>질문 예</dt><dd>정확한 용어를 모르는 의미 중심 질문</dd><dt>예정 결과물</dt><dd>T2·T3 결과와 의미 유사 후보를 함께 재정렬한 목록</dd><dt>현재 사용법</dt><dd>사용할 수 없습니다. 현재 화면의 “넓게”는 T2 동의어 확장이지 T4가 아닙니다.</dd></dl>
+      </article>
+    </div>
+  </section>
+
+  <section class="feature-card guide-card">
+    <h2>검색 결과를 읽는 법</h2>
+    <table class="guide-table"><thead><tr><th>표시</th><th>뜻</th></tr></thead><tbody>
+      <tr><td>정확 매칭</td><td>입력한 표현이 그대로 발견되었습니다.</td></tr>
+      <tr><td>동의어 매칭</td><td>용어사전에 등록된 비슷한 표현으로 발견되었습니다.</td></tr>
+      <tr><td>Draft</td><td>초안으로 판단된 문서입니다. 판별불가는 초안 여부를 확인하지 못했다는 뜻입니다.</td></tr>
+      <tr><td>중복 대표본</td><td>내용이 같은 파일 중 하나만 보여주고 있습니다. 필요하면 중복본을 펼칠 수 있습니다.</td></tr>
+      <tr><td>본문 검색 불가</td><td>스캔 PDF, 손상 파일 등으로 텍스트를 얻지 못한 문서가 있습니다.</td></tr>
+    </tbody></table>
+  </section>
+
+  <section class="feature-card guide-card">
+    <h2>화면별 사용처</h2>
+    <div class="link-list">
+      <a href="/"><strong>검색</strong><span>계약서를 찾고 근거 문단을 확인합니다.</span></a>
+      <a href="/setup"><strong>색인/설정</strong><span>원본 폴더를 확인하고 시험·갱신·재구축을 실행합니다.</span></a>
+      <a href="/operations"><strong>운영</strong><span>검색 가능한 문서 수와 실패·본문 없음 문서를 점검합니다.</span></a>
+      <a href="/research"><strong>리서치</strong><span>저장 검색, 북마크, 비교 목록과 메모를 다시 봅니다.</span></a>
+      <a href="/settings"><strong>API 설정</strong><span>현재 기본 검색에는 필요 없습니다. 향후 AI 기능을 위한 선택 설정입니다.</span></a>
+    </div>
+  </section>
+
+  <section class="callout warning guide-card">
+    <h2>중요한 한계</h2>
+    <ul>
+      <li>검색 결과는 현재 색인된 샘플 계약서 기준이며 법률 자문이 아닙니다.</li>
+      <li>스캔 PDF는 이미지라서 본문 검색이 안 될 수 있습니다.</li>
+      <li>키워드가 발견되지 않았다는 사실만으로 조항이 없다고 단정할 수 없습니다.</li>
+      <li>원문이 바뀌면 일반 갱신을 실행해야 검색 결과에 반영됩니다.</li>
+      <li>색인은 네트워크 공유 폴더가 아닌 이 PC의 로컬 디스크에 두어야 합니다.</li>
+    </ul>
+  </section>
+</main>
+</body>
+</html>

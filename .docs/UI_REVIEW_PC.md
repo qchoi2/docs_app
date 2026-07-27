@@ -12,7 +12,8 @@ _2026-07-09 · Frontend hardening 2차 반영._
 - 검색 우선, AI 후순위
 - 원본 계약서 읽기 전용
 - cs_index와 ui_state.sqlite는 PC 로컬 디스크
-- Claude Code/Codex는 개발·배치 보조자, 런타임 Haiku/Sonnet/Opus는 Anthropic API 경로
+- Claude Code/Codex는 개발·배치 보조자. MCP 사용 시 AI 클라이언트가 답변하고,
+  웹앱 단독 Haiku/Sonnet/Opus만 선택적 Anthropic 직접 API 경로
 ```
 
 ## 2. 데이터 계약 불일치 — 우선 수정

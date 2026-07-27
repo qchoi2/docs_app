@@ -188,6 +188,17 @@ def search_contracts(
     clause: Optional[str] = None,
     clause_present: bool = False,
     clause_absent: bool = False,
+    party_name: Optional[str] = None,
+    party_role: Optional[str] = None,
+    payment_method: Optional[str] = None,
+    amount_min: Optional[float] = None,
+    amount_max: Optional[float] = None,
+    cap_pct_min: Optional[float] = None,
+    cap_pct_max: Optional[float] = None,
+    survival_months_min: Optional[int] = None,
+    survival_months_max: Optional[int] = None,
+    governing_law: Optional[str] = None,
+    forum: Optional[str] = None,
 ) -> Tuple[Dict[str, object], int]:
     keywords = keywords or []
     db_path = out / "catalog.sqlite"
@@ -206,6 +217,22 @@ def search_contracts(
     clause_tag = resolve_clause_tag(clause, entries) if clause else None
     clause_mode = "absent" if clause_tag and clause_absent else "present" if clause_tag else None
     clause_filter_info: Optional[Dict[str, object]] = None
+    structured_filters = {
+        "party_name": party_name,
+        "party_role": party_role,
+        "payment_method": payment_method,
+        "amount_min": amount_min,
+        "amount_max": amount_max,
+        "cap_pct_min": cap_pct_min,
+        "cap_pct_max": cap_pct_max,
+        "survival_months_min": survival_months_min,
+        "survival_months_max": survival_months_max,
+        "governing_law": governing_law,
+        "forum": forum,
+    }
+    structured_filters = {key: value for key, value in structured_filters.items() if value is not None and value != ""}
+    validate_structured_filter_ranges(structured_filters)
+    structured_filter_info: Optional[Dict[str, object]] = None
 
     with closing(connect_search_db(db_path, read_only)) as conn:
         conn.row_factory = sqlite3.Row
@@ -271,6 +298,9 @@ def search_contracts(
         clause_filter_info = build_clause_filter_info(conn, candidate_keys, clause_tag, clause_mode)
         if clause_filter_info is not None:
             candidate_keys &= set(clause_filter_info["matched_file_keys"])
+        structured_filter_info = build_structured_filter_info(conn, candidate_keys, structured_filters)
+        if structured_filter_info is not None:
+            candidate_keys &= set(structured_filter_info["matched_file_keys"])
 
         if not candidate_keys:
             unsearchable = count_unsearchable(conn, ctype, lang, exclude_drafts)
@@ -282,6 +312,7 @@ def search_contracts(
                 keywords,
                 expanded_query,
                 clause_filter_info,
+                structured_filter_info,
                 [],
                 0,
                 0,
@@ -318,6 +349,10 @@ def search_contracts(
 
         dup_counts = duplicate_counts(conn)
         clause_evidence = load_clause_evidence(conn, [row["file_key"] for _score, row in selected_rows], clause_tag)
+        structured_evidence = load_structured_evidence(
+            structured_filter_info,
+            [row["file_key"] for _score, row in selected_rows],
+        )
         results = []
         for score, row in selected_rows:
             details = per_file_details.get(row["file_key"], {"matched_terms": [], "snippet_candidates": []})
@@ -333,6 +368,8 @@ def search_contracts(
                 why.append(f"{lang} 언어 필터 일치")
             if clause_tag:
                 why.append(f"{clause_tag} 조항 {clause_mode}")
+            if structured_filters:
+                why.append("T3 v3 구조화 조건 일치")
 
             result_item = {
                 "file_key": row["file_key"],
@@ -357,13 +394,26 @@ def search_contracts(
             }
             if clause_tag:
                 result_item["clause"] = clause_evidence.get(row["file_key"], {})
+            if structured_filters:
+                result_item["structured"] = structured_evidence.get(row["file_key"], {})
             results.append(result_item)
 
         unsearchable = count_unsearchable(conn, ctype, lang, exclude_drafts)
         if unsearchable:
             warnings.append(f"unsearchable_docs:{unsearchable}")
 
-    result = build_result(ctype, lang, keywords, expanded_query, clause_filter_info, results, total, total_files, warnings)
+    result = build_result(
+        ctype,
+        lang,
+        keywords,
+        expanded_query,
+        clause_filter_info,
+        structured_filter_info,
+        results,
+        total,
+        total_files,
+        warnings,
+    )
     log_query(out, result, expand, warnings)
     return result, len(results)
 
@@ -507,6 +557,222 @@ def load_clause_evidence(
     return evidence
 
 
+def validate_structured_filter_ranges(filters: Dict[str, object]) -> None:
+    for low_key, high_key in (
+        ("amount_min", "amount_max"),
+        ("cap_pct_min", "cap_pct_max"),
+        ("survival_months_min", "survival_months_max"),
+    ):
+        low = filters.get(low_key)
+        high = filters.get(high_key)
+        for key, value in ((low_key, low), (high_key, high)):
+            if value is not None and (isinstance(value, bool) or not isinstance(value, (int, float))):
+                raise ValueError("%s must be numeric" % key)
+            if value is not None and value < 0:
+                raise ValueError("%s must not be negative" % key)
+        if low is not None and high is not None and low > high:
+            raise ValueError("%s must not exceed %s" % (low_key, high_key))
+
+
+def _json_object(raw: object) -> Dict[str, object]:
+    if not raw:
+        return {}
+    try:
+        value = json.loads(str(raw))
+    except (TypeError, ValueError):
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def _contains_text(value: object, query: str) -> bool:
+    if value is None:
+        return False
+    return normalize(query).casefold() in normalize(str(value)).casefold()
+
+
+def _number_in_range(value: object, low: Optional[float], high: Optional[float]) -> Optional[bool]:
+    if value is None or isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    if low is not None and value < low:
+        return False
+    if high is not None and value > high:
+        return False
+    return True
+
+
+def _match_structured_row(row: sqlite3.Row, filters: Dict[str, object]) -> Tuple[Optional[bool], Dict[str, object]]:
+    if int(row["meta_schema_version"] or 0) < 3:
+        return None, {}
+    parties = _json_object(row["parties_json"])
+    consideration = _json_object(row["consideration_json"])
+    clause_map = _json_object(row["clause_map_json"])
+    evidence: Dict[str, object] = {"meta_schema_version": int(row["meta_schema_version"]), "confidence": row["confidence"]}
+
+    party_name = filters.get("party_name")
+    party_role = filters.get("party_role")
+    if party_name is not None or party_role is not None:
+        if parties.get("evaluated") is not True or not isinstance(parties.get("items"), list):
+            return None, evidence
+        matching_parties = []
+        for item in parties["items"]:
+            if not isinstance(item, dict):
+                continue
+            if party_name is not None and not _contains_text(item.get("name"), str(party_name)):
+                continue
+            if party_role is not None and not _contains_text(item.get("role"), str(party_role)):
+                continue
+            matching_parties.append(item)
+        if not matching_parties:
+            return False, evidence
+        evidence["parties"] = matching_parties[:5]
+
+    if any(key in filters for key in ("payment_method", "amount_min", "amount_max")):
+        if consideration.get("evaluated") is not True:
+            return None, evidence
+        method = filters.get("payment_method")
+        if method is not None:
+            methods = consideration.get("payment_methods")
+            if not isinstance(methods, list):
+                return None, evidence
+            if not any(_contains_text(item, str(method)) for item in methods):
+                return False, evidence
+        amount_match = _number_in_range(
+            consideration.get("amount_value"),
+            filters.get("amount_min"),
+            filters.get("amount_max"),
+        )
+        if any(key in filters for key in ("amount_min", "amount_max")):
+            if amount_match is None:
+                return None, evidence
+            if amount_match is False:
+                return False, evidence
+        evidence["consideration"] = consideration
+
+    if any(key in filters for key in ("cap_pct_min", "cap_pct_max")):
+        indemnity = clause_map.get("손해배상")
+        if not isinstance(indemnity, dict) or indemnity.get("present") is not True:
+            return None, evidence
+        normalized_values = indemnity.get("normalized")
+        if not isinstance(normalized_values, dict):
+            return None, evidence
+        matched = _number_in_range(
+            normalized_values.get("cap_pct_of_price"),
+            filters.get("cap_pct_min"),
+            filters.get("cap_pct_max"),
+        )
+        if matched is None:
+            return None, evidence
+        if matched is False:
+            return False, evidence
+        evidence["손해배상"] = indemnity
+
+    if any(key in filters for key in ("survival_months_min", "survival_months_max")):
+        source = None
+        months = None
+        for tag in ("진술보장", "손해배상"):
+            clause = clause_map.get(tag)
+            normalized_values = clause.get("normalized") if isinstance(clause, dict) else None
+            if isinstance(normalized_values, dict) and normalized_values.get("survival_months") is not None:
+                source = clause
+                months = normalized_values.get("survival_months")
+                break
+        matched = _number_in_range(
+            months,
+            filters.get("survival_months_min"),
+            filters.get("survival_months_max"),
+        )
+        if matched is None:
+            return None, evidence
+        if matched is False:
+            return False, evidence
+        evidence["존속기간"] = source
+
+    law = filters.get("governing_law")
+    if law is not None:
+        clause = clause_map.get("준거법")
+        normalized_values = clause.get("normalized") if isinstance(clause, dict) else None
+        if not isinstance(normalized_values, dict) or normalized_values.get("law") is None:
+            return None, evidence
+        if not _contains_text(normalized_values.get("law"), str(law)):
+            return False, evidence
+        evidence["준거법"] = clause
+
+    forum = filters.get("forum")
+    if forum is not None:
+        clause = clause_map.get("분쟁해결")
+        normalized_values = clause.get("normalized") if isinstance(clause, dict) else None
+        if not isinstance(normalized_values, dict):
+            return None, evidence
+        values = [normalized_values.get("forum"), normalized_values.get("institution_or_court")]
+        if not any(_contains_text(value, str(forum)) for value in values if value is not None):
+            if not any(value is not None for value in values):
+                return None, evidence
+            return False, evidence
+        evidence["분쟁해결"] = clause
+
+    return True, evidence
+
+
+def build_structured_filter_info(
+    conn: sqlite3.Connection,
+    candidate_keys: Sequence[str],
+    filters: Dict[str, object],
+) -> Optional[Dict[str, object]]:
+    if not filters:
+        return None
+    if not candidate_keys:
+        return {
+            "filters": filters,
+            "matched_file_keys": [],
+            "needs_review": [],
+            "needs_review_count": 0,
+            "evidence": {},
+        }
+    placeholders = ",".join("?" for _ in candidate_keys)
+    rows = conn.execute(
+        """
+        SELECT f.file_key, dm.meta_schema_version, dm.parties_json,
+               dm.consideration_json, dm.clause_map_json, dm.confidence
+        FROM files f
+        LEFT JOIN doc_meta dm ON dm.file_key=f.file_key
+        WHERE f.file_key IN (%s)
+        """ % placeholders,
+        list(candidate_keys),
+    ).fetchall()
+    matched: List[str] = []
+    needs_review: List[Dict[str, str]] = []
+    evidence: Dict[str, Dict[str, object]] = {}
+    for row in rows:
+        status, row_evidence = _match_structured_row(row, filters)
+        if status is True:
+            matched.append(row["file_key"])
+            evidence[row["file_key"]] = row_evidence
+        elif status is None:
+            needs_review.append({"file_key": row["file_key"], "reason": "T3 v3 구조화 값 미평가"})
+    matched.sort()
+    needs_review.sort(key=lambda item: item["file_key"])
+    return {
+        "filters": filters,
+        "matched_file_keys": matched,
+        "needs_review": needs_review[:100],
+        "needs_review_count": len(needs_review),
+        "needs_review_truncated": len(needs_review) > 100,
+        "evidence": evidence,
+    }
+
+
+def load_structured_evidence(
+    structured_filter_info: Optional[Dict[str, object]],
+    file_keys: Sequence[str],
+) -> Dict[str, Dict[str, object]]:
+    if structured_filter_info is None:
+        return {}
+    evidence = structured_filter_info.get("evidence")
+    if not isinstance(evidence, dict):
+        return {}
+    return {key: evidence.get(key, {}) for key in file_keys}
+
+
 def duplicate_counts(conn: sqlite3.Connection) -> Dict[str, int]:
     rows = conn.execute(
         """
@@ -589,11 +855,19 @@ def build_result(
     keywords: List[str],
     expanded_query: Dict[str, List[str]],
     clause_filter: Optional[Dict[str, object]],
+    structured_filter: Optional[Dict[str, object]],
     results: List[Dict[str, object]],
     total: int,
     total_files: int,
     warnings: List[str],
 ) -> Dict[str, object]:
+    public_structured = None
+    if structured_filter is not None:
+        public_structured = {
+            key: value
+            for key, value in structured_filter.items()
+            if key != "evidence" and key != "matched_file_keys"
+        }
     return {
         "query": {
             "type": ctype,
@@ -601,6 +875,7 @@ def build_result(
             "kw": keywords,
             "expanded": expanded_query,
             "clause": clause_filter,
+            "structured": public_structured,
         },
         "total": total,
         "total_files": total_files,
@@ -640,6 +915,17 @@ def build_parser() -> argparse.ArgumentParser:
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--present", action="store_true")
     group.add_argument("--absent", action="store_true")
+    parser.add_argument("--party-name")
+    parser.add_argument("--party-role")
+    parser.add_argument("--payment-method")
+    parser.add_argument("--amount-min", type=float)
+    parser.add_argument("--amount-max", type=float)
+    parser.add_argument("--cap-pct-min", type=float)
+    parser.add_argument("--cap-pct-max", type=float)
+    parser.add_argument("--survival-months-min", type=int)
+    parser.add_argument("--survival-months-max", type=int)
+    parser.add_argument("--governing-law")
+    parser.add_argument("--forum")
     parser.add_argument("--item", help="V4 atomic taxonomy ID or canonical label")
     parser.add_argument("--item-absent", action="store_true",
                         help="Return only coverage-proved V4 absence; separate needs_review")
@@ -696,6 +982,17 @@ def main(argv: Optional[List[str]] = None) -> int:
                 clause=args.clause,
                 clause_present=args.present,
                 clause_absent=args.absent,
+                party_name=args.party_name,
+                party_role=args.party_role,
+                payment_method=args.payment_method,
+                amount_min=args.amount_min,
+                amount_max=args.amount_max,
+                cap_pct_min=args.cap_pct_min,
+                cap_pct_max=args.cap_pct_max,
+                survival_months_min=args.survival_months_min,
+                survival_months_max=args.survival_months_max,
+                governing_law=args.governing_law,
+                forum=args.forum,
             )
     except Exception as exc:
         print(f"ERROR: {exc}", file=sys.stderr)

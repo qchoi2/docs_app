@@ -42,7 +42,7 @@ Step 1에 들어가기 전에 아래를 확인한다.
 3. claude 실행 또는 세션 내 /login으로 로그인 상태를 확인한다.
 4. Claude Code가 불가하거나 한도에 도달한 경우, Codex 구독요금제를 선택적으로 사용하되 현재 Step 하나만 맡긴다.
 5. Codex 사용 시 OpenAI API key를 입력·저장·요구하지 않는다. VS Code 확장 또는 CLI의 ChatGPT 로그인 흐름을 사용한다.
-6. Haiku/Sonnet/Opus API 경로는 Codex/Claude Code 로그인과 별개이며, 실제 런타임 호출에는 사용자의 ANTHROPIC_API_KEY와 api_budget.yaml 상한이 필요함을 확인한다.
+6. 웹앱/CLI가 Haiku/Sonnet/Opus를 직접 호출하는 경로는 Codex/Claude Code 로그인과 별개이며, 사용자의 ANTHROPIC_API_KEY와 api_budget.yaml 상한이 필요함을 확인한다. MCP AI 클라이언트 답변 경로는 예외다.
 6. 어느 에이전트를 쓰든 IMPLEMENTATION_BRIEF.md / CODING_SEQUENCE.md / CODING_AGENT_RULES.md를 먼저 읽고 진행한다.
 ```
 
@@ -193,6 +193,8 @@ Claude Code 미설치/미로그인 절차, Codex 선택 활용, Codex는 API key
 검색 품질 확인 후 Phase 1B를 구현하라.
 lib/budget.py는 api_budget.yaml을 읽고 예산 상한, 캐시, ledger를 처리한다.
 answer_quick.py는 search_contracts.py --json 상위 후보만 사용해 짧은 답변을 생성한다.
+이 기능은 웹앱/CLI 단독 실행용 직접 API 폴백이다. MCP AI 클라이언트가 최종 답변을
+작성하는 경로에서는 answer_quick.py를 호출하거나 ANTHROPIC_API_KEY를 요구하지 않는다.
 실 API 호출 테스트는 금지하고 mock으로만 검증한다. 최종 답변 로그는 agent_log.jsonl에 남긴다.
 ```
 
@@ -214,6 +216,45 @@ API 호출이나 doc_meta 기록은 하지 않는다.
 완료 기준:
 - 추천 목록과 추천 사유 출력
 - limit 옵션 동작
+
+## Step 13 — 웹앱 병행 읽기 전용 MCP 어댑터
+
+명령:
+
+```text
+MCP_INTEGRATION.md를 읽고 mcp_server.py를 구현하라.
+기존 search_contracts/read_contract/open_text/inspect_file 코어를 직접 재사용한다.
+로컬 stdio만 지원하고, 검색·조항 정독·문단 읽기·파일 점검·중복 확인·코퍼스 상태·facets의
+7개 read-only 도구만 노출한다. 색인·설정·사용자 상태 쓰기 도구는 만들지 마라.
+공식 MCP SDK는 requirements-mcp.txt에 별도 pin하고 기본 requirements에 추가하지 마라.
+file_key만 문서 식별자로 받고 txt_path와 계약서 전체 원문은 반환하지 마라.
+```
+
+완료 기준:
+- MCP 미설치 상태에서도 웹앱·CLI import와 기존 테스트 통과
+- 7개 도구의 readOnlyHint=true, destructiveHint=false
+- 웹앱/CLI와 MCP 검색의 file_key·순위·warnings 일치
+- 조항 부재/미평가 구분, 로컬 캐시 경로 미노출
+- `mcp_server.py --out <cs_index> --check` 통과
+- SDK 도구 목록과 실제 tool call 결정적 테스트 통과
+
+## Step 14 — 실제 AI 클라이언트 스모크와 선택적 Sampling
+
+명령:
+
+```text
+먼저 목표 AI 클라이언트 하나에 stdio MCP 서버를 등록하고 tools/list, 검색, 조항 정독,
+file_key 인용 답변을 스모크하라. 이 단계에서는 프로그램 직접 API가 호출되지 않아야 한다.
+Sampling은 클라이언트가 sampling capability를 선언하는 경우에만 별도 실험한다.
+사용자 승인, 미지원, 거부, timeout을 처리하고 유료 API 자동 폴백을 만들지 마라.
+대량 무인 배치와 고정 모델 평가에는 Sampling을 기본값으로 사용하지 마라.
+```
+
+완료 기준:
+- 실제 클라이언트 1개 이상 연결 성공
+- 한국어 질의→도구 호출→근거 인용 답변 확인
+- 직접 API 무호출 확인
+- Sampling 구현 시 capability/승인/미지원/거부 테스트 통과
 
 
 
@@ -265,7 +306,7 @@ Claude Code, Codex CLI, Node.js/npm, Git, 프로젝트 경로 쓰기 권한, 샌
 초기 버전에서는 설치 명령을 서버에서 직접 실행하지 마라.
 웹앱의 Agent Setup Wizard는 Claude/ChatGPT 비밀번호, OAuth 토큰, 세션 토큰, 로그인 코드를 입력받거나 저장하지 마라.
 Codex는 API key를 가져오지 않는 구조로 유지하고, ChatGPT 구독계정 로그인 기반의 VS Code 확장/CLI 절차만 안내하라.
-단, G1.5 Haiku/A9/A10/G2는 백엔드가 Anthropic API를 직접 호출하는 기능이므로, 별도 Runtime API Settings 화면에 `ANTHROPIC_API_KEY` 입력창과 api_budget 상한 입력을 두는 구조를 분리 설계하라. `.env` 직접 설정은 고급/수동 백업 경로로만 둔다.
+단, 웹앱/CLI 단독 G1.5 Haiku/A9/A10/G2 직접 API 경로에는 별도 Runtime API Settings 화면의 `ANTHROPIC_API_KEY` 입력창과 api_budget 상한 입력이 필요하다. MCP AI 클라이언트 답변 경로와 분리 설계하고, `.env` 직접 설정은 고급/수동 백업 경로로만 둔다.
 ```
 
 완료 기준:
@@ -335,6 +376,7 @@ MVP 비교 목록은 메모리 상태만 쓰지 말고 ui_state.sqlite의 이름
 ```text
 선택한 결과만 근거로 AI 요약/비교표를 생성하는 화면을 구현하라.
 file_key와 ¶번호를 반드시 인용하고, 파일럿 코퍼스인 경우 주의 문구를 답변 상단에 표시하라.
+웹앱 내부 AI 버튼은 직접 API 경로이고, MCP AI 클라이언트 답변 경로와 상태·비용 문구를 구분하라.
 ```
 
 완료 기준:
@@ -354,4 +396,5 @@ file_key와 ¶번호를 반드시 인용하고, 파일럿 코퍼스인 경우 �
 5. 적용한 기본값
 6. 남은 제한사항/질문
 7. 파일럿 실행 권장 명령
+8. MCP `--check` 및 실제 AI 클라이언트 스모크 결과
 ```

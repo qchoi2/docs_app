@@ -9,7 +9,7 @@ _2026-07-09 · 최초 실행 환경에서 코딩 에이전트가 아직 설치·
 - **Codex 선택 활용**: VS Code 내 코드 수정, 테스트 실패 원인 파악, 작은 단위의 패치, Claude Code 한도 도달 시 대체 작업자.
 - **GPT-5.5 검토 역할**: 구현 전후 설계 검토, 단계 쪼개기, 결과물 리뷰, 오류 메시지 해석.
 - **API 실호출 금지(개발 단계)**: Phase 1 구현·테스트 중에는 유료 API를 실호출하지 않는다. `answer_quick.py`는 mock으로만 검증한다.
-- **역할 분리**: Claude Code/Codex는 개발·배치 작업자이고, `answer_quick.py`(G1.5 Haiku), A9/A10, G2는 웹앱/CLI 런타임에서 Anthropic API를 직접 호출하는 별도 기능이다.
+- **역할 분리**: Claude Code/Codex는 개발·배치 작업자다. MCP 사용 시에는 AI 클라이언트가 검색 도구를 호출하고 현재 대화 모델로 답변한다. 웹앱/CLI 단독 `answer_quick.py`, A9/A10, G2만 Anthropic API 직접 호출 후보로 분리한다.
 - **Codex API key 금지**: Codex는 ChatGPT 구독계정 로그인 기반으로만 사용하고 OpenAI API key를 요구·저장하지 않는다.
 - **Claude 런타임 API key 필요**: Haiku/Sonnet/Opus API 경로를 실제로 쓰려면 사용자가 `ANTHROPIC_API_KEY`를 제공해야 한다. 단, 이는 Agent Setup Wizard가 아니라 별도 **Runtime API Settings** 또는 PC 로컬 secret 저장소에서 처리한다. `.env`는 개발자용 백업 경로로만 둔다.
 
@@ -178,7 +178,7 @@ Agent Setup Wizard는 아래 정보를 직접 수집·저장·대리 입력하�
 - 브라우저 로그인 코드 또는 임시 인증 코드
 ```
 
-**중요한 경계:** Agent Setup Wizard는 Claude Code/Codex의 설치·로그인 상태만 다룬다. 반면 `answer_quick.py`(G1.5 Haiku), A9/A10, G2 같은 런타임 API 기능은 웹앱 백엔드가 Anthropic API를 직접 호출하는 구조이므로, 실제 사용 시 사용자의 `ANTHROPIC_API_KEY`가 필요하다. 이 키는 Agent Setup Wizard가 아니라 별도 **Runtime API Settings** 또는 서버 `.env`에서 받는다.
+**중요한 경계:** Agent Setup Wizard는 Claude Code/Codex의 설치·로그인 상태만 다룬다. 웹앱/CLI 단독 `answer_quick.py`(G1.5 Haiku), A9/A10, G2 직접 API 기능에는 사용자의 `ANTHROPIC_API_KEY`가 필요하며, 별도 **Runtime API Settings** 또는 서버 `.env`에서 받는다. MCP AI 클라이언트가 현재 대화 모델로 답변하는 경로에는 이 키가 필요하지 않다.
 
 **Codex는 API key를 가져오지 않는 구조로 설계한다.** Codex 사용 경로는 ChatGPT 구독계정 기반의 VS Code 확장 또는 CLI 로그인 흐름을 전제로 하며, 웹앱은 OpenAI API key를 입력받는 화면을 만들지 않는다. OpenAI API 직접 호출은 본 프로젝트 범위가 아니다.
 
@@ -236,7 +236,7 @@ python --version
 
 ## 8. Runtime API Settings — Haiku/Sonnet 직접 호출 경로
 
-`docs_progress_v2.md`의 원래 구조상 Haiku는 단순한 코딩 에이전트가 아니라, 다음 기능에서 **백엔드가 직접 호출하는 Anthropic API 모델**이다.
+다음 목록은 웹앱/CLI가 **백엔드에서 직접 호출하는 Anthropic API 경로**다. MCP AI 클라이언트 답변 경로는 제외한다.
 
 ```text
 - G1.5 answer_quick.py: 검색 상위 후보 스니펫을 Haiku에 전달해 2~3문장 즉답
@@ -261,8 +261,43 @@ python --version
 ```text
 - API key 입력/저장은 Agent Setup Wizard와 분리하고, Runtime API Settings에 `ANTHROPIC_API_KEY` 입력창을 둔다.
 - Codex를 위해 OpenAI API key를 받지 않는다.
-- API key가 없으면 G1.5/A9/A10/G2 기능은 disabled 상태로 표시한다.
+- API key가 없으면 웹앱/CLI 직접 API G1.5/A9/A10/G2 기능만 disabled 상태로 표시한다. MCP 검색·클라이언트 답변은 계속 사용할 수 있다.
 - api_budget.yaml의 per_call/per_run 상한이 null이면 API key가 있어도 호출하지 않는다.
 - 모든 호출은 lib/budget.py를 통과하고 api_ledger.jsonl 및 api_cache를 사용한다.
 - 개발·테스트 단계에서는 mock만 사용하고 실 API 호출은 사용자의 명시적 실행 때만 허용한다.
 ```
+
+## 9. MCP AI 클라이언트 설정과 모델 사용 경계
+
+상세 계약은 `MCP_INTEGRATION.md`를 따른다. MCP는 Agent Setup Wizard나 Runtime API
+Settings와 별개의 선택 인터페이스다.
+
+### 9.1 설치·등록
+
+```text
+1. Python 3.10+ 환경에서 requirements-mcp.txt 설치
+2. python mcp_server.py --out <로컬 cs_index> --check
+3. AI 클라이언트의 MCP 설정에 Python command와 mcp_server.py/--out args 등록
+4. 클라이언트 재시작 또는 MCP 연결 새로고침
+5. 도구 목록, 코퍼스 상태, 검색, 조항 정독 순서로 스모크
+```
+
+- 웹앱/CLI 기본 requirements와 MCP 선택 requirements를 합치지 않는다.
+- AI 클라이언트 설정에는 계정 비밀번호, 세션 토큰, API key를 넣지 않는다.
+- `cs_index`는 로컬 디스크만 사용하고 원본 계약서 경로를 MCP 인자로 넘기지 않는다.
+
+### 9.2 비용 경계
+
+- AI 클라이언트가 MCP 도구 결과로 현재 대화 답변을 작성하는 경로에는 프로그램의
+  `ANTHROPIC_API_KEY`가 필요하지 않다.
+- 이는 모델 연산이 무료라는 뜻이 아니다. 클라이언트 구독, 조직 정책, 사용량·속도 한도가 적용된다.
+- 웹앱 단독 AI 버튼, 무인 배치, 고정 모델 교차검증에는 직접 API가 필요할 수 있다.
+- MCP 미지원 또는 연결 해제를 이유로 웹앱이 자동 유료 API를 호출하지 않는다.
+
+### 9.3 Sampling 후속 기능
+
+- 클라이언트가 `sampling` capability를 선언한 경우만 서버 요청을 허용한다.
+- 사용자가 프롬프트와 결과를 검토·거부할 수 있어야 한다.
+- 모델 힌트는 모델 고정이 아니므로 A9 독립 교차검증·재현 평가에는 그대로 쓰지 않는다.
+- Sampling은 T3 단건 또는 A10 소량 실험부터 시작하고 전량 무인 배치 기본값으로 삼지 않는다.
+- 미지원·거부·timeout 시 명시적 오류로 끝내고 직접 API 자동 폴백을 금지한다.

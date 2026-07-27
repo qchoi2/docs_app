@@ -71,6 +71,24 @@ pilot_001 배치 색인 → 상단 배너에 파일럿 표시 → 결과 품질 
 - 첫 실행에서 API key 입력을 필수로 만들기
 ```
 
+### 2.5 MCP AI 클라이언트 흐름
+
+MCP는 웹 화면 내부 기능이 아니라 같은 검색 코어를 사용하는 병행 인터페이스다.
+
+```text
+AI 클라이언트에서 사용자 질문
+→ 로컬 stdio MCP 연결
+→ 검색 도구 호출
+→ 필요한 조항/문단만 부분 정독
+→ AI 클라이언트가 file_key 인용 답변 작성
+```
+
+- MCP 사용자는 웹앱에서 먼저 API key를 설정할 필요가 없다.
+- 웹앱은 계속 색인, 오류 확인, 저장 검색, 비교 목록, 리서치 세션을 담당한다.
+- MCP에서 찾은 `file_key`를 웹앱에서 다시 검색·검수할 수 있어야 한다.
+- 웹앱이 활성 AI 클라이언트 세션을 자동으로 빌려 쓴다고 가정하지 않는다.
+- MCP 설치·연결 안내는 설정/도움말에서 제공할 수 있지만, 클라이언트 토큰을 받지 않는다.
+
 ## 3. 메인 검색 화면
 
 구성:
@@ -436,6 +454,16 @@ AI 버튼 disabled 원인 구분:
 - 파일럿 코퍼스: disabled 사유는 아니지만 “파일럿 기준” 경고 표시
 ```
 
+위 disabled 문구는 **웹앱 직접 API 버튼**에만 적용한다. MCP AI 클라이언트에서 현재
+대화 모델로 답변하는 경로는 별도 상태로 표시하며 `ANTHROPIC_API_KEY` 부재를 오류로 보지 않는다.
+권장 상태 문구:
+
+```text
+- MCP 미설정: “AI 클라이언트에서 사용하려면 MCP 연결 설정 필요”
+- MCP 사용 가능: “AI 클라이언트가 답변 생성 — 별도 답변 API key 불필요”
+- 직접 API 미설정: “웹앱 내 AI 답변만 비활성화됨”
+```
+
 enabled/disabled 이진 상태만 표시하지 말고, 사용자가 바로 조치할 수 있는 원인 문구를 버튼 옆 배지로 표시한다.
 
 
@@ -473,7 +501,7 @@ Sandbox        정상/의심/오류
 
 ### 15.1 Runtime API Settings
 
-Haiku가 소환되는 경로는 Claude Code/Codex 로그인과 별개다. `answer_quick.py`(G1.5), A10 분류 폴백, A9 교차검증, G2 답변은 웹앱 백엔드 또는 CLI가 Anthropic API를 직접 호출하므로, API 기능을 켜려면 사용자가 Anthropic API key를 제공해야 한다.
+직접 API 경로는 Claude Code/Codex 로그인과 별개다. 웹앱/CLI 단독 `answer_quick.py`(G1.5), A10 분류 폴백, A9 교차검증, G2 답변이 Anthropic API를 직접 호출할 때만 사용자가 Anthropic API key를 제공해야 한다. MCP AI 클라이언트가 현재 대화 모델로 답변하는 경로에는 이 설정을 요구하지 않는다.
 
 화면 구성:
 
@@ -505,7 +533,7 @@ G2 답변: enabled/disabled
 
 ```text
 - Runtime API Settings에는 `ANTHROPIC_API_KEY` 입력창을 만든다. 사용자는 이 UI에서 키를 입력·저장·삭제·교체할 수 있어야 한다.
-- API key가 없으면 G1.5/A9/A10/G2는 `disabled: missing_key`로 표시한다.
+- API key가 없으면 웹앱 직접 API G1.5/A9/A10/G2만 `disabled: missing_key`로 표시한다. MCP AI 클라이언트 경로는 계속 사용 가능하다.
 - api_budget.yaml 상한이 null이면 API key가 있어도 `disabled: budget_not_set`으로 표시하고 호출하지 않는다.
 - 둘 다 없으면 `disabled: missing_key_and_budget`으로 표시한다.
 - 모든 호출은 lib/budget.py를 통과한다.
@@ -534,6 +562,30 @@ G2 답변: enabled/disabled
 
 설정/시크릿/로그 저장 위치, 오류 코드, 백엔드 API 경계는 `BACKEND_REVIEW_PC.md`를 따른다.
 
+### 15.3 MCP 연결 안내
+
+웹앱 설정 또는 도움말에는 선택적으로 다음 상태·안내를 제공한다. MCP 프로세스를 웹앱이
+임의로 설치·로그인시키는 기능은 아니다.
+
+```text
+[MCP 계약 검색]
+상태: 선택 기능 / SDK 미설치 / corpus 확인됨 / 클라이언트 연결 필요
+Transport: local stdio
+제공 도구: 검색, 조항 정독, 문단 읽기, 문서 점검, 중복, 코퍼스 상태, facets
+[설치 명령 복사]
+[--check 명령 복사]
+[클라이언트 설정 예시 복사]
+```
+
+보안·UX 원칙:
+
+- AI 클라이언트별 설정 파일을 웹앱이 임의 수정하지 않는다. 사용자가 복사·검토 후 등록한다.
+- Python 실행 파일, 프로젝트, `cs_index` 경로만 안내하며 토큰·비밀번호·API key를 받지 않는다.
+- MCP가 비활성이어도 웹앱 전체 기능은 정상 동작한다.
+- MCP 경로의 사용량은 AI 클라이언트 구독/조직 정책에 따르며 “완전 무료”로 표시하지 않는다.
+- Sampling은 지원 capability와 사용자 승인 여부를 확인하기 전 UI에서 사용 가능으로 표시하지 않는다.
+- 상세 계약은 `MCP_INTEGRATION.md`를 따른다.
+
 ## 16. UI MVP / v2 / v3 범위
 
 ### UI MVP
@@ -551,6 +603,7 @@ G2 답변: enabled/disabled
 - URL 기반 검색 상태 복원
 - 관리자용 Agent Setup Wizard 상태 진단/절차 안내
 - Runtime API Settings disabled 사유 배지
+- MCP 선택 설치·`--check`·AI 클라이언트 등록 안내
 - 진행률 aria-live 알림과 검색창 IME 보호
 ```
 
@@ -575,6 +628,7 @@ G2 답변: enabled/disabled
 - 자연어 질의 라우팅
 - 통계형 질의
 - API 예산 표시
+- MCP AI 클라이언트 답변과 웹앱 직접 API 답변의 상태·비용 경로 구분
 ```
 
 ## 17. 후순위

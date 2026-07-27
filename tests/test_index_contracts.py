@@ -5,6 +5,8 @@ from contextlib import closing
 from pathlib import Path
 
 from docx import Document
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
 
 from index_contracts import DEFAULT_ROOT, IndexOptions, build_parser, choose_candidates, index_contracts, main
 
@@ -72,6 +74,54 @@ def write_docx(path: Path, *paragraphs: str) -> None:
     for paragraph in paragraphs:
         document.add_paragraph(paragraph)
     document.save(path)
+
+
+def test_docx_tracked_insertions_are_indexed_and_deletions_are_excluded(tmp_path):
+    root = tmp_path / "docs"
+    out = tmp_path / "index"
+    root.mkdir()
+    docx_path = root / "tracked.docx"
+
+    document = Document()
+    paragraph = document.add_paragraph("현재 ")
+    deleted = OxmlElement("w:del")
+    deleted_run = OxmlElement("w:r")
+    deleted_text = OxmlElement("w:delText")
+    deleted_text.text = "삭제문"
+    deleted_run.append(deleted_text)
+    deleted.append(deleted_run)
+    paragraph._p.append(deleted)
+    inserted = OxmlElement("w:ins")
+    inserted_run = OxmlElement("w:r")
+    inserted_text = OxmlElement("w:t")
+    inserted_text.set(qn("xml:space"), "preserve")
+    inserted_text.text = "삽입문"
+    inserted_run.append(inserted_text)
+    inserted.append(inserted_run)
+    paragraph._p.append(inserted)
+    document.save(docx_path)
+
+    index_contracts(root, out)
+
+    file_key = short_sha256(docx_path.read_bytes())
+    assert (out / "txt" / f"{file_key}.txt").read_text(encoding="utf-8") == "[¶1]\t현재 삽입문\n"
+
+
+def test_force_reindexes_an_unchanged_selected_file(tmp_path):
+    root = tmp_path / "docs"
+    out = tmp_path / "index"
+    root.mkdir()
+    docx_path = root / "same.docx"
+    write_docx(docx_path, "원문")
+    index_contracts(root, out)
+    file_key = short_sha256(docx_path.read_bytes())
+    txt_path = out / "txt" / f"{file_key}.txt"
+    txt_path.write_text("손상된 캐시", encoding="utf-8")
+
+    result = index_contracts(root, out, IndexOptions(force=True))
+
+    assert result["indexed"] == 1
+    assert txt_path.read_text(encoding="utf-8") == "[¶1]\t원문\n"
 
 
 def test_indexes_synthetic_docx_paragraphs(tmp_path):
