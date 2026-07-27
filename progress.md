@@ -977,3 +977,19 @@ python webapp.py --out cs_index      # 또는 run_webapp.bat [색인경로]
 
 **소유자 결정 필요**: (a) 후보 생성 기준·부재 차단 규칙 교정(DEF 문서-특정 항목 제외),
 (b) 진짜 Gate B 결과에 따른 확장 계속 vs 축소판 전환, (c) 계획 외 유형 편입 정식화 여부.
+
+### 2026-07-27 — pooled 독립 Gate B 구현 + 후보결함 진단 (Claude, opus)
+
+소유자 결정(① Gate B 먼저·병행확장 중단, ② DEF 일반용어만 후보, ③ CB/BW/EB 편입)에 따라 진행.
+
+- **pooled Gate B 구현**: `eval_v4_gate.py --pooled` 추가. 전수 라벨링 대신 두 방식
+  (legacy FTS / V4 구조화)의 상위결과를 합친 pool만 소유자가 검증 → precision·상대재현율 산출.
+  `--pool-depth`(기본 25)로 검증량 제한, `--worklist`로 미검증 항목 출력. 테스트 3건 추가(241 passed).
+  seed 22개 질의에 taxonomy 바인딩 완료. pool-depth 25 기준 소유자 검증 대상 **총 834건**.
+  초기 gap: V4E08(R&W보험)은 V4 검색 0건 vs legacy 790건.
+- **항목 2 진단**: pending 29,807개 **전량 document_count=1**(자동갱신 미작동), DEF 후보는
+  용어명이 아닌 위치(제N항)로 명명돼 재사용성 판별 불가 → 후보 생성 파이프라인 결함.
+  빠른 패치 불가, 병행세션 중단 후 교정 A(용어명)→B(반복수 갱신) 단독 진행. 상세: `.docs/PLAN_REVIEW_20260727.md`.
+- **항목 3**: CB/BW/EB는 V4_PLAN §6에 이미 반영됨(병행 세션).
+
+다음: 소유자가 pool_verified 채운 뒤 Gate B 판정 / 후보 생성 교정(A→B) 단독 배치.

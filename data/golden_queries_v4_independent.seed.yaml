@@ -57,6 +57,7 @@ queries:
     intent: existence
     family: RW
     topic: 노무/미지급임금
+    taxonomy: RW.LABOR.UNPAID_COMPENSATION
     query: "미지급 임금이 없다는 진술보장이 있는 SPA를 찾아줘"
     check: 제시된 근거가 미지급/체불/미불 임금 부존재 진술을 실제로 담고 있나
     pool_verified: { correct: [], incorrect: [] }
@@ -65,6 +66,7 @@ queries:
     intent: existence
     family: RW
     topic: 노무/불법파견
+    taxonomy: RW.LABOR
     query: "불법파견 관련 진술보장이 들어간 계약"
     check: 파견/도급 위장 관련 진술이 실제로 존재하나
     pool_verified: { correct: [], incorrect: [] }
@@ -73,6 +75,7 @@ queries:
     intent: existence
     family: COV
     topic: 경업금지
+    taxonomy: COV.NON_COMPETE
     query: "매도인 경업금지 확약이 있는 계약"
     check: 매도인 비경쟁(경업금지) 확약이 실제로 존재하나
     pool_verified: { correct: [], incorrect: [] }
@@ -81,6 +84,7 @@ queries:
     intent: existence
     family: CP
     topic: 기업결합신고
+    taxonomy: CP.ANTITRUST_CLEARANCE
     query: "기업결합신고 승인을 종결 선행조건으로 둔 계약"
     check: 경쟁당국 승인/신고 완료가 선행조건으로 실제 존재하나
     pool_verified: { correct: [], incorrect: [] }
@@ -89,6 +93,7 @@ queries:
     intent: existence
     family: PAY
     topic: earn-out
+    taxonomy: PAY.EARNOUT
     query: "언아웃(조건부 대금)이 있는 SPA"
     check: 실적연동 조건부 대금 구조가 실제 존재하나
     pool_verified: { correct: [], incorrect: [] }
@@ -97,6 +102,7 @@ queries:
     intent: existence
     family: REM
     topic: 손해배상 상한
+    taxonomy: REM.CAP
     query: "손해배상 상한(cap)이 명시된 계약"
     check: 배상 총액 상한 조항이 실제 존재하나
     pool_verified: { correct: [], incorrect: [] }
@@ -105,6 +111,7 @@ queries:
     intent: existence
     family: PAY
     topic: 에스크로/홀드백
+    taxonomy: PAY.ESCROW
     query: "에스크로 또는 홀드백으로 대금 일부를 유보한 계약"
     check: escrow/holdback 유보 구조가 실제 존재하나
     pool_verified: { correct: [], incorrect: [] }
@@ -113,6 +120,7 @@ queries:
     intent: existence
     family: RW
     topic: 진술보장보험
+    taxonomy: COV.RWI
     query: "진술보장보험(R&W insurance)을 전제로 한 계약"
     check: R&W 보험 발효/전제 문구가 실제 존재하나
     pool_verified: { correct: [], incorrect: [] }
@@ -124,6 +132,7 @@ queries:
     intent: absence
     family: COV
     topic: 경업금지
+    taxonomy: COV.NON_COMPETE
     query: "매도인 경업금지 확약이 '없는' SPA를 찾아줘"
     check: 그 계약의 확약/경업 조항을 열어 경업금지가 실제로 부존재하나
     pool_verified: { correct: [], incorrect: [], unknown: [] }
@@ -132,6 +141,7 @@ queries:
     intent: absence
     family: REM
     topic: 손해배상 상한
+    taxonomy: REM.CAP
     query: "손해배상 상한이 '없는'(무제한) 계약"
     check: 배상 조항에 총액 상한이 실제로 없나(기본진술 예외 cap과 구분)
     pool_verified: { correct: [], incorrect: [], unknown: [] }
@@ -140,6 +150,7 @@ queries:
     intent: absence
     family: RW
     topic: 조세/미납조세
+    taxonomy: RW.TAX
     query: "미납 조세가 없다는 진술이 '빠진' 계약"
     check: 조세 진술 영역에 해당 진술이 실제로 없나
     pool_verified: { correct: [], incorrect: [], unknown: [] }
@@ -148,6 +159,7 @@ queries:
     intent: absence
     family: CP
     topic: 제3자 동의
+    taxonomy: CP.THIRD_PARTY_CONSENT
     query: "제3자 동의(change of control 승인)를 선행조건으로 두지 '않은' 계약"
     check: 선행조건 목록에 제3자 동의가 실제로 없나
     pool_verified: { correct: [], incorrect: [], unknown: [] }
@@ -156,6 +168,7 @@ queries:
     intent: absence
     family: PAY
     topic: 가격조정
+    taxonomy: CP.PURCHASE_PRICE_ADJUSTMENT
     query: "운전자본(NWC) 등 가격조정 메커니즘이 '없는' SPA"
     check: 대금 조항에 가격조정이 실제로 없나(고정가/locked-box와 구분)
     pool_verified: { correct: [], incorrect: [], unknown: [] }
@@ -164,6 +177,7 @@ queries:
     intent: absence
     family: COV
     topic: 독점협상
+    taxonomy: COV.EXCLUSIVITY
     query: "no-shop(독점협상) 확약이 없는 계약"
     check: 확약 영역에 no-shop이 실제로 없나
     pool_verified: { correct: [], incorrect: [], unknown: [] }
@@ -172,6 +186,7 @@ queries:
     intent: absence
     family: RW
     topic: 환경
+    taxonomy: RW.ENVIRONMENT
     query: "환경 관련 진술보장이 없는 계약"
     check: 진술보장 영역에 환경 도메인 진술이 실제로 없나
     pool_verified: { correct: [], incorrect: [], unknown: [] }
@@ -180,6 +195,7 @@ queries:
     intent: absence
     family: REM
     topic: sandbagging
+    taxonomy: REM.SANDBAGGING
     query: "sandbagging(인지에도 배상청구 허용) 조항이 없는 계약"
     check: 배상 조항에 pro/anti-sandbagging 명시가 실제로 없나
     pool_verified: { correct: [], incorrect: [], unknown: [] }
@@ -190,6 +206,7 @@ queries:
     intent: comparison
     family: REM
     topic: 손해배상 상한
+    taxonomy: REM.CAP
     query: "SPA 3건의 손해배상 상한을 표로 비교해줘"
     check: 각 셀 file_key+verbatim(상한 수치/비율)이 원문과 일치하나. 미평가 셀은 needs_review 표시했나
     pool_verified: { correct: [], incorrect: [] }
@@ -198,6 +215,7 @@ queries:
     intent: comparison
     family: REM
     topic: 존속기간
+    taxonomy: REM.SURVIVAL
     query: "진술보장 존속기간(survival)을 계약별로 비교"
     check: 일반/기본진술/조세 존속기간 구분이 원문과 일치하나
     pool_verified: { correct: [], incorrect: [] }
@@ -206,6 +224,7 @@ queries:
     intent: comparison
     family: PAY
     topic: 대금구조
+    taxonomy: PAY.BASE_PRICE
     query: "한국형(계약금·중도금·잔금)과 미국형(escrow·adjustment) 대금구조 비교"
     check: 단계별 verbatim이 원문과 일치하나
     pool_verified: { correct: [], incorrect: [] }
@@ -214,6 +233,7 @@ queries:
     intent: comparison
     family: CP
     topic: 선행조건
+    taxonomy: CP.THIRD_PARTY_CONSENT
     query: "두 SPA의 종결 선행조건 목록을 나란히 비교"
     check: 나열된 CP item이 원문과 일치하고 공통/차이가 정확한가
     pool_verified: { correct: [], incorrect: [] }
@@ -222,6 +242,7 @@ queries:
     intent: comparison
     family: COV
     topic: SHA 확약
+    taxonomy: COV.SHA.BOARD_NOMINATION
     query: "주주간계약 2건의 이사지명·reserved matters 비교"
     check: SHA 특유 COV item이 원문과 일치하나(SHA 커버리지 낮음 — 평가문서 확인)
     pool_verified: { correct: [], incorrect: [] }
@@ -230,6 +251,7 @@ queries:
     intent: comparison
     family: RW
     topic: 노무 진술 세분
+    taxonomy: RW.LABOR
     query: "노무 진술보장 세부 항목(위반없음·근로조건·미지급보수 등)을 계약별로 비교"
     check: 원자 명제 단위 비교가 원문과 일치하나(V4가 v3 대비 우위를 보여야 하는 대표 케이스)
     pool_verified: { correct: [], incorrect: [] }
