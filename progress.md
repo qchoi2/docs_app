@@ -1010,3 +1010,22 @@ python webapp.py --out cs_index      # 또는 run_webapp.bat [색인경로]
   플래그의 오탐(진술 속 언급을 확약으로 오인 등)을 교정. 존재형·비교형은 미완.
 
 다음: RW family coverage 결함 원인 조사 / 존재형·비교형 검증(선택).
+
+### 2026-07-27 — RW 진술 추출·coverage 결함 근본원인 규명 (Claude, opus)
+
+Gate B 부재형의 RW 저조(조세 44%·환경 50%) 원인을 DB 직접 조회로 규명했다.
+전문·권고: `.docs/V4_RW_COVERAGE_DEFECT_20260727.md`.
+
+- **추출 범위 결함**: RW body='complete' 934문서 중 하위영역 item 0개 비율 —
+  IP 98%(전 코퍼스 IP item 29개뿐), 노무 84%, 환경 68%, 조세 36%. 잘 추출된
+  문서(RW 16+)에서도 IP 97%·노무 78% 누락 → thinness 아닌 하위영역 선택적 누락.
+  taxonomy엔 RW.IP.* 노드가 있으므로 분류가 아니라 추출 문제.
+- **coverage 과표기**: RW coverage 962행 중 933행이 동일 "V4-2 본문 검수 완료"로
+  일괄 complete. 하위영역별 완전성 검증 없음 → complete가 추출 완전성과 무관.
+- 메커니즘: 부재판정이 (body complete)+(item 없음)이면 confirmed_absent인데, RW는
+  전자가 항상 참(도장)·후자가 추출누락으로 참 → 진술이 있어도 "없음" 확정.
+- 권고: (즉시) search_clause_absence에서 RW family는 confirmed_absent 금지·needs_review
+  강등. (근본) 하위영역 체크리스트 강제 재추출 + 영역별 완전성 감사로 complete 재정의,
+  전량 확장보다 우선.
+
+다음: 즉시 안전장치(RW 부재→needs_review) 구현 여부는 소유자 승인 후. 근본 재추출은 별도 배치.
