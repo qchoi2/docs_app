@@ -1,5 +1,19 @@
+# --- Python ---
 __pycache__/
 *.py[cod]
 .pytest_cache/
+
+# --- Local corpus & generated index (never commit; can be multi-GB) ---
 root/
 cs_index/
+contract_docs/
+
+# --- DB safety snapshots created by V4 store/backup runs (can be multi-GB) ---
+.backups/
+
+# --- Temp / probe / editor artifacts ---
+.tmp_pytest*/
+tmp_doc_convert_probe/
+tmp_*/
+*.tmp
+.vscode/
