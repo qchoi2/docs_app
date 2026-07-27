@@ -1,0 +1,235 @@
+# ============================================================
+# V4 독립 골든 질의 SEED (초안: Claude, 2026-07-27 / 방법 개정: 소유자 지시)
+# ------------------------------------------------------------
+# 목적: V4_PLAN §9 Gate B를 "진짜"로 만들기 위한 독립 척도.
+#   현재 Gate B(data/v4_gate_b_golden.json)는 V4가 만든 승인 item으로
+#   질의를 만들어 recall이 구조적으로 항상 1.0이 되는 자기참조 지표다.
+#
+# ★ 평가 방법 = 풀링(pooling) + 사람 검증 (전수 라벨링 아님)
+#   소유자가 코퍼스 전체의 정답을 손으로 채우는 건 불가능하다(특히 부재형).
+#   대신 소유자는 "시스템이 제시한 결과가 문항에 맞는지"만 확인한다.
+#
+#   워크플로우:
+#     1) 같은 query를 두 방식으로 실행:
+#          (a) baseline = v3 + MCP/정독,  (b) v4 = V4 하이브리드 검색
+#     2) 두 결과의 file_key를 합쳐 pool을 만든다(중복 제거).
+#     3) 소유자는 pool의 각 항목만 "맞음/아님"으로 판정한다.
+#        - 존재/비교형: 제시된 근거(verbatim/¶)가 문항 조건을 실제로 만족하나?
+#        - 부재형: 그 계약의 해당 조항 위치만 열어 "정말 없나?"를 확인.
+#          (별지 미평가/판독불가면 unknown 으로 둔다 — 없다고 단정 금지)
+#     4) 자동 산출:
+#          precision(method) = method 결과 중 correct 비율
+#          상대재현율(method) = (pool의 correct 합집합) 중 method가 잡은 비율
+#        → "어느 방식이 더 잘 찾나"를 전수 정독 없이 비교.
+#
+#   따라서 아래 각 질의의 정답 칸은 "미리 채우는 expected"가 아니라
+#   "두 방식을 돌린 뒤 pool을 검증해 채우는" verdict 슬롯이다.
+#
+# ★ 원칙
+#   - pool_verified는 반드시 실제 결과 pool에서만 채운다. V4 데이터에서
+#     역산하거나 상상으로 채우지 마라.
+#   - 부재형 unknown(별지 미평가 등)은 correct/incorrect 어디에도 넣지 말고
+#     분리 집계한다.
+#   - 채운 뒤 status: active 로 바꾸고 eval_v4_gate.py의 pooled 모드에 연결한다.
+#
+# 필드
+#   intent         existence | absence | comparison
+#   family/topic   관련 taxonomy family와 주제(질의 이해용)
+#   query          사용자가 실제로 물어볼 자연어
+#   check          소유자가 pool 항목을 "맞음"으로 판정하는 기준
+#   pool_verified  correct/incorrect(/absence는 unknown 추가). 두 방식 실행 후 채움
+# ============================================================
+
+meta:
+  version: 0                 # seed. pool_verified 채우면 1로
+  status: seed               # seed -> active
+  created: 2026-07-27
+  method: pooled_verification # 전수 라벨링 아님: pool만 사람이 검증 → precision + 상대재현율
+  compares: [baseline_v3_read, v4_hybrid]
+  author: Claude(질의 초안) + 소유자(pool 검증)
+  target: "부재형·비교형 각 10+, 존재형 10+ (총 30~50)"
+  wire_to: eval_v4_gate.py   # pooled 모드 구현 후 연결
+
+queries:
+
+  # ---------------- 존재형 (existence) ----------------
+  - id: V4E01
+    intent: existence
+    family: RW
+    topic: 노무/미지급임금
+    query: "미지급 임금이 없다는 진술보장이 있는 SPA를 찾아줘"
+    check: 제시된 근거가 미지급/체불/미불 임금 부존재 진술을 실제로 담고 있나
+    pool_verified: { correct: [], incorrect: [] }
+
+  - id: V4E02
+    intent: existence
+    family: RW
+    topic: 노무/불법파견
+    query: "불법파견 관련 진술보장이 들어간 계약"
+    check: 파견/도급 위장 관련 진술이 실제로 존재하나
+    pool_verified: { correct: [], incorrect: [] }
+
+  - id: V4E03
+    intent: existence
+    family: COV
+    topic: 경업금지
+    query: "매도인 경업금지 확약이 있는 계약"
+    check: 매도인 비경쟁(경업금지) 확약이 실제로 존재하나
+    pool_verified: { correct: [], incorrect: [] }
+
+  - id: V4E04
+    intent: existence
+    family: CP
+    topic: 기업결합신고
+    query: "기업결합신고 승인을 종결 선행조건으로 둔 계약"
+    check: 경쟁당국 승인/신고 완료가 선행조건으로 실제 존재하나
+    pool_verified: { correct: [], incorrect: [] }
+
+  - id: V4E05
+    intent: existence
+    family: PAY
+    topic: earn-out
+    query: "언아웃(조건부 대금)이 있는 SPA"
+    check: 실적연동 조건부 대금 구조가 실제 존재하나
+    pool_verified: { correct: [], incorrect: [] }
+
+  - id: V4E06
+    intent: existence
+    family: REM
+    topic: 손해배상 상한
+    query: "손해배상 상한(cap)이 명시된 계약"
+    check: 배상 총액 상한 조항이 실제 존재하나
+    pool_verified: { correct: [], incorrect: [] }
+
+  - id: V4E07
+    intent: existence
+    family: PAY
+    topic: 에스크로/홀드백
+    query: "에스크로 또는 홀드백으로 대금 일부를 유보한 계약"
+    check: escrow/holdback 유보 구조가 실제 존재하나
+    pool_verified: { correct: [], incorrect: [] }
+
+  - id: V4E08
+    intent: existence
+    family: RW
+    topic: 진술보장보험
+    query: "진술보장보험(R&W insurance)을 전제로 한 계약"
+    check: R&W 보험 발효/전제 문구가 실제 존재하나
+    pool_verified: { correct: [], incorrect: [] }
+
+  # ---------------- 부재형 (absence) — Gate B의 핵심 ----------------
+  # pool 항목별로 "그 계약에 정말 없나?"를 해당 조항 위치만 열어 확인.
+  # 별지 미평가/판독불가는 unknown 으로 분리(없다고 단정 금지).
+  - id: V4A01
+    intent: absence
+    family: COV
+    topic: 경업금지
+    query: "매도인 경업금지 확약이 '없는' SPA를 찾아줘"
+    check: 그 계약의 확약/경업 조항을 열어 경업금지가 실제로 부존재하나
+    pool_verified: { correct: [], incorrect: [], unknown: [] }
+
+  - id: V4A02
+    intent: absence
+    family: REM
+    topic: 손해배상 상한
+    query: "손해배상 상한이 '없는'(무제한) 계약"
+    check: 배상 조항에 총액 상한이 실제로 없나(기본진술 예외 cap과 구분)
+    pool_verified: { correct: [], incorrect: [], unknown: [] }
+
+  - id: V4A03
+    intent: absence
+    family: RW
+    topic: 조세/미납조세
+    query: "미납 조세가 없다는 진술이 '빠진' 계약"
+    check: 조세 진술 영역에 해당 진술이 실제로 없나
+    pool_verified: { correct: [], incorrect: [], unknown: [] }
+
+  - id: V4A04
+    intent: absence
+    family: CP
+    topic: 제3자 동의
+    query: "제3자 동의(change of control 승인)를 선행조건으로 두지 '않은' 계약"
+    check: 선행조건 목록에 제3자 동의가 실제로 없나
+    pool_verified: { correct: [], incorrect: [], unknown: [] }
+
+  - id: V4A05
+    intent: absence
+    family: PAY
+    topic: 가격조정
+    query: "운전자본(NWC) 등 가격조정 메커니즘이 '없는' SPA"
+    check: 대금 조항에 가격조정이 실제로 없나(고정가/locked-box와 구분)
+    pool_verified: { correct: [], incorrect: [], unknown: [] }
+
+  - id: V4A06
+    intent: absence
+    family: COV
+    topic: 독점협상
+    query: "no-shop(독점협상) 확약이 없는 계약"
+    check: 확약 영역에 no-shop이 실제로 없나
+    pool_verified: { correct: [], incorrect: [], unknown: [] }
+
+  - id: V4A07
+    intent: absence
+    family: RW
+    topic: 환경
+    query: "환경 관련 진술보장이 없는 계약"
+    check: 진술보장 영역에 환경 도메인 진술이 실제로 없나
+    pool_verified: { correct: [], incorrect: [], unknown: [] }
+
+  - id: V4A08
+    intent: absence
+    family: REM
+    topic: sandbagging
+    query: "sandbagging(인지에도 배상청구 허용) 조항이 없는 계약"
+    check: 배상 조항에 pro/anti-sandbagging 명시가 실제로 없나
+    pool_verified: { correct: [], incorrect: [], unknown: [] }
+
+  # ---------------- 비교형 (comparison) ----------------
+  # 비교표의 각 셀(계약×항목)이 근거와 함께 정확한지 소유자가 확인.
+  - id: V4C01
+    intent: comparison
+    family: REM
+    topic: 손해배상 상한
+    query: "SPA 3건의 손해배상 상한을 표로 비교해줘"
+    check: 각 셀 file_key+verbatim(상한 수치/비율)이 원문과 일치하나. 미평가 셀은 needs_review 표시했나
+    pool_verified: { correct: [], incorrect: [] }
+
+  - id: V4C02
+    intent: comparison
+    family: REM
+    topic: 존속기간
+    query: "진술보장 존속기간(survival)을 계약별로 비교"
+    check: 일반/기본진술/조세 존속기간 구분이 원문과 일치하나
+    pool_verified: { correct: [], incorrect: [] }
+
+  - id: V4C03
+    intent: comparison
+    family: PAY
+    topic: 대금구조
+    query: "한국형(계약금·중도금·잔금)과 미국형(escrow·adjustment) 대금구조 비교"
+    check: 단계별 verbatim이 원문과 일치하나
+    pool_verified: { correct: [], incorrect: [] }
+
+  - id: V4C04
+    intent: comparison
+    family: CP
+    topic: 선행조건
+    query: "두 SPA의 종결 선행조건 목록을 나란히 비교"
+    check: 나열된 CP item이 원문과 일치하고 공통/차이가 정확한가
+    pool_verified: { correct: [], incorrect: [] }
+
+  - id: V4C05
+    intent: comparison
+    family: COV
+    topic: SHA 확약
+    query: "주주간계약 2건의 이사지명·reserved matters 비교"
+    check: SHA 특유 COV item이 원문과 일치하나(SHA 커버리지 낮음 — 평가문서 확인)
+    pool_verified: { correct: [], incorrect: [] }
+
+  - id: V4C06
+    intent: comparison
+    family: RW
+    topic: 노무 진술 세분
+    query: "노무 진술보장 세부 항목(위반없음·근로조건·미지급보수 등)을 계약별로 비교"
+    check: 원자 명제 단위 비교가 원문과 일치하나(V4가 v3 대비 우위를 보여야 하는 대표 케이스)
+    pool_verified: { correct: [], incorrect: [] }

@@ -953,3 +953,27 @@ python webapp.py --out cs_index      # 또는 run_webapp.bat [색인경로]
 - Gate B V4 측정시간은 100,207 item 기준 약 20.3초로 반복 측정되어,
   다음 단계에서 SQL 실행계획·인덱스 성능을 재점검한다.
 - 상세 보고: `.docs/V4_TAXONOMY_CANDIDATE_REVIEW_20260727.md`
+
+### 2026-07-27 — 계획 궤적 리뷰 · 독립 Gate B seed (Claude, opus)
+
+실제 `cs_index/catalog.sqlite`를 읽기전용 조회해 계획(V4_PLAN §9~§11)과 대조했다.
+전문은 [.docs/PLAN_REVIEW_20260727.md](.docs/PLAN_REVIEW_20260727.md).
+
+**실측 현황**: V4 item 100,207 / 평가문서 950(coverage 기준 ~968), taxonomy v19·414노드,
+대상유형 진행 **782/1,623=48%**(SPA 98%·SSA 28%·SHA 1.9%·ATA/BTA 5.7% 쏠림),
+부재 질의 가능 742/차단 567, pending 후보 29,807(서로 다른 이름 13,199종·사람처리 47).
+
+**핵심 진단**
+1. **Gate B가 자기참조**: V4 승인 item으로 질의를 만들어 recall이 구조적으로 항상 1.0 →
+   "확장 가치" 판정 불가. Gate A 미통과인데 확장은 950문서까지 진행됨.
+2. **후보 3만 개가 부재 질의를 43% 문서에서 차단**(coverage=partial). 문구 클러스터링으로
+   일괄 처리 불가(13,199종), DEF 정의항 등 문서-특정 항목 과다생성이 근본 원인.
+3. 유형 쏠림(SPA만 98%), 골든 세트 노후.
+
+**이번 세션 산출물**
+- `.docs/PLAN_REVIEW_20260727.md` — 진단 + 권고 시퀀스.
+- `data/golden_queries_v4_independent.seed.yaml` — V4와 무관한 독립 Gate B seed
+  (존재 8·부재 8·비교 6). 기대 답안은 소유자가 채워 active 전환.
+
+**소유자 결정 필요**: (a) 후보 생성 기준·부재 차단 규칙 교정(DEF 문서-특정 항목 제외),
+(b) 진짜 Gate B 결과에 따른 확장 계속 vs 축소판 전환, (c) 계획 외 유형 편입 정식화 여부.
