@@ -993,3 +993,20 @@ python webapp.py --out cs_index      # 또는 run_webapp.bat [색인경로]
 - **항목 3**: CB/BW/EB는 V4_PLAN §6에 이미 반영됨(병행 세션).
 
 다음: 소유자가 pool_verified 채운 뒤 Gate B 판정 / 후보 생성 교정(A→B) 단독 배치.
+
+### 2026-07-27 — Gate B 부재형 flagship 전수 검증 완료 (Claude, opus)
+
+독립 pooled Gate B의 부재형 8개 질의를 원문 대조로 전수 사람검증했다(검증값
+`data/v4_gate_b_verdicts.json`, `eval_v4_gate.py --pooled`로 재현). 결과·권고 전문:
+`.docs/V4_GATE_B_ABSENCE_FINDINGS_20260727.md`.
+
+- **V4 부재정밀도 130/171 = 76%**(false absence 41건). family별 이봉분포:
+  RW 진술계열 저조(조세 44%, 환경 50% — 흔한 진술 섹션을 절반 놓침), 특약·선행조건
+  양호(제3자동의 92%, no-shop 91%, sandbagging 95%, 가격조정 80%, 경업금지 77%), 손배상한 67%.
+- 결론: 부재 질의를 family 무차별 신뢰 금지. RW 진술계열 confirmed_absent는 needs_review로
+  강등하고, V4 추출/coverage가 "Section 4.14 Tax Matters" 등 명백한 진술을 놓치는 원인을
+  전량 확장 전에 조사해야 한다(PLAN_REVIEW의 coverage 결함 진단과 일치).
+- 검증 도구: `verify_gate_b.py`(cards/apply-auto/set/ingest), 원문 대조로 자동 키워드
+  플래그의 오탐(진술 속 언급을 확약으로 오인 등)을 교정. 존재형·비교형은 미완.
+
+다음: RW family coverage 결함 원인 조사 / 존재형·비교형 검증(선택).
