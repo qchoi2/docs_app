@@ -11,6 +11,9 @@ contract_docs/
 # --- DB safety snapshots created by V4 store/backup runs (can be multi-GB) ---
 .backups/
 
+# --- Gate B verification artifact (evolving owner/provisional verdicts) ---
+data/v4_gate_b_verdicts.json
+
 # --- Temp / probe / editor artifacts ---
 .tmp_pytest*/
 .pytest_tmp*/

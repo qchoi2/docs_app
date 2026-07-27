@@ -42,7 +42,7 @@ def _file_meta(conn: sqlite3.Connection) -> dict:
     return {
         str(r["file_key"]): dict(r)
         for r in conn.execute(
-            "SELECT file_key,txt_path,filename,ctype,lang FROM files"
+            "SELECT file_key,txt_path,filename,ctype,lang,dup_group FROM files"
         )
     }
 
@@ -117,7 +117,11 @@ def build_cards(
     only: str | None,
     auto: bool = False,
     types: set | None = None,
+    review_only: bool = False,
 ) -> str:
+    """Build the worksheet. review_only keeps only items still needing a human
+    decision (blank + V4-error candidates); auto-confirmed 'correct' items are
+    omitted (capture them separately via `apply-auto`)."""
     report = evaluate_pooled(out, seed_path, pool_depth=depth)
     seed_by_id = {
         q["id"]: q
@@ -159,28 +163,40 @@ def build_cards(
                 note = " (V4 confirmed_absent만 — needs_review 제외)"
                 if not items:
                     continue
+            item_lines = []
+            seen_groups = set()
+            for fk in items:
+                m = meta.get(fk, {})
+                if types and str(m.get("ctype", "")) not in types:
+                    continue
+                group = str(m.get("dup_group") or fk)
+                if group in seen_groups:  # one representative per duplicate group
+                    continue
+                seen_groups.add(group)
+                paras = _read_paras(out, m.get("txt_path"))
+                matched, snippet = _raw_match(paras, terms)
+                verdict, basis = _auto_verdict(detail.get("mode"), matched) if auto else (None, None)
+                if review_only and verdict == "correct":
+                    continue  # trusted auto-confirmation; owner need not see it
+                item_lines.append(
+                    f"### {m.get('filename') or fk}   [{m.get('ctype','?')} {m.get('lang','?')}]"
+                )
+                item_lines.append(f"- 파일키: {fk}")
+                item_lines.append(f"- V4 판단: {_v4_evidence(conn, subtree, fk)}")
+                item_lines.append(f"- 원문 근처: {snippet}")
+                if verdict:
+                    item_lines.append(f"- verdict: {verdict}   # auto(확인要): {basis}")
+                else:
+                    item_lines.append("- verdict: ")
+                item_lines.append("")
+            if not item_lines:
+                continue
             lines.append(
                 f"## {qid} — {q.get('query','')}  [mode: {detail.get('mode')}]{note}"
             )
             lines.append(f"검증법: {_HINT.get(intent, '')}")
             lines.append("")
-            for fk in items:
-                m = meta.get(fk, {})
-                if types and str(m.get("ctype", "")) not in types:
-                    continue
-                paras = _read_paras(out, m.get("txt_path"))
-                matched, snippet = _raw_match(paras, terms)
-                lines.append(
-                    f"### {fk}  [{m.get('ctype','?')} {m.get('lang','?')}]  {m.get('filename','')}"
-                )
-                lines.append(f"- V4 판단: {_v4_evidence(conn, subtree, fk)}")
-                lines.append(f"- 원문 근처: {snippet}")
-                verdict, basis = _auto_verdict(detail.get("mode"), matched) if auto else (None, None)
-                if verdict:
-                    lines.append(f"- verdict: {verdict}   # auto: {basis}")
-                else:
-                    lines.append("- verdict: ")
-                lines.append("")
+            lines.extend(item_lines)
     return "\n".join(lines) + "\n"
 
 
@@ -196,9 +212,9 @@ def parse_worksheet(text: str) -> dict:
             verdicts.setdefault(qid, {"correct": [], "incorrect": [], "unknown": []})
             fk = None
             continue
-        mf = re.match(r"###\s+(\S+)", s)
-        if mf:
-            fk = mf.group(1)
+        mk = re.match(r"-\s*파일키:\s*(\S+)", s)
+        if mk:
+            fk = mk.group(1)
             continue
         mv = re.match(r"-\s*verdict:\s*(.*)", s)
         if mv and qid and fk:
@@ -211,12 +227,27 @@ def parse_worksheet(text: str) -> dict:
     return {q: b for q, b in verdicts.items() if any(b.values())}
 
 
+def _merge_query(old: dict, new: dict) -> dict:
+    """Merge verdicts at file_key granularity; a new judgment overrides an old
+    one for the same file_key (idempotent, incremental re-ingest)."""
+    base = {b: list((old or {}).get(b, [])) for b in ("correct", "incorrect", "unknown")}
+    changed = {fk for b in new.values() for fk in b}
+    for b in base:
+        base[b] = [fk for fk in base[b] if fk not in changed]
+    for b, fks in new.items():
+        base[b].extend(fks)
+    for b in base:
+        base[b] = list(dict.fromkeys(base[b]))
+    return base
+
+
 def ingest(seed_path: Path, worksheet: Path, verdicts_path: Path) -> dict:
     parsed = parse_worksheet(worksheet.read_text(encoding="utf-8"))
     existing = {}
     if verdicts_path.exists():
         existing = json.loads(verdicts_path.read_text(encoding="utf-8"))
-    existing.update(parsed)  # re-ingest overwrites a query's verdicts
+    for qid, block in parsed.items():
+        existing[qid] = _merge_query(existing.get(qid), block)  # per-file_key merge
     verdicts_path.write_text(
         json.dumps(existing, ensure_ascii=False, indent=2), encoding="utf-8"
     )
@@ -254,7 +285,28 @@ def main(argv=None) -> int:
         "Drops off-scope docs (MOU/LOI) to cut volume without judging.",
     )
     c.add_argument(
+        "--review-only",
+        action="store_true",
+        help="Only items still needing a human decision (blank + V4-error "
+        "candidates). Omits auto-confirmed 'correct'; capture those with apply-auto.",
+    )
+    c.add_argument(
         "--worksheet", type=Path, default=Path("cs_index/gate_b_worksheet.md")
+    )
+
+    a = sub.add_parser(
+        "apply-auto",
+        help="Write trusted auto verdicts (text-confirmed existence->correct) "
+        "straight to the verdicts json, so the owner only reviews the rest.",
+    )
+    a.add_argument("--out", type=Path, default=Path("cs_index"))
+    a.add_argument(
+        "--seed", type=Path, default=Path("data/golden_queries_v4_independent.seed.yaml")
+    )
+    a.add_argument("--pool-depth", type=int, default=25)
+    a.add_argument("--types")
+    a.add_argument(
+        "--verdicts", type=Path, default=Path("data/v4_gate_b_verdicts.json")
     )
 
     g = sub.add_parser("ingest", help="read filled worksheet -> verdicts json")
@@ -276,14 +328,39 @@ def main(argv=None) -> int:
             else None
         )
         text = build_cards(
-            args.out, args.seed, args.pool_depth, args.query, auto=args.auto, types=types
+            args.out, args.seed, args.pool_depth, args.query,
+            auto=args.auto, types=types, review_only=args.review_only,
         )
         args.worksheet.parent.mkdir(parents=True, exist_ok=True)
         args.worksheet.write_text(text, encoding="utf-8")
-        filled = text.count("# auto:")
-        print(f"wrote {args.worksheet}")
-        if args.auto:
-            print(f"auto-filled {filled} provisional verdicts (owner reviews/overrides)")
+        print(f"wrote {args.worksheet}  (items: {text.count(chr(10) + '### ')})")
+    elif args.cmd == "apply-auto":
+        types = (
+            {t.strip() for t in args.types.split(",") if t.strip()}
+            if args.types
+            else None
+        )
+        full = build_cards(
+            args.out, args.seed, args.pool_depth, None, auto=True, types=types
+        )
+        parsed = parse_worksheet(full)
+        # keep only the trusted, text-confirmed 'correct' verdicts
+        trusted = {
+            qid: {"correct": b["correct"], "incorrect": [], "unknown": []}
+            for qid, b in parsed.items()
+            if b["correct"]
+        }
+        existing = {}
+        if args.verdicts.exists():
+            existing = json.loads(args.verdicts.read_text(encoding="utf-8"))
+        for qid, block in trusted.items():
+            existing[qid] = _merge_query(existing.get(qid), block)
+        args.verdicts.parent.mkdir(parents=True, exist_ok=True)
+        args.verdicts.write_text(
+            json.dumps(existing, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        n = sum(len(b["correct"]) for b in trusted.values())
+        print(f"applied {n} text-confirmed 'correct' verdicts to {args.verdicts}")
     else:
         summary = ingest(args.seed, args.worksheet, args.verdicts)
         print(json.dumps(summary, ensure_ascii=False, indent=2))

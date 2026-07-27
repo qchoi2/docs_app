@@ -17,23 +17,37 @@ def test_auto_verdict_is_bias_safe():
 def test_parse_worksheet_ignores_auto_comment():
     text = (
         "## Q1 — x  [mode: present]\n"
-        "### aaaaaaaaaaaaaaaa  [SPA 국문] f.docx\n"
+        "### f.docx  [SPA 국문]\n"
+        "- 파일키: aaaaaaaaaaaaaaaa\n"
         "- verdict: correct   # auto: 원문에 조항 확인\n"
     )
     assert parse_worksheet(text)["Q1"]["correct"] == ["aaaaaaaaaaaaaaaa"]
 
 
+def test_ingest_merges_per_file_key(tmp_path):
+    from verify_gate_b import _merge_query
+    old = {"correct": ["a", "b"], "incorrect": ["c"], "unknown": []}
+    new = {"correct": [], "incorrect": ["a"], "unknown": []}  # a: correct -> incorrect
+    merged = _merge_query(old, new)
+    assert "a" not in merged["correct"] and "a" in merged["incorrect"]
+    assert merged["correct"] == ["b"]  # b untouched
+
+
 def test_parse_worksheet_maps_verdicts():
     text = (
         "## V4A07 — 환경 없는 계약  [mode: absent]\n"
-        "### aaaaaaaaaaaaaaaa  [SPA 국문] x.docx\n"
+        "### x.docx  [SPA 국문]\n"
+        "- 파일키: aaaaaaaaaaaaaaaa\n"
         "- verdict: correct\n"
-        "### bbbbbbbbbbbbbbbb  [SPA 국문] y.docx\n"
+        "### y.docx  [SPA 국문]\n"
+        "- 파일키: bbbbbbbbbbbbbbbb\n"
         "- verdict: x\n"
-        "### cccccccccccccccc  [SPA 국문] z.docx\n"
+        "### z.docx  [SPA 국문]\n"
+        "- 파일키: cccccccccccccccc\n"
         "- verdict: \n"  # blank -> skipped
         "## V4E01 — 미지급 임금  [mode: present]\n"
-        "### dddddddddddddddd  [SPA 국문] w.docx\n"
+        "### w.docx  [SPA 국문]\n"
+        "- 파일키: dddddddddddddddd\n"
         "- verdict: 모름\n"
     )
     parsed = parse_worksheet(text)
@@ -55,8 +69,8 @@ def test_cards_then_ingest_then_score_roundtrip(tmp_path):
         encoding="utf-8",
     )
     cards = build_cards(out, seed, depth=25, only=None)
-    # present pool = v4 arm {doc a}; card lists it with a verdict slot
-    assert "### aaaaaaaaaaaaaaaa" in cards
+    # present pool = v4 arm {doc a}; card lists it by filename + 파일키
+    assert "- 파일키: aaaaaaaaaaaaaaaa" in cards
     assert "- verdict:" in cards
 
     filled = cards.replace("- verdict: \n", "- verdict: correct\n", 1)
