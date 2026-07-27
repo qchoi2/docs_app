@@ -1074,3 +1074,27 @@ CORE_RW_SUBDOMAINS(조세·소송·준법·중요계약·노무·IP·환경·인
   (4)rep→covenant 오분류 시정 (5)T4 계속 보류.
 
 다음: ② 재추출 파일럿(누락 진술 실제 추출 시연) 또는 소유자 검토 대기. 결정 권고는 소유자 몫.
+
+### 2026-07-28 — §9 권고 승인·착수: coverage 정직화 적용 (Claude, opus)
+
+소유자가 §9 권고를 승인. 권고대로 진행 시작.
+- **coverage 정직화 적용**: `audit_rw_coverage.py --apply`로 under-extracted RW-complete 733개를
+  partial로 강등(사유 `rw_subdomain_audit_pending` 부기), WAL-safe 백업
+  `cs_index/.backups/catalog.pre_rw_audit_*.sqlite`. RW body_status: complete 201/partial 734/
+  not_evaluated 33. integrity ok. 병행 워커는 중단 확인(WAL 0, 마지막 쓰기 본 세션).
+- 다음: RW 재추출 파이프라인 형식 파악 → 파일럿.
+
+### 2026-07-28 — ② RW 재추출 배치 준비 + 추출 프롬프트 교정 (Claude, opus)
+
+재추출(권고 ②)을 실행 가능한 형태로 준비했다(733개 재추출은 AI 클라이언트 파일 하네스
+배치라 운영 DB 대량 손기록은 소유자 감독하에 진행; 여기서는 안전한 준비까지).
+- `plan_rw_reextraction.py`: audit가 강등한 733개를 ctype 우선순위(SPA 525→SSA 62→SHA 7→
+  ATA/BTA 9→CB/BW/EB)로 정렬하고 문서별 `missing_subdomains`를 붙인 매니페스트 생성
+  (`cs_index/rw_reextraction_manifest.json`). 테스트 포함.
+- `.docs/extract_prompt_v4_rw_addendum.md`: 추출 결함의 실제 교정. RW 진술을 **하위영역
+  전수 처리**(각 영역 item 추출 또는 present=false 명시, 미처리 시 complete 금지), rep(중요계약
+  열거)와 covenant(경업금지 확약) 구분, 재추출 런북. 굵은 누락영역: IP·노무·환경·부동산·보험·개인정보.
+- 축소판 운영: RW 부재 게이팅이 CLI/웹/MCP로 전파됨(확인). 재추출·재측정으로 RW 정밀도 회복 후
+  게이팅 해제 검토.
+
+다음: 실제 RW 재추출 배치 실행(AI 클라이언트, manifest 순). rep→covenant 오분류 corpus 진단.
