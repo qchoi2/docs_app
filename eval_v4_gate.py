@@ -313,11 +313,14 @@ def _pool_present(conn: sqlite3.Connection, out: Path, taxonomy_id: str, ctype, 
     return {"legacy": legacy, "v4": v4}, {"legacy": len(legacy_full)}
 
 
-def evaluate_pooled(out: Path, seed_path: Path, pool_depth: int = 25) -> dict:
+def evaluate_pooled(
+    out: Path, seed_path: Path, pool_depth: int = 25, verdicts: dict | None = None
+) -> dict:
     import yaml
 
     seed = yaml.safe_load(seed_path.read_text(encoding="utf-8"))
     queries = seed.get("queries", [])
+    verdicts = verdicts or {}
     details = []
     with closing(connect_v4_ro(out)) as conn:
         for query in queries:
@@ -325,7 +328,8 @@ def evaluate_pooled(out: Path, seed_path: Path, pool_depth: int = 25) -> dict:
             intent = query.get("intent")
             mode = _INTENT_MODE.get(intent)
             taxonomy = query.get("taxonomy")
-            verified = query.get("pool_verified") or {}
+            # External verdicts (from verify_gate_b ingest) win over seed placeholders.
+            verified = verdicts.get(qid) or query.get("pool_verified") or {}
             row = {"id": qid, "intent": intent, "taxonomy": taxonomy}
             if not taxonomy or mode is None:
                 row["status"] = "unbound"
@@ -454,9 +458,20 @@ def main(argv=None) -> int:
         default=25,
         help="Max results pooled per arm for owner verification (default 25).",
     )
+    parser.add_argument(
+        "--verdicts",
+        type=Path,
+        default=Path("data/v4_gate_b_verdicts.json"),
+        help="Owner verdicts JSON (qid -> {correct,incorrect,unknown}); merged over seed.",
+    )
     args = parser.parse_args(argv)
     if args.pooled:
-        report = evaluate_pooled(args.out, args.seed, pool_depth=args.pool_depth)
+        verdicts = None
+        if args.verdicts and args.verdicts.exists():
+            verdicts = json.loads(args.verdicts.read_text(encoding="utf-8"))
+        report = evaluate_pooled(
+            args.out, args.seed, pool_depth=args.pool_depth, verdicts=verdicts
+        )
         if args.worklist:
             worklist = {
                 r["id"]: r.get("unjudged", [])
