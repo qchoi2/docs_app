@@ -348,3 +348,61 @@ def test_replace_result_repoints_preserved_taxonomy_resolution_evidence():
         ).fetchone()[0]
     )
     assert refreshed_resolution["materialized_item_ids"] == [refreshed_item_id]
+
+
+def test_replace_result_renumbers_conflicting_preserved_item_ref():
+    conn = database()
+    now = "2026-07-27T00:00:00+00:00"
+    cursor = conn.execute(
+        """
+        INSERT INTO v4_clause_item(
+          file_key,item_ref,family,taxonomy_id,proposition,statement_polarity,
+          qualifier_json,verbatim,loc_start,loc_end,normalized_json,confidence,
+          txt_hash,taxonomy_version,extractor_version,prompt_version,review_status,
+          created_at,updated_at
+        ) VALUES ('doc1','rw-001','RW','RW.LABOR','reviewed proposition',
+                  'affirmative','{}','different reviewed evidence',11,11,'{}','high',
+                  'hash',13,'resolution','prompt','approved',?,?)
+        """,
+        (now, now),
+    )
+    old_item_id = int(cursor.lastrowid)
+    conn.execute(
+        """
+        INSERT INTO v4_taxonomy_candidate(
+          proposed_ko,family,recommended_parent_id,distinction_reason,
+          evidence_file_key,loc_start,loc_end,verbatim,nearest_taxonomy_id,
+          status,resolution_json,created_at,updated_at
+        ) VALUES ('reviewed','RW','RW.LABOR','resolved','doc1',11,11,
+                  'different reviewed evidence','RW.LABOR','merged',?,?,?)
+        """,
+        (
+            json.dumps(
+                {
+                    "action": "merge",
+                    "taxonomy_id": "RW.LABOR",
+                    "materialized_item_ids": [old_item_id],
+                }
+            ),
+            now,
+            now,
+        ),
+    )
+
+    replace_v4_result(
+        conn,
+        file_key="doc1",
+        txt_hash="hash",
+        data=valid_result(),
+    )
+
+    refs = [
+        row[0]
+        for row in conn.execute(
+            "SELECT item_ref FROM v4_clause_item ORDER BY item_id"
+        )
+    ]
+    assert len(refs) == 2
+    assert len(set(refs)) == 2
+    assert "rw-001" in refs
+    assert any(ref.startswith("RW-TC") for ref in refs)

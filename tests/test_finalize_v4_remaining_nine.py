@@ -194,3 +194,166 @@ def test_annex_paragraphs_become_items_or_coordinate_backed_candidates():
         ("COV", "schedule-1", "partial"),
     }
     validate_v4_result(result, file_key="doc1", known_taxonomy=known)
+
+
+def test_identical_coordinates_in_different_source_files_are_both_preserved():
+    known = {seed.taxonomy_id: seed.family for seed in SEED_TAXONOMY}
+    coverage = {
+        family: {
+            "body_status": "not_evaluated",
+            "annex_status": "not_evaluated",
+            "reason": "no body",
+        }
+        for family in FAMILIES
+    }
+    data = {
+        "file_key": "owner",
+        "meta_schema_version": 4,
+        "taxonomy_version": 14,
+        "extractor_version": "proposal",
+        "prompt_version": "prompt",
+        "items": [],
+        "coverage": coverage,
+        "source_coverage": [
+            {
+                "family": "RW",
+                "source_id": source_id,
+                "source_kind": "schedule",
+                "source_name": source_id,
+                "source_ref": "¶10",
+                "storage_file_key": storage_key,
+                "status": "partial",
+                "reason": "pre-review",
+            }
+            for source_id, storage_key in (
+                ("schedule-a", "storage-a"),
+                ("schedule-b", "storage-b"),
+            )
+        ],
+        "taxonomy_candidates": [],
+    }
+    shared_text = "No litigation is pending against the Company."
+    source = {
+        "file_key": "owner",
+        "family_sections": {},
+        "source_inventory": [
+            {
+                "family": "RW",
+                "source_id": source_id,
+                "source_kind": "schedule",
+                "source_name": source_id,
+                "source_ref": "¶10",
+                "storage_file_key": storage_key,
+                "status_hint": "available",
+                "paragraphs": [{"para": 10, "text": shared_text}],
+            }
+            for source_id, storage_key in (
+                ("schedule-a", "storage-a"),
+                ("schedule-b", "storage-b"),
+            )
+        ],
+    }
+
+    result, unresolved = finalize_result(data, known, source=source)
+
+    assert unresolved == []
+    assert [
+        (item["source_id"], item["loc_start"], item["taxonomy_id"])
+        for item in result["items"]
+    ] == [
+        ("schedule-a", 10, "RW.LITIGATION.NO_PENDING"),
+        ("schedule-b", 10, "RW.LITIGATION.NO_PENDING"),
+    ]
+
+
+def test_long_body_paragraph_without_hint_is_still_reviewed():
+    known = {seed.taxonomy_id: seed.family for seed in SEED_TAXONOMY}
+    coverage = {
+        family: {
+            "body_status": "not_evaluated",
+            "annex_status": "no_annex",
+            "reason": "not reviewed",
+        }
+        for family in FAMILIES
+    }
+    data = {
+        "file_key": "doc1",
+        "meta_schema_version": 4,
+        "taxonomy_version": 14,
+        "extractor_version": "proposal",
+        "prompt_version": "prompt",
+        "items": [],
+        "coverage": coverage,
+        "source_coverage": [],
+        "taxonomy_candidates": [],
+    }
+    text = (
+        "The Company represents and warrants that there is no pending "
+        "lawsuit, arbitration, administrative proceeding or investigation "
+        "against the Company that would reasonably be expected to affect "
+        "the transactions contemplated by this Agreement."
+    )
+    source = {
+        "file_key": "doc1",
+        "source_inventory": [],
+        "family_sections": {
+            "RW": {
+                "paragraphs": [{"para": 20, "text": text}],
+                "atomic_unit_hints": [],
+            }
+        },
+    }
+
+    result, unresolved = finalize_result(data, known, source=source)
+
+    assert unresolved == []
+    assert [
+        (row["taxonomy_id"], row["loc_start"])
+        for row in result["items"]
+    ] == [("RW.LITIGATION.NO_PENDING", 20)]
+
+
+def test_pending_arbitration_denial_is_not_dispute_resolution():
+    assert classify_text(
+        "회사에 대하여 현재 계류 중이거나 제기될 우려가 있는 소송, 중재절차 "
+        "또는 행정조사는 존재하지 아니한다."
+    ) == ["RW.LITIGATION.NO_PENDING"]
+
+
+def test_headingless_body_is_reviewed_and_candidate_marks_family_complete():
+    known = {seed.taxonomy_id: seed.family for seed in SEED_TAXONOMY}
+    data = {
+        "file_key": "doc1",
+        "meta_schema_version": 4,
+        "taxonomy_version": 14,
+        "extractor_version": "proposal",
+        "prompt_version": "prompt",
+        "items": [],
+        "coverage": {
+            family: {
+                "body_status": "not_evaluated",
+                "annex_status": "no_annex",
+                "reason": "no recognized heading",
+            }
+            for family in FAMILIES
+        },
+        "source_coverage": [],
+        "taxonomy_candidates": [],
+    }
+    source = {
+        "file_key": "doc1",
+        "family_sections": {},
+        "source_inventory": [],
+        "unscoped_body_paragraphs": [
+            {
+                "para": 7,
+                "text": "The Company shall issue the Bonds to the Investor at Closing.",
+            }
+        ],
+    }
+
+    result, unresolved = finalize_result(data, known, source=source)
+
+    assert len(unresolved) == 1
+    assert unresolved[0]["family"] == "COV"
+    assert result["coverage"]["COV"]["body_status"] == "complete"

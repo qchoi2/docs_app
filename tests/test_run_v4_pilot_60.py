@@ -2,7 +2,9 @@ from run_v4_pilot_60 import (
     allocate_quotas,
     locate_family_ranges,
     normalize_title,
+    repair_family_sections,
 )
+from v4_schema import FAMILIES
 
 
 def paragraphs(*texts):
@@ -47,6 +49,34 @@ def test_article_mode_closes_each_family_at_next_article():
     assert ranges["REM"] == [(11, 12)]
 
 
+def test_later_schedule_articles_do_not_erase_main_agreement_headings():
+    rows = paragraphs(
+        "DEFINITIONS",
+        '"Business Day" means a weekday.',
+        "REPRESENTATIONS AND WARRANTIES OF THE COMPANY",
+        "The Company is duly organized.",
+        "COVENANTS",
+        "The Company shall operate in the ordinary course.",
+        "CONDITIONS PRECEDENT",
+        "All approvals shall have been obtained.",
+        "INDEMNIFICATION",
+        "The Seller shall indemnify the Buyer.",
+        "SCHEDULE 1",
+        "Article 1 (Voting Rights)",
+        "Each share carries one vote.",
+        "Article 2 (Dividends)",
+        "Dividends shall be paid pro rata.",
+        "Article 3 (Conversion)",
+        "The preferred shares may be converted.",
+    )
+    ranges = locate_family_ranges(rows)
+    assert ranges["DEF"] == [(1, 2)]
+    assert ranges["RW"] == [(3, 4)]
+    assert ranges["COV"] == [(5, 6)]
+    assert ranges["CP"] == [(7, 8)]
+    assert ranges["REM"] == [(9, 10)]
+
+
 def test_table_of_contents_hit_is_not_used_as_actual_article():
     rows = paragraphs(
         "Interpretation ........................................ 1",
@@ -87,3 +117,28 @@ def test_table_of_contents_hit_is_not_used_as_actual_article():
 
 def test_normalize_title_removes_leader_and_page_number():
     assert normalize_title("Purchase Price ............... 25") == "purchaseprice"
+
+
+def test_headingless_document_preserves_unscoped_physical_paragraphs():
+    rows = paragraphs(
+        "CONVERTIBLE BOND SUBSCRIPTION AGREEMENT",
+        "The Company shall issue the Bonds to the Investor.",
+    )
+    payload = {
+        "family_sections": {
+            family: {"paragraphs": [], "atomic_unit_hints": []}
+            for family in FAMILIES
+        },
+        "source_inventory": [],
+    }
+
+    repaired = repair_family_sections(
+        payload,
+        {
+            "file_key": "doc1",
+            "path": "CBSA.docx",
+            "paragraphs": rows,
+        },
+    )
+
+    assert repaired["unscoped_body_paragraphs"] == rows

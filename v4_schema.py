@@ -1478,7 +1478,31 @@ def replace_v4_result(
         if equivalent is not None:
             new_item_id = int(equivalent[0])
         else:
-            values = [preserved[name] for name in insert_columns]
+            restored = dict(preserved)
+            item_ref = str(restored.get("item_ref") or "")
+            if conn.execute(
+                """
+                SELECT 1 FROM v4_clause_item
+                WHERE file_key=? AND item_ref=?
+                """,
+                (file_key, item_ref),
+            ).fetchone() is not None:
+                base_ref = (
+                    f"{restored['family']}-TC{int(restored['item_id']):06d}"
+                )
+                item_ref = base_ref
+                suffix = 1
+                while conn.execute(
+                    """
+                    SELECT 1 FROM v4_clause_item
+                    WHERE file_key=? AND item_ref=?
+                    """,
+                    (file_key, item_ref),
+                ).fetchone() is not None:
+                    suffix += 1
+                    item_ref = f"{base_ref}-{suffix}"
+                restored["item_ref"] = item_ref
+            values = [restored[name] for name in insert_columns]
             cursor = conn.execute(
                 f"""
                 INSERT INTO v4_clause_item({','.join(insert_columns)})

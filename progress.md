@@ -22,15 +22,20 @@
 - **MCP** (`mcp_server.py`, `v4_mcp_tools.py`): 읽기전용 도구 7개 + V4 검색/비교 도구 2개.
 - **V4 (세부 원자 항목 계층)**: taxonomy **v14 / 409 nodes**, 6-family(RW·CP·COV·DEF·PAY·REM),
   본문·별지 분리 coverage, 별지 물리문단 완전성 감사, 하이브리드 검색(구조화+FTS+문단폴백),
-  안전한 부재 판정. 누적 V4 item **47,139개**, 평가 문서 **669+**. 검색 성능 보강(게이트 조회 95초→2초).
+  안전한 부재 판정. SPA·SSA·ATA/BTA·SHA뿐 아니라 CBSA·NPA·BWSA·WPA·EBSA를
+  전 항목 추출 범위에 포함한다. 누적 V4 item **98,904개**, 평가 문서 **968건**,
+  pending taxonomy 후보 **31,083개**.
 
 **진행 중 / 다음 단계**
-- **V4-6 확장 배치 계속**: SPA→SSA→SHA→ATA/BTA 순. Gate A(자체 완전성) 미통과 상태이므로
-  pending taxonomy 후보와 missing source는 부재 판정에서 제외하고 `needs_review`로 보존.
+- **V4-6 확장 배치 계속**: 기존 600건 재처리와 증권계약 포함 300건 적재 완료.
+  다음 순서는 남은 SSA→ATA/BTA→SHA이며, 이후 미처리 증권계약을 포함해 계속 확장한다.
+  pending taxonomy 후보와 partial source는 부재 판정에서 제외하고 `needs_review`로 보존.
+- **taxonomy 후보 검수**: 31,083개 후보의 반복 문구를 군집화해 기존 leaf 병합과
+  신규 leaf 승격을 검토한다. 현재 결정 규칙으로 안전한 자동 병합·기각은 0건이다.
 - **Gate B 정식화**: 현재 recall 평가는 승인 item 기반 회귀이므로 독립 사람검수 골드 필요.
 - **T4 (벡터 하이브리드)**: 미착수. V4-5 게이트 통과·coverage 안정 후 시작(Phase 4).
 
-**테스트**: `python -m pytest` → **214 passed, 1 skipped**.
+**테스트**: `python -m pytest` → **228 passed, 1 skipped**.
 - ⚠️ 환경 주의: `AppData\Local\Temp\pytest-of-<user>` 폴더 권한 문제로 pytest가 대량
   `PermissionError`를 낼 수 있다. 이때는 `python -m pytest --basetemp=<쓰기가능경로>`로 우회한다.
   (과거 세션이 이를 우회하려고 repo 안에 `.tmp_pytest_*/`를 만든 흔적이 있었고, 이번에 정리·gitignore 처리했다.)
@@ -896,3 +901,28 @@ python webapp.py --out cs_index      # 또는 run_webapp.bat [색인경로]
 - `docs(progress): restructure progress.md with status summary + archive`
 
 검증: `python -m pytest --basetemp=<scratch> -q` → 214 passed, 1 skipped (변경 후 재확인).
+### 2026-07-27 — V4 증권계약 범위 확장·900건 본문 완전성 교정
+
+- V4 전 항목 추출 범위를 SPA·SSA·ATA/BTA·SHA에서 CB인수(CBSA),
+  CB매수(NPA), BW인수(BWSA), W매수(WPA), EB인수(EBSA)까지 확장했다.
+- 기존 600건을 새 본문·별지 완전성 규칙으로 재처리하고, 증권계약을 실제
+  포함한 새 300건(SPA 35, CB인수 121, CB매수 3, BW인수 34, W매수 1,
+  EB인수 15, SSA 91)을 추가 적재했다.
+- 뒤쪽 별지 Article의 본문 범위 오염, 장문 무힌트 본문 누락, 제목 미인식
+  계약의 전체 미평가, 소송 부존재/중재합의 충돌, 별도 storage 별지 중복,
+  후보 검토 item_ref 충돌을 수정했다.
+- Exhibit·법률의견·closing checklist·schedule of exceptions·term sheet/TS·
+  CPS/CB terms·series certificate·발행결정 공시를 계약 본체 표본에서 제외하고,
+  SSA 폴더의 SHA/RFR·co-sale 파일은 SHA로 정규화했다.
+- 운영 DB는 item/FTS 각 98,904개, coverage 968문서, pending 후보 31,083개,
+  merged 295개, rejected 16개다. 전체 본문 미평가 0, 비말단
+  `RW.SOLVENCY` 0, stale 0, resolution 참조 누락 0, integrity ok, FK 0이다.
+- 구조 감사 세 배치 모두 error 0·좌표 누락 0. 전체 테스트 228 passed,
+  1 skipped. V4 Gate B 36/36, recall 1.0000, 정독 문서 수 58.31% 감소,
+  T1/T2 fail 0.
+- 자동 후보 검토 dry-run에서 안전한 자동 병합·기각은 0건이어서 31,083개
+  후보를 원문 좌표와 함께 유지했다. 다음 단계는 반복 후보 군집의 taxonomy
+  검수·승격이다.
+- 적재 전 WAL-safe 백업:
+  `.backups/v4_scope_body_corrections_pre_store_20260727/cs_index_backup_20260727_155517`
+- 상세 보고: `.docs/V4_SCOPE_EXPANSION_CB_BW_EB_20260727.md`

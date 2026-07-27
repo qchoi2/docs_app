@@ -250,7 +250,7 @@ def classify_text(text: str) -> list[str]:
         ids.append("RW.DISCLOSURE.ACCURACY")
     if has(
         text,
-        r"\b(?:there (?:is|are) )?no (?:pending |threatened )?(?:litigation|actions?|proceedings?)\b",
+        r"\b(?:there (?:is|are) )?no (?:pending |threatened )?(?:litigation|lawsuits?|actions?|arbitrations?|administrative proceedings?|proceedings?|investigations?)\b",
         r"(?:소송|쟁송|분쟁|절차|금지소송등)(?:가|은|는| 등은)?.{0,140}(?:존재하지|진행되고 있지|계류 중이지|제기된 바 없|제기되지 아니)",
     ):
         ids.append("RW.LITIGATION.NO_PENDING")
@@ -638,7 +638,15 @@ def classify_text(text: str) -> list[str]:
         ids.append("REM.EFFECTIVE_DATE")
     if has(text, r"governed by.*laws?|governing law", r"(?:대한민국|한국).*(?:법률|법규).*(?:해석|규율|집행)"):
         ids.append("REM.GOVERNING_LAW")
-    if has(text, r"(?:exclusive )?jurisdiction|arbitration", r"(?:관할법원|전속관할|합의관할|중재)"):
+    if has(
+        text,
+        r"(?:exclusive )?jurisdiction",
+        r"\b(?:shall|must|will)\b.{0,80}\barbitration\b",
+        r"\b(?:submitted to|settled by|resolved by)\s+arbitration\b",
+        r"(?:관할법원|전속관할|합의관할)",
+        r"(?:분쟁|분쟁사항).{0,80}(?:중재)",
+        r"(?:중재).{0,80}(?:해결|회부|신청)",
+    ):
         ids.append("REM.DISPUTE_RESOLUTION")
     if has(text, r"entire agreement|supersedes?.*prior", r"(?:최종적|완전한).*(?:합의).*(?:종전|대체)"):
         ids.append("REM.ENTIRE_AGREEMENT")
@@ -890,6 +898,126 @@ def finalize_result(
             for taxonomy_id in ids:
                 add(hint_candidate, taxonomy_id, candidate=True)
 
+    # A family range can contain long operative paragraphs that have no short
+    # heading and no direct alias match in the proposal pass. Review every
+    # physical body paragraph once so such clauses cannot disappear merely
+    # because ``atomic_unit_hints`` is empty.
+    represented_body_evidence = {
+        (int(row["loc_start"]), str(row["verbatim"]).strip())
+        for row in [*output, *unresolved]
+        if row.get("source_kind", "body") == "body"
+        and row.get("loc_start")
+        and row.get("verbatim")
+    }
+    for section_family, section in (
+        (source or {}).get("family_sections") or {}
+    ).items():
+        if not isinstance(section, dict):
+            continue
+        for paragraph in section.get("paragraphs") or []:
+            para = int(paragraph["para"])
+            text = str(paragraph.get("text") or "").strip()
+            evidence_key = (para, text)
+            if not text or evidence_key in represented_body_evidence:
+                continue
+            taxonomy_ids = [
+                taxonomy_id
+                for taxonomy_id in classify_text(text)
+                if taxonomy_id in known
+            ]
+            body_candidate = {
+                "verbatim": text,
+                "loc_start": para,
+                "loc_end": para,
+                "source_kind": "body",
+                "source_id": None,
+                "source_name": "계약서 본문",
+                "source_ref": f"¶{para}",
+                "parent_clause_ref": f"{section_family} 본문",
+                "qualifier": {
+                    "review_method": "V4-2 본문 물리 문단 전수검수",
+                },
+            }
+            if taxonomy_ids:
+                for taxonomy_id in taxonomy_ids:
+                    add(body_candidate, taxonomy_id, candidate=True)
+                represented_body_evidence.add(evidence_key)
+                continue
+            if not source_needs_candidate(text):
+                continue
+            family = (
+                str(section_family)
+                if str(section_family) in FAMILIES
+                else infer_source_candidate_family(text, set())
+            )
+            unresolved.append(
+                {
+                    **body_candidate,
+                    "proposed_ko": f"검토후보: 본문 ¶{para} 명제",
+                    "proposed_en": None,
+                    "family": family,
+                    "recommended_parent_id": family,
+                    "distinction_reason": (
+                        "본문의 실질 문단이나 기존 taxonomy 규칙으로 확정 "
+                        "분류되지 않아 원문 좌표를 보존한 검토가 필요함"
+                    ),
+                    "nearest_taxonomy_id": family,
+                }
+            )
+            represented_body_evidence.add(evidence_key)
+
+    # Some agreements use no recognizable family/article headings.  The
+    # range repair pass preserves those physical paragraphs separately so the
+    # document can still receive a conservative proposition-by-proposition
+    # review instead of being silently marked wholly unevaluated.
+    for paragraph in (source or {}).get("unscoped_body_paragraphs") or []:
+        para = int(paragraph["para"])
+        text = str(paragraph.get("text") or "").strip()
+        evidence_key = (para, text)
+        if not text or evidence_key in represented_body_evidence:
+            continue
+        taxonomy_ids = [
+            taxonomy_id
+            for taxonomy_id in classify_text(text)
+            if taxonomy_id in known
+        ]
+        family = infer_source_candidate_family(text, set())
+        body_candidate = {
+            "verbatim": text,
+            "loc_start": para,
+            "loc_end": para,
+            "source_kind": "body",
+            "source_id": None,
+            "source_name": "계약서 본문",
+            "source_ref": f"¶{para}",
+            "parent_clause_ref": "제목 미인식 본문",
+            "qualifier": {
+                "review_method": "V4-2 제목 미인식 본문 물리 문단 전수검토",
+            },
+        }
+        if taxonomy_ids:
+            for taxonomy_id in taxonomy_ids:
+                add(body_candidate, taxonomy_id, candidate=True)
+            represented_body_evidence.add(evidence_key)
+            continue
+        if not source_needs_candidate(text):
+            continue
+        unresolved.append(
+            {
+                **body_candidate,
+                "proposed_ko": f"검토후보: 본문 ¶{para} 명제",
+                "proposed_en": None,
+                "family": family,
+                "recommended_parent_id": family,
+                "distinction_reason": (
+                    "표준 조항 제목이 없는 본문의 실질 문단으로, 기존 taxonomy "
+                    "규칙으로 확정 분류되지 않아 원문 좌표를 보존한 검토가 필요함"
+                ),
+                "nearest_taxonomy_id": family,
+            }
+        )
+        represented_body_evidence.add(evidence_key)
+
     # Review each physical schedule/annex paragraph exactly once. Source
     # inventory rows can repeat the same physical source for several families;
     # duplicate family links must not create duplicate clause items.
@@ -910,13 +1038,29 @@ def finalize_result(
             key = (storage_key, int(paragraph["para"]), text)
             physical_sources.setdefault(key, []).append((source_row, paragraph))
 
+    source_storage_keys = {
+        str(row.get("source_id") or ""): str(
+            row.get("storage_file_key")
+            or (source or {}).get("file_key")
+            or data.get("file_key")
+        )
+        for row in (source or {}).get("source_inventory") or []
+    }
     represented_source_evidence = {
-        (int(row["loc_start"]), str(row["verbatim"]).strip())
+        (
+            source_storage_keys.get(
+                str(row.get("source_id") or ""),
+                str((source or {}).get("file_key") or data.get("file_key")),
+            ),
+            int(row["loc_start"]),
+            str(row["verbatim"]).strip(),
+        )
         for row in output
         if row.get("source_kind") != "body"
     }
     for (_storage_key, para, text), links in physical_sources.items():
-        if not text or (para, text) in represented_source_evidence:
+        evidence_key = (_storage_key, para, text)
+        if not text or evidence_key in represented_source_evidence:
             continue
         taxonomy_ids = [
             taxonomy_id
@@ -942,7 +1086,7 @@ def finalize_result(
         if taxonomy_ids:
             for taxonomy_id in taxonomy_ids:
                 add(source_candidate, taxonomy_id, candidate=True)
-            represented_source_evidence.add((para, text))
+            represented_source_evidence.add(evidence_key)
             continue
         if not source_needs_candidate(text):
             continue
@@ -971,17 +1115,18 @@ def finalize_result(
             (candidate_family, str(representative["source_id"]))
         )
 
-    body_families_with_items = {
+    body_families_with_evidence = {
         str(row["family"])
-        for row in output
-        if row["source_kind"] == "body"
+        for row in [*output, *unresolved]
+        if row.get("source_kind", "body") == "body"
+        and str(row.get("family")) in FAMILIES
     }
     coverage = {}
     for family in FAMILIES:
         original = data["coverage"][family]
         body_was_reviewed = (
             original["body_status"] != "not_evaluated"
-            or family in body_families_with_items
+            or family in body_families_with_evidence
         )
         coverage[family] = {
             "body_status": "complete" if body_was_reviewed else "not_evaluated",

@@ -143,6 +143,11 @@ def generic_major_heading(value: str, known_toc_titles: set[str]) -> bool:
     text = " ".join(value.split()).strip()
     if not text or len(text) > 100 or TOC_LEADER_RE.search(text):
         return False
+    # Operative English sentences can be short and title-cased ("The Seller
+    # is duly organized."). A terminal sentence mark is strong evidence that
+    # the paragraph is not an article boundary.
+    if re.search(r"[.;]$", text):
+        return False
     if normalize_title(text) in known_toc_titles:
         return True
     if ANNEX_TITLE_RE.fullmatch(text):
@@ -213,17 +218,32 @@ def locate_family_ranges(paragraphs: list[dict]) -> dict[str, list[tuple[int, in
     if not paragraph_by_number:
         return {family: [] for family in FAMILIES}
     toc = toc_titles(paragraphs)
-    article_heading_count = sum(
-        bool(
-            re.match(
-                r"^\s*ARTICLE\s+(?:[IVXLC]+|\d+)\.?\s+\S",
-                str(text),
-                re.IGNORECASE,
-            )
+    article_heading_numbers = [
+        number
+        for number, text in paragraph_by_number.items()
+        if re.match(
+            r"^\s*ARTICLE\s+(?:[IVXLC]+|\d+)\.?\s+\S",
+            str(text),
+            re.IGNORECASE,
         )
-        for text in paragraph_by_number.values()
+    ]
+    recognized_family_numbers = [
+        number
+        for number, text in paragraph_by_number.items()
+        if title_family(str(text))
+    ]
+    # A main agreement can be followed by schedules whose internal provisions
+    # are also numbered "Article 1", "Article 2", etc. Those later schedules
+    # must not force the entire document into ARTICLE-only mode and erase the
+    # agreement's earlier standalone family headings.
+    article_mode = (
+        not toc
+        and len(article_heading_numbers) >= 3
+        and (
+            not recognized_family_numbers
+            or min(article_heading_numbers) <= min(recognized_family_numbers)
+        )
     )
-    article_mode = not toc and article_heading_count >= 3
     family_at: dict[int, str] = {}
     boundaries: set[int] = set()
     for number, text in paragraph_by_number.items():
@@ -355,6 +375,14 @@ def repair_family_sections(payload: dict, source: dict) -> dict:
             for row in payload["source_inventory"]
             if row["family"] == family
         ]
+    payload["unscoped_body_paragraphs"] = (
+        []
+        if any(section.get("paragraphs") for section in sections.values())
+        else [
+            {"para": int(row["para"]), "text": str(row.get("text") or "")}
+            for row in paragraphs
+        ]
+    )
     return payload
 
 

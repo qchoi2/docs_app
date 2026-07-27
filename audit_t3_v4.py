@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Dict, List, Mapping, Optional
 
 from audit_t3_v3 import _compact, _normalized_number_is_supported
+from finalize_v4_remaining_nine import source_needs_candidate
 from lib.console import configure_utf8_stdio
 from v4_schema import (
     V4SchemaError,
@@ -35,6 +36,9 @@ def paragraph_map(payload: Mapping[str, object]) -> Dict[int, str]:
         for row in section.get("paragraphs") or []:
             if isinstance(row, dict) and isinstance(row.get("para"), int):
                 result[int(row["para"])] = str(row.get("text") or "")
+    for row in payload.get("unscoped_body_paragraphs") or []:
+        if isinstance(row, dict) and isinstance(row.get("para"), int):
+            result[int(row["para"])] = str(row.get("text") or "")
     for source in payload.get("source_inventory") or []:
         if not isinstance(source, dict):
             continue
@@ -203,6 +207,27 @@ def source_coverage_issues(
     return issues
 
 
+def document_coverage_issues(data: Mapping[str, object]) -> List[dict]:
+    """Reject a nominal pass when no body family was actually evaluated."""
+
+    coverage = data.get("coverage") or {}
+    if not isinstance(coverage, dict) or not coverage:
+        return [{"code": "document_coverage_missing"}]
+    statuses = [
+        str(row.get("body_status") or "not_evaluated")
+        for row in coverage.values()
+        if isinstance(row, dict)
+    ]
+    if statuses and all(status == "not_evaluated" for status in statuses):
+        return [
+            {
+                "code": "document_body_not_evaluated",
+                "detail": "all clause families have body_status=not_evaluated",
+            }
+        ]
+    return []
+
+
 def atomicity_issues(
     data: Mapping[str, object],
     source: Mapping[str, object],
@@ -217,6 +242,12 @@ def atomicity_issues(
         if isinstance(row, dict)
     }
     items = data.get("items") or []
+    body_evidence = {
+        (int(row.get("loc_start") or 0), str(row.get("verbatim") or "").strip())
+        for row in [*items, *(data.get("taxonomy_candidates") or [])]
+        if isinstance(row, dict)
+        and row.get("source_kind", "body") == "body"
+    }
     for index, item in enumerate(items):
         taxonomy_id = str(item.get("taxonomy_id") or "")
         if taxonomy_id in children and taxonomy_id not in candidate_parents:
@@ -262,6 +293,44 @@ def atomicity_issues(
                         },
                     }
                 )
+        for paragraph in section.get("paragraphs") or []:
+            if not isinstance(paragraph, dict):
+                continue
+            para = int(paragraph.get("para") or 0)
+            text = str(paragraph.get("text") or "").strip()
+            if (
+                source_needs_candidate(text)
+                and (para, text) not in body_evidence
+            ):
+                issues.append(
+                    {
+                        "code": "body_paragraph_unrepresented",
+                        "detail": {
+                            "family": family,
+                            "loc_start": para,
+                            "text": text[:160],
+                        },
+                    }
+                )
+    for paragraph in source.get("unscoped_body_paragraphs") or []:
+        if not isinstance(paragraph, dict):
+            continue
+        para = int(paragraph.get("para") or 0)
+        text = str(paragraph.get("text") or "").strip()
+        if (
+            source_needs_candidate(text)
+            and (para, text) not in body_evidence
+        ):
+            issues.append(
+                {
+                    "code": "body_paragraph_unrepresented",
+                    "detail": {
+                        "family": "UNSCOPED",
+                        "loc_start": para,
+                        "text": text[:160],
+                    },
+                }
+            )
     return issues
 
 
@@ -300,6 +369,7 @@ def audit_v4(manifest_path: Path, *, out: Path, input_dir: Path, result_dir: Pat
                 evidence_issues(data, paragraphs, source_maps)
                 + candidate_issues(data, paragraphs, known, aliases)
                 + source_coverage_issues(data, source)
+                + document_coverage_issues(data)
                 + atomicity_issues(data, source, parents)
             )
             needs_review = bool(issues) or any(item.get("confidence") == "low" or item.get("review_status") == "needs_review" for item in data["items"]) or bool(data.get("taxonomy_candidates"))

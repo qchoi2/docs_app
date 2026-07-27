@@ -13,12 +13,16 @@
 
 ctype_rules:
   # --- 사채 인수류 (구체적 패턴 먼저: "인수계약" 단독보다 위) ---
+  - ctype: CB매수
+    patterns: [CB매수, CB_매수, 전환사채 매수, 전환사채매수, note purchase agreement, NPA]
+  - ctype: W매수
+    patterns: [W_매수, W 매수, 워런트 매수, warrant purchase, WPA]
   - ctype: CB인수
-    patterns: [CB_인수, CB 인수, 전환사채 인수, 전환사채인수, CB_매수, 전환사채 매수]
+    patterns: [CB_인수, CB 인수, 전환사채 인수, 전환사채인수, CBSA]
   - ctype: BW인수
-    patterns: [BW_인수, BW 인수, 신주인수권부사채, BW_매수]
+    patterns: [BW_인수, BW 인수, 신주인수권부사채, BW_매수, BWSA]
   - ctype: EB인수
-    patterns: [EB_인수, EB 인수, 교환사채, EB_매수]
+    patterns: [EB_인수, EB 인수, 교환사채, EB_매수, EBSA]
 
   # --- 조직재편 ---
   - ctype: 분할합병

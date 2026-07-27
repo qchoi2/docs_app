@@ -14,7 +14,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from finalize_v4_remaining_nine import finalize_result, prepare_reviewed_source
-from run_v4_pilot_60 import write_json
+from plan_v4_batch import build_input, load_taxonomy_catalog
+from propose_v4_remaining_nine import build_result, load_nodes
+from run_v4_pilot_60 import (
+    load_v3_like_payload,
+    repair_family_sections,
+    write_json,
+)
 from v4_schema import (
     V4_SCHEMA_REVISION,
     initialize_v4_schema,
@@ -23,7 +29,13 @@ from v4_schema import (
 )
 
 
-def refinalize_batch(out: Path, batch_id: str) -> dict:
+def refinalize_batch(
+    out: Path,
+    batch_id: str,
+    *,
+    rebuild_input: bool = False,
+    rebuild_unscoped_only: bool = False,
+) -> dict:
     manifest_path = out / f"{batch_id}_manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     raw_dir = out / f"enrich_inputs_{batch_id}_raw"
@@ -42,6 +54,51 @@ def refinalize_batch(out: Path, batch_id: str) -> dict:
             ).fetchone()[0]
         )
         conn.commit()
+
+    if rebuild_input or rebuild_unscoped_only:
+        with sqlite3.connect(out / "catalog.sqlite") as conn:
+            conn.row_factory = sqlite3.Row
+            catalog = load_taxonomy_catalog(conn)
+            nodes, _ = load_nodes(conn)
+            for row in manifest["items"]:
+                file_key = str(row["file_key"])
+                if rebuild_unscoped_only:
+                    existing_raw = json.loads(
+                        (raw_dir / f"{file_key}.json").read_text(
+                            encoding="utf-8"
+                        )
+                    )
+                    if any(
+                        section.get("paragraphs")
+                        for section in (
+                            existing_raw.get("family_sections") or {}
+                        ).values()
+                        if isinstance(section, dict)
+                    ):
+                        continue
+                file_row = conn.execute(
+                    """
+                    SELECT file_key,path,ctype,lang,content_hash,txt_path
+                    FROM files
+                    WHERE file_key=? AND status='ok'
+                    """,
+                    (file_key,),
+                ).fetchone()
+                if file_row is None:
+                    raise RuntimeError(f"{file_key}: current source file unavailable")
+                source, v3_result = load_v3_like_payload(
+                    conn, out, dict(file_row)
+                )
+                raw = build_input(
+                    source,
+                    v3_result,
+                    taxonomy_version=taxonomy_version,
+                    taxonomy_catalog=catalog,
+                )
+                raw = repair_family_sections(raw, source)
+                pre = build_result(raw, nodes)
+                write_json(raw_dir / f"{file_key}.json", raw)
+                write_json(pre_dir / f"{file_key}.json", pre)
 
     totals = {
         "items": 0,
@@ -106,6 +163,15 @@ def refinalize_batch(out: Path, batch_id: str) -> dict:
             "source_candidate_count": totals["source_candidates"],
             "partial_source_count": totals["partial_sources"],
             "annex_review_mode": "physical-paragraph-complete-v1",
+            "body_range_rebuilt": bool(
+                rebuild_input
+                or rebuild_unscoped_only
+                or manifest.get("body_range_rebuilt")
+            ),
+            "unscoped_body_rebuilt": bool(
+                rebuild_unscoped_only
+                or manifest.get("unscoped_body_rebuilt")
+            ),
             "refinalized_at": datetime.now(timezone.utc).isoformat(),
             "items": updated_rows,
         }
@@ -118,6 +184,19 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--batch-id", required=True)
+    parser.add_argument(
+        "--rebuild-input",
+        action="store_true",
+        help="Rebuild family ranges and proposal artifacts from current txt.",
+    )
+    parser.add_argument(
+        "--rebuild-unscoped-only",
+        action="store_true",
+        help=(
+            "Rebuild only documents whose current input has no recognized "
+            "family body range, then refinalize the batch."
+        ),
+    )
     return parser
 
 
@@ -125,7 +204,12 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     print(
         json.dumps(
-            refinalize_batch(args.out, args.batch_id),
+            refinalize_batch(
+                args.out,
+                args.batch_id,
+                rebuild_input=args.rebuild_input,
+                rebuild_unscoped_only=args.rebuild_unscoped_only,
+            ),
             ensure_ascii=False,
             sort_keys=True,
         )
