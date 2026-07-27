@@ -1043,3 +1043,18 @@ coverage='complete'여도 `confirmed_absent`를 반환하지 않고 전부 `need
 - CLI(`--item-absent`)·웹·MCP 모두 dict 경유로 경고 전파. 테스트 픽스처에 CP family를
   추가해 비-RW confirm 경로를 검증. 전체 248 passed, 1 skipped.
 - 남음: 근본 교정(RW 하위영역 체크리스트 재추출 + 영역별 coverage 감사)은 별도 배치.
+
+### 2026-07-28 — ②-honesty: RW coverage 감사 도구 + 재추출 대상 식별 (Claude, opus)
+
+근본 교정 ②의 "coverage 정직화" 절반을 구현했다. `audit_rw_coverage.py`:
+CORE_RW_SUBDOMAINS(조세·소송·준법·중요계약·노무·IP·환경·인허가·재무·자산·부동산·보험)
+체크리스트로 RW-complete 문서를 감사. report(기본, 읽기전용) / --apply(complete→partial,
+사유 rw_subdomain_audit_pending, WAL-safe 백업 후).
+
+- 실측: RW-complete 934 중 **733(78%)이 under-extracted**(core<6), 169개는 실질진술 0개.
+  도메인별 문서 커버리지: 소송 69%·조세 63%·재무 51% vs IP 1.8%·보험 0.2%·자산 0.9%·노무 16%.
+  = 추출이 앞부분 boilerplate 진술만 잡고 실질 사업진술을 누락한 패턴 재확인.
+- --apply(733행 partial 강등)는 쿼리 게이팅으로 이미 안전하므로 재추출 착수 시 실행하도록 보류.
+- 재추출(②-2, 누락 진술 실제 추출)은 AI 클라이언트 파일 하네스 배치(유료 API 없이). 별도 진행.
+
+다음: Gate B 존재형·비교형을 전문 확인 방식으로 마저 검증.
