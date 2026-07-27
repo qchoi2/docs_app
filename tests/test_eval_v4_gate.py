@@ -24,12 +24,12 @@ def test_gate_evaluator_scores_present_absent_and_flags_unscored_compare(tmp_pat
                     {
                         "id": "a1",
                         "mode": "absent",
-                        "taxonomy_id": "RW.LABOR.NO_VIOLATION",
+                        "taxonomy_id": "CP.THIRD_PARTY_CONSENT",
                     },
                     {
                         "id": "c1",
                         "mode": "compare",
-                        "taxonomy_id": "RW.LABOR.NO_VIOLATION",
+                        "taxonomy_id": "CP.THIRD_PARTY_CONSENT",
                     },
                 ]
             }
@@ -80,7 +80,7 @@ def test_evaluate_pooled_builds_pool_worklist_and_scores(tmp_path):
         "    pool_verified: { correct: [aaaaaaaaaaaaaaaa], incorrect: [] }\n"
         "  - id: A1\n"
         "    intent: absence\n"
-        "    taxonomy: RW.LABOR.NO_VIOLATION\n"
+        "    taxonomy: CP.THIRD_PARTY_CONSENT\n"
         "    pool_verified: { correct: [bbbbbbbbbbbbbbbb], incorrect: [], unknown: [] }\n"
         "  - id: U1\n"
         "    intent: existence\n"

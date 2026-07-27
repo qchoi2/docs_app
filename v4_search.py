@@ -557,6 +557,15 @@ def search_clause_items(
         }
 
 
+# Families whose coverage='complete' cannot currently be trusted to prove
+# absence. Per .docs/V4_RW_COVERAGE_DEFECT_20260727.md, RW (representations)
+# was blanket-stamped complete while whole rep sub-domains (IP 98%, labor 84%,
+# environment 68%, tax 36% of docs) were never extracted — so RW confirmed_absent
+# is mostly false. Until re-extraction + a real per-sub-domain coverage audit,
+# RW absence is demoted to needs_review. Covenant/condition families stay trusted.
+ABSENCE_UNVERIFIED_FAMILIES = {"RW"}
+
+
 def search_clause_absence(
     out: Path,
     taxonomy_id: str,
@@ -571,7 +580,8 @@ def search_clause_absence(
     """Classify documents as confirmed_absent or needs_review.
 
     Only a current, complete body+annex family review with no unresolved
-    family candidate can prove absence.
+    family candidate can prove absence. Representation families whose coverage
+    is not trustworthy (ABSENCE_UNVERIFIED_FAMILIES) never confirm absence.
     """
     if polarity and polarity not in POLARITIES:
         raise V4SearchError("Unknown statement polarity.")
@@ -616,6 +626,7 @@ def search_clause_absence(
         coverage_by_file = _bulk_coverage_states(
             conn, files, str(node["family"])
         )
+        family_gated = str(node["family"]) in ABSENCE_UNVERIFIED_FAMILIES
         absent: list[dict] = []
         needs_review: list[dict] = []
         present_excluded = 0
@@ -625,6 +636,13 @@ def search_clause_absence(
                 present_excluded += 1
                 continue
             coverage = coverage_by_file[file_key]
+            # RW-family 'complete' coverage is not verified per sub-domain, so it
+            # cannot prove absence — flag the reason and demote to needs_review.
+            if family_gated and coverage["state"] == "complete":
+                coverage = {
+                    **coverage,
+                    "reasons": [*coverage.get("reasons", []), "rw_coverage_unverified"],
+                }
             result = {
                 **file_row,
                 "taxonomy_id": node["taxonomy_id"],
@@ -632,7 +650,7 @@ def search_clause_absence(
                 "coverage": coverage,
                 "match_path": "v4_coverage",
             }
-            if coverage["state"] == "complete":
+            if coverage["state"] == "complete" and not family_gated:
                 result["state"] = "confirmed_absent"
                 absent.append(result)
             else:
@@ -656,9 +674,12 @@ def search_clause_absence(
             "confirmed_absent": absent[:limit],
             "needs_review": needs_review[:limit],
             "warnings": (
-                ["unevaluated_or_incomplete_documents_are_not_absent"]
-                if needs_review
-                else []
+                (["unevaluated_or_incomplete_documents_are_not_absent"] if needs_review else [])
+                + (
+                    ["rw_absence_unverified_demoted_to_needs_review"]
+                    if family_gated
+                    else []
+                )
             ),
         }
 

@@ -1029,3 +1029,17 @@ Gate B 부재형의 RW 저조(조세 44%·환경 50%) 원인을 DB 직접 조회
   전량 확장보다 우선.
 
 다음: 즉시 안전장치(RW 부재→needs_review) 구현 여부는 소유자 승인 후. 근본 재추출은 별도 배치.
+
+### 2026-07-28 — 즉시 안전장치: RW 부재판정 강등 구현 (Claude, opus)
+
+`.docs/V4_RW_COVERAGE_DEFECT_20260727.md`의 즉시 권고를 구현했다(소유자 승인).
+`v4_search.search_clause_absence`에서 `ABSENCE_UNVERIFIED_FAMILIES={"RW"}` family는
+coverage='complete'여도 `confirmed_absent`를 반환하지 않고 전부 `needs_review`로 강등하고
+사유 `rw_coverage_unverified` + 경고 `rw_absence_unverified_demoted_to_needs_review`를 붙인다.
+특약·선행조건 family(COV/CP/PAY/REM)는 Gate B에서 90%대라 그대로 유지.
+
+- 실측 확인: RW.TAX·RW.ENVIRONMENT는 confirmed_absent 0(전부 needs_review),
+  CP.THIRD_PARTY_CONSENT 241·COV.NON_COMPETE 292는 정상 유지.
+- CLI(`--item-absent`)·웹·MCP 모두 dict 경유로 경고 전파. 테스트 픽스처에 CP family를
+  추가해 비-RW confirm 경로를 검증. 전체 248 passed, 1 skipped.
+- 남음: 근본 교정(RW 하위영역 체크리스트 재추출 + 영역별 coverage 감사)은 별도 배치.

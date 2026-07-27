@@ -80,16 +80,37 @@ def make_index(tmp_path):
                 NOW,
             ),
         )
+        # doc a also has a CP item, so CP (non-gated) exercises the full
+        # present/confirmed_absent/needs_review classification.
+        conn.execute(
+            """
+            INSERT INTO v4_clause_item(
+              file_key,item_ref,family,taxonomy_id,proposition,statement_polarity,
+              source_kind,verbatim,loc_start,loc_end,confidence,txt_hash,
+              taxonomy_version,extractor_version,prompt_version,review_status,
+              created_at,updated_at
+            ) VALUES (?,?,?,?,?,?,'body',?,?,?,'high',?,12,'test','test',
+                      'approved',?,?)
+            """,
+            (
+                "a" * 16, "CP-001", "CP", "CP.THIRD_PARTY_CONSENT",
+                "제3자 동의를 종결 선행조건으로 한다.", "affirmative",
+                "제3자 동의를 얻어야 한다.", 12, 12, "a" * 16, NOW, NOW,
+            ),
+        )
         for letter, body_status in (("a", "complete"), ("b", "complete"), ("c", "partial")):
-            conn.execute(
-                """
-                INSERT INTO v4_document_coverage(
-                  file_key,family,body_status,annex_status,txt_hash,
-                  taxonomy_version,extractor_version,prompt_version,reviewed_at
-                ) VALUES (?,?,?,'no_annex',?,12,'test','test',?)
-                """,
-                (letter * 16, "RW", body_status, letter * 16, NOW),
-            )
+            # RW and CP coverage; no CP items exist, so CP (a covenant/condition
+            # family, not absence-gated) can exercise the confirmed_absent path.
+            for family in ("RW", "CP"):
+                conn.execute(
+                    """
+                    INSERT INTO v4_document_coverage(
+                      file_key,family,body_status,annex_status,txt_hash,
+                      taxonomy_version,extractor_version,prompt_version,reviewed_at
+                    ) VALUES (?,?,?,'no_annex',?,12,'test','test',?)
+                    """,
+                    (letter * 16, family, body_status, letter * 16, NOW),
+                )
         conn.commit()
     return out
 
@@ -108,13 +129,31 @@ def test_search_resolves_alias_and_returns_atomic_coordinates(tmp_path):
     assert result["results"][0]["match_path"] == "v4_atomic_item"
 
 
-def test_absence_requires_complete_coverage(tmp_path):
+def test_rw_absence_is_demoted_to_needs_review(tmp_path):
+    # RW coverage is unverified (see V4_RW_COVERAGE_DEFECT), so even a complete
+    # RW family never confirms absence — it is demoted to needs_review.
     out = make_index(tmp_path)
     result = search_clause_absence(out, "RW.LABOR.NO_VIOLATION")
+    assert result["confirmed_absent"] == []
+    review_keys = {row["file_key"] for row in result["needs_review"]}
+    assert review_keys == {"b" * 16, "c" * 16}
+    assert result["present_excluded_count"] == 1
+    by_key = {row["file_key"]: row for row in result["needs_review"]}
+    assert "rw_coverage_unverified" in by_key["b" * 16]["coverage"]["reasons"]
+    assert "body_partial" in by_key["c" * 16]["coverage"]["reasons"]
+    assert "rw_absence_unverified_demoted_to_needs_review" in result["warnings"]
+
+
+def test_non_rw_family_confirms_absent(tmp_path):
+    # CP is a covenant/condition family (not gated); complete coverage with no
+    # CP item still proves absence.
+    out = make_index(tmp_path)
+    result = search_clause_absence(out, "CP.THIRD_PARTY_CONSENT")
+    # doc a has a CP item (present, excluded); doc b is complete+no item.
     assert [row["file_key"] for row in result["confirmed_absent"]] == ["b" * 16]
     assert [row["file_key"] for row in result["needs_review"]] == ["c" * 16]
     assert result["present_excluded_count"] == 1
-    assert "body_partial" in result["needs_review"][0]["coverage"]["reasons"]
+    assert "rw_absence_unverified_demoted_to_needs_review" not in result["warnings"]
 
 
 def test_pending_family_candidate_blocks_absence(tmp_path):

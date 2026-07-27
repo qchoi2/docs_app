@@ -33,11 +33,17 @@ def test_mcp_absence_preserves_needs_review(tmp_path):
     out = make_index(tmp_path)
     mcp = FakeMcp()
     register_v4_tools(mcp, out)
+    # CP (non-gated) still confirms absence via the MCP adapter.
     result = mcp.tools["search_clause_items"](
-        "RW.LABOR.NO_VIOLATION", item_absent=True
+        "CP.THIRD_PARTY_CONSENT", item_absent=True
     )
     assert result["confirmed_absent_count"] == 1
     assert result["needs_review_count"] == 1
+    # RW absence is demoted (coverage unverified).
+    rw = mcp.tools["search_clause_items"](
+        "RW.LABOR.NO_VIOLATION", item_absent=True
+    )
+    assert rw["confirmed_absent_count"] == 0
 
 
 def test_mcp_compare_returns_three_states(tmp_path):
