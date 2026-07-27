@@ -309,6 +309,15 @@ def main(argv=None) -> int:
         "--verdicts", type=Path, default=Path("data/v4_gate_b_verdicts.json")
     )
 
+    s = sub.add_parser("set", help="record verdicts for specific file_keys (merged)")
+    s.add_argument("--query", required=True)
+    s.add_argument("--correct", default="")
+    s.add_argument("--incorrect", default="")
+    s.add_argument("--unknown", default="")
+    s.add_argument(
+        "--verdicts", type=Path, default=Path("data/v4_gate_b_verdicts.json")
+    )
+
     g = sub.add_parser("ingest", help="read filled worksheet -> verdicts json")
     g.add_argument(
         "--seed", type=Path, default=Path("data/golden_queries_v4_independent.seed.yaml")
@@ -361,6 +370,23 @@ def main(argv=None) -> int:
         )
         n = sum(len(b["correct"]) for b in trusted.values())
         print(f"applied {n} text-confirmed 'correct' verdicts to {args.verdicts}")
+    elif args.cmd == "set":
+        def _split(v):
+            return [x.strip() for x in v.split(",") if x.strip()]
+        block = {
+            "correct": _split(args.correct),
+            "incorrect": _split(args.incorrect),
+            "unknown": _split(args.unknown),
+        }
+        existing = {}
+        if args.verdicts.exists():
+            existing = json.loads(args.verdicts.read_text(encoding="utf-8"))
+        existing[args.query] = _merge_query(existing.get(args.query), block)
+        args.verdicts.parent.mkdir(parents=True, exist_ok=True)
+        args.verdicts.write_text(
+            json.dumps(existing, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        print(json.dumps({args.query: {k: len(v) for k, v in block.items()}}, ensure_ascii=False))
     else:
         summary = ingest(args.seed, args.worksheet, args.verdicts)
         print(json.dumps(summary, ensure_ascii=False, indent=2))
