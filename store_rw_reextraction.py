@@ -35,6 +35,11 @@ from lib.console import configure_utf8_stdio
 
 POLARITY = {"affirmative", "negative", "none_exist", "not_applicable"}
 CONFIDENCE = {"low", "med", "high"}
+# A result carrying one of these in review_method was produced by reading the
+# document's reps article start-to-end (proofread), so it reconstructs the whole
+# RW family and is authoritative — it overrides the regression guard for that one
+# document. Auto-extraction results (no marker) keep the guard.
+_FULL_READ_MARKERS = {"full_read", "full-read", "fullread", "proofread", "정독"}
 
 COLS = [
     "file_key", "item_ref", "family", "taxonomy_id", "proposition", "statement_polarity",
@@ -89,6 +94,12 @@ def _normalize_tid(tid, known_rw: set):
 def store_one(conn: sqlite3.Connection, out: Path, data: dict, known_rw: set,
               mode: str = "replace", allow_regress: bool = False) -> dict:
     file_key = str(data["file_key"])
+    # A proofread result reconstructs the ENTIRE RW family from a full reading of
+    # the reps article, so a sub-domain it omits is a deliberate correction (a
+    # mis-classified or genuinely absent rep), not an incomplete extraction. Such
+    # a result overrides the regression guard for THIS document only.
+    full_read = str(data.get("review_method", "")).strip().lower() in _FULL_READ_MARKERS
+    effective_allow_regress = allow_regress or full_read
     items = data.get("items") or []
     if not items:
         return {"file_key": file_key, "status": "skipped_no_items"}
@@ -138,7 +149,7 @@ def store_one(conn: sqlite3.Connection, out: Path, data: dict, known_rw: set,
         }
         new_domains = {_dom(it["taxonomy_id"]) for it in items}
         dropped = prev_domains - new_domains
-        if dropped and not allow_regress:
+        if dropped and not effective_allow_regress:
             return {"file_key": file_key, "status": "skipped_regression",
                     "lost_domains": sorted(dropped)}
     if mode == "replace":
@@ -202,8 +213,13 @@ def store_one(conn: sqlite3.Connection, out: Path, data: dict, known_rw: set,
         lost = sorted(prev_domains - new_domains)  # substantive domains dropped
     res = {"file_key": file_key, "status": "stored", "mode": mode,
            "rw_items": n, "added": len(items)}
+    if full_read:
+        res["review_method"] = "full_read"
     if lost:
         res["lost_domains"] = lost  # potential regression: fewer reps than before
+        if full_read:
+            # proofread deliberately dropped these domains — surface for owner review
+            res["regress_overridden"] = True
     return res
 
 
@@ -268,11 +284,19 @@ def main(argv=None) -> int:
     errors = [r for r in results if r["status"] == "error"]
     regressions = [
         {"file_key": r["file_key"], "lost_domains": r["lost_domains"]}
-        for r in results if r.get("lost_domains")
+        for r in results if r.get("status") == "skipped_regression"
+    ]
+    full_read_stored = sum(1 for r in results if r.get("review_method") == "full_read")
+    regress_overridden = [
+        {"file_key": r["file_key"], "lost_domains": r["lost_domains"]}
+        for r in results if r.get("regress_overridden")
     ]
     print(json.dumps(
         {"dry_run": args.dry_run, "backup": backup_name, "files": len(files),
          "by_status": dict(by_status), "integrity": integrity,
+         "full_read_stored": full_read_stored,
+         "regress_overridden_count": len(regress_overridden),
+         "regress_overridden": regress_overridden[:40],
          "regression_count": len(regressions), "regressions": regressions[:40],
          "errors": errors[:40]},
         ensure_ascii=False, indent=2,

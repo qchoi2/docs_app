@@ -64,6 +64,45 @@ def test_store_one_add_mode_appends_without_deleting(tmp_path):
     assert "RW.ENVIRONMENT" in after and "RW.LABOR.NO_VIOLATION" in after
 
 
+def test_store_one_skips_regression_without_marker(tmp_path):
+    out = make_index(tmp_path)  # doc a has RW.LABOR.NO_VIOLATION -> domain RW.LABOR
+    data = {  # replace with only RW.TAX drops RW.LABOR; no proofread marker
+        "file_key": "a" * 16,
+        "items": [{"taxonomy_id": "RW.TAX", "proposition": "조세 신고 완료",
+                   "verbatim": "세금", "loc_start": 2, "statement_polarity": "affirmative"}],
+    }
+    with closing(sqlite3.connect(out / "catalog.sqlite")) as conn:
+        result = store_one(conn, out, data, _known_rw(conn))
+        conn.commit()
+        after = {r[0] for r in conn.execute(
+            "SELECT taxonomy_id FROM v4_clause_item WHERE file_key=? AND family='RW'", ("a" * 16,)
+        )}
+    assert result["status"] == "skipped_regression"
+    assert result["lost_domains"] == ["RW.LABOR"]
+    assert "RW.LABOR.NO_VIOLATION" in after  # existing reps protected
+
+
+def test_full_read_marker_overrides_regression(tmp_path):
+    out = make_index(tmp_path)  # doc a has RW.LABOR.NO_VIOLATION -> domain RW.LABOR
+    data = {  # same drop, but proofread result is authoritative for this doc
+        "file_key": "a" * 16,
+        "review_method": "full_read",
+        "items": [{"taxonomy_id": "RW.TAX", "proposition": "조세 신고 완료",
+                   "verbatim": "세금", "loc_start": 2, "statement_polarity": "affirmative"}],
+    }
+    with closing(sqlite3.connect(out / "catalog.sqlite")) as conn:
+        result = store_one(conn, out, data, _known_rw(conn))
+        conn.commit()
+        after = {r[0] for r in conn.execute(
+            "SELECT taxonomy_id FROM v4_clause_item WHERE file_key=? AND family='RW'", ("a" * 16,)
+        )}
+    assert result["status"] == "stored"
+    assert result["review_method"] == "full_read"
+    assert result.get("regress_overridden") is True
+    assert result["lost_domains"] == ["RW.LABOR"]  # surfaced for owner review
+    assert after == {"RW.TAX"}  # proofread set fully replaced the old auto set
+
+
 def test_store_one_rejects_non_rw_taxonomy(tmp_path):
     out = make_index(tmp_path)
     data = {
