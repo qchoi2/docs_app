@@ -75,8 +75,18 @@ def main(argv=None) -> int:
         default=Path("cs_index/rw_reextraction_manifest.json"),
     )
     parser.add_argument("--limit", type=int, help="only the first N targets")
+    parser.add_argument(
+        "--shard",
+        help="k/N — emit only shard k of N (1-indexed), for parallel agents. "
+        "Disjoint, priority-balanced (every Nth doc).",
+    )
     args = parser.parse_args(argv)
     rows = plan(args.out)
+    if args.shard:
+        k, n = (int(x) for x in args.shard.split("/"))
+        if not (1 <= k <= n):
+            parser.error("--shard k/N requires 1 <= k <= N")
+        rows = rows[k - 1 :: n]
     if args.limit:
         rows = rows[: args.limit]
     args.manifest.write_text(
