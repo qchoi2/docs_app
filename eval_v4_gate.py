@@ -459,12 +459,22 @@ def main(argv=None) -> int:
         help="Max results pooled per arm for owner verification (default 25).",
     )
     parser.add_argument(
+        "--ungate",
+        action="store_true",
+        help="Measurement only: clear the RW absence gate for THIS run (in-process) "
+        "to re-measure RW confirmed-absence precision after re-extraction. Does not "
+        "change stored behaviour.",
+    )
+    parser.add_argument(
         "--verdicts",
         type=Path,
         default=Path("data/v4_gate_b_verdicts.json"),
         help="Owner verdicts JSON (qid -> {correct,incorrect,unknown}); merged over seed.",
     )
     args = parser.parse_args(argv)
+    if getattr(args, "ungate", False):
+        import v4_search
+        v4_search.ABSENCE_UNVERIFIED_FAMILIES = set()  # this run only
     if args.pooled:
         verdicts = None
         if args.verdicts and args.verdicts.exists():

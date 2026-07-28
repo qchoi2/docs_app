@@ -1176,3 +1176,19 @@ Gate B에서 환경 진술(¶115) false-absence였고 V4가 RW item 3개만 추�
 
 도구: store_rw_reextraction.py(replace/add 모드, 테스트 3). 결과 JSON은 cs_index/
 rw_reextract_results/(gitignore).
+
+### 2026-07-28 — B: 병렬 재추출 저장·재측정 (조율자) (Claude, opus)
+
+GPT/Codex 병렬 샤드(1/3·2/3) 산출물을 조율자로서 검증·저장·재측정.
+- **store 견고화**: taxonomy_id 정규화(발명 leaf→상위 도메인, 32건 살림), 문서별
+  savepoint/rollback(1건 오류가 배치 중단 안 함), --dry-run(무쓰기 검증), utf-8-sig(BOM),
+  replace 모드에서 RW.BUYER 보존(에이전트가 매수인 진술 배제해도 손실 없음),
+  plan --skip-existing(중복 회피). 검증: 246→194 저장가능·오류 0.
+- **저장**: `store_rw_reextraction.py --mode replace` → **198 문서 RW 재추출 반영**
+  (54 empty skip), 백업·integrity ok.
+- **재측정**: `eval_v4_gate.py --pooled --ungate`(측정 전용, 영구 동작 불변). RW 부재정밀도
+  조세 44→50%·환경 50→75%, 특히 confirmed_absent 급감(18→2, 18→4)=false-absence 실제 제거.
+  특약·조건 계열은 불변(90%대). 부분(198/733)이라 표본 작음, 전량 시 수렴 예상.
+- **GPT 방식 평가**: 정확(rep/covenant 구분·대상회사 진술·매수인 배제). leaf id 발명은
+  store 정규화로 흡수. items 없는 54개는 관찰 필요.
+다음: GPT 진행분 주기적 저장·재측정, 샤드 3/3 빈 부분 보완.
