@@ -1143,3 +1143,23 @@ Gate B에서 환경 진술(¶115) false-absence였고 V4가 RW item 3개만 추�
 - Gate B 환경 false-absence의 근본(환경 진술 미추출)이 이 문서에서 해소됨. 재추출 루프
   (정독→매핑→저장→검증) 검증 완료.
 다음: 일반 재추출 저장 도구화 + 733 배치 확대(문서별 정독 추출은 다세션 작업).
+
+### 2026-07-28 — B: 조세·환경 false-absence 재추출 진행 (Claude, opus)
+
+권한 허용 후 store_rw_reextraction.py에 add 모드 추가(누락 진술만 targeted 추가; 항목이
+존재하면 부재판정에서 present로 제외되어 false-absence 해소). Grep/Read로 각 문서의 실제
+조세·환경 진술 조항을 읽어 result JSON 작성 → 저장.
+
+- 처리 완료(4문서, Gate B tax/env false-absence 7건 수정):
+  - 현대호텔[19cb2dd2] 환경(전량 재추출, RW 3→20/13도메인)
+  - Apollo[117e684f] 조세¶468+환경¶472 (RW 11→13)
+  - Kindle[11eca6ef] 조세¶241+환경¶259 (RW 1→3)
+  - Jaguar-P[0df3b7a8] 조세¶414+환경¶429 (RW 0→2)
+- 각 문서가 이제 실제 조세·환경 진술 item을 보유 → 해당 부재질의에서 present_excluded로
+  올바르게 처리(더 이상 false-absent 아님). WAL-safe 백업·integrity ok.
+- 남은 tax/env false-absence 문서(~9): 0eefd95f,1074bc52,14c3460e,1bf253b2,1d5383e7,
+  1ea25c3d,1f0dc203,2215ead0,000e6939,08154d71. 동일 방식으로 계속.
+- 전량 처리 후 RW 게이팅 임시 해제 → eval_v4_gate --pooled로 RW 부재정밀도 회복 정량 확인 예정.
+
+도구: store_rw_reextraction.py(replace/add 모드, 테스트 3). 결과 JSON은 cs_index/
+rw_reextract_results/(gitignore).
