@@ -6,16 +6,26 @@ _다른 코딩 에이전트(GPT/Codex 등)에게 이 파일을 그대로 주면 
 
 ## 목표
 V4 진술보장(RW) 추출이 실질 진술(IP·노무·환경·보험·조세 등)을 대량 누락해 "없는 계약 찾기"가
-오답을 낸다. 배정된 계약서들의 **매도인/대상회사 진술 조항을 읽어 누락된 RW 진술을 원자
-항목으로 추출**해 `result JSON`으로 저장한다.
+오답을 낸다. 배정된 계약서들의 **진술 조항 전체(매도인·대상회사 + 매수인)를 읽어 누락된 RW
+진술을 원자 항목으로 추출**해 `result JSON`으로 저장한다.
 
 ## ★★ 가장 중요한 규칙: 결과 JSON은 그 문서의 RW **전체**를 담아라
-조율자 store는 문서 단위로 RW를 **통째로 교체(replace)**한다(기존 RW.BUYER·해결후보 item만 보존).
-따라서 어떤 문서를 (재)작성할 때, 그 result JSON의 `items`에는 **그 문서 매도인·대상회사의 모든 RW
-진술(근본적 진술 + 조세·환경·노무 등 실질 진술)을 전부** 담아야 한다. "근본 진술만 보강"이라며
-**일부만** 담으면 기존에 추출돼 있던 실질 진술이 삭제되어 **후퇴**한다. 항상 **원문 진술 조항 전체를
-재정독해 완전한 세트**를 내라. (이미 실질 진술이 잘 든 문서를 굳이 다시 만들 필요는 없지만, 다시
-만든다면 반드시 완전하게.)
+조율자 store는 문서 단위로 RW를 **통째로 교체(replace)**한다(해결후보 item만 보존).
+따라서 문서마다 그 문서의 진술 조항 **전체를 재정독**해, result JSON의 `items`에 **그 문서의
+모든 RW 진술을 빠짐없이** 담아라. **매도인·대상회사 진술뿐 아니라 매수인 진술도 포함**한다:
+- **근본적 진술**: RW.AUTHORITY(조직·권한·자격·집행가능성·위반없음·동의불요), RW.CAPITALIZATION
+  (주식 소유·부담없음), RW.LITIGATION(소송 부존재) 등 — 소수지분·간이 계약이라도 있으면 반드시 포함.
+- **실질 진술**: RW.TAX·RW.ENVIRONMENT·RW.LABOR·RW.IP·RW.FINANCIAL·RW.COMPLIANCE·RW.PERMITS·
+  RW.CONTRACTS·RW.REAL_ESTATE·RW.ASSETS·RW.INSURANCE 등 원문에 있는 것 전부.
+- **매수인 진술**: 매수인이 하는 진술(권한·자금조달/충분한 자금·no-reliance·독자조사·비상장 등)은
+  **RW.BUYER**로 담아라. 이제 매수인 진술도 검색 대상이므로 **배제하지 말고 포함**한다.
+
+**manifest의 `missing_subdomains`는 "과소추출됐던 힌트"일 뿐, 그것만 담으라는 뜻이 아니다.** 원문에
+있는 근본+실질 진술을 **모두** 담아야 한다. 일부만(예: 실질만, 또는 근본만) 담으면:
+- 근본 진술이 빠지면 → 그 문서는 근본 진술이 영영 안 들어가 "근본 진술만 제공하는 계약" 검색이 안 됨.
+- 기존보다 도메인이 줄면 → 조율자 store가 **후퇴로 판정해 저장을 스킵**한다(네 작업이 버려짐).
+
+이미 완전하게 든 문서를 다시 만들 필요는 없지만, **처리하는 문서는 항상 완전한 세트**로 내라.
 
 ## ★ 절대 규칙 (병렬 안전)
 1. **catalog.sqlite(운영 DB)에 절대 쓰지 마라.** DB는 단일 writer 원칙이다. 너는 **result
@@ -72,7 +82,8 @@ V4 진술보장(RW) 추출이 실질 진술(IP·노무·환경·보험·조세 �
   `RW.TAX RW.LABOR RW.IP RW.ENVIRONMENT RW.LITIGATION RW.COMPLIANCE RW.PERMITS RW.CONTRACTS
   RW.REAL_ESTATE RW.ASSETS RW.INSURANCE RW.PRIVACY RW.FINANCIAL RW.CAPITALIZATION RW.AUTHORITY
   RW.RELATED_PARTY RW.BENEFITS RW.CUSTOMERS_SUPPLIERS RW.PRODUCTS RW.ABSENCE_OF_CHANGES` (전부 실재).
-- **매수인 진술은 RW.BUYER**로. 조항이 아예 없는 하위영역은 항목을 만들지 마라(생략 = 진짜 부재).
+- **매수인 진술은 RW.BUYER**로 **반드시 포함**하라(자금조달·no-reliance·독자조사·권한 등).
+  조항이 아예 없는 하위영역은 항목을 만들지 마라(생략 = 진짜 부재).
 
 ## 조율자(중앙, 1명)가 하는 일 — 병렬 아님
 - 모든 에이전트의 result JSON이 `cs_index/rw_reextract_results/`에 모이면:

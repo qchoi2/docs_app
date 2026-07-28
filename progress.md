@@ -44,8 +44,16 @@
   **처리 완료(tax/env false-absence 수정): 현대호텔·Apollo·Kindle·Jaguar-P (4문서)**.
 - **병렬화**: GPT/Codex를 샤드로 병행 가능. 지시서 `.docs/RW_REEXTRACTION_AGENT_BRIEF.md`.
   에이전트는 result JSON만 쓰고, DB 저장·commit은 조율자 1명이 직렬(단일 writer).
-- **다음**: 나머지 tax/env false-absence(~9) + 733 전량 재추출 → RW 게이팅 해제 → Gate B 재측정
-  → 확장 재개 판정. rep→covenant 오분류(COV.NON_COMPETE 31%)는 재추출 프롬프트로 시정.
+- **매수인 진술 포함 (2026-07-28 결정)**: 재추출이 매수인 진술도 RW.BUYER로 담는다(자금조달·
+  no-reliance·독자조사·권한 등). store replace는 이제 RW.BUYER도 전체 교체 대상이고, 후퇴 가드가
+  RW.BUYER 도메인 손실도 스킵으로 보호(구버전 buyer-less 결과가 기존 buyer를 지우지 못함).
+  → 매수인 진술 존재·부재 검색이 신뢰성 있게 열린다.
+- **다음**: 나머지 tax/env false-absence(~9) + 733 전량 재추출(매수인 진술 포함) → RW 게이팅 해제
+  → Gate B 재측정 → 확장 재개 판정. rep→covenant 오분류(COV.NON_COMPETE 31%)는 재추출 프롬프트로 시정.
+- **다른 계열로 일반화 (2026-07-28 결정, RW 마무리 후)**: RW를 Gate B로 개선 확인한 뒤,
+  `audit_rw_coverage.py`를 CP/COV/DEF/PAY/REM용으로 일반화해 "complete인데 하위영역 누락"을
+  **먼저 측정**하고, 결함이 확인된 계열만 동일 파이프라인(plan→병렬 result JSON→store→eval)으로
+  재추출한다. 결함 없는 계열까지 무조건 재추출하지 않는다(낭비 방지).
 - **보류**: 전량 확장(§9로 중단), T4(벡터).
 
 **테스트**: `python -m pytest --basetemp=<쓰기가능경로>` → **253 passed, 1 skipped**.

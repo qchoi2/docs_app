@@ -124,37 +124,37 @@ def store_one(conn: sqlite3.Connection, out: Path, data: dict, known_rw: set,
     prefix = "RWRX" if mode == "replace" else "RWADD"
     prev_domains = set()
     if mode == "replace":
+        # Re-extraction now covers the COMPLETE RW set — seller/target AND buyer
+        # (RW.BUYER) reps. So RW.BUYER is part of the regression check too: if the
+        # new result drops a sub-domain the doc already has (including RW.BUYER),
+        # skip it. This protects docs whose buyer reps came from the original V4
+        # extraction when an older buyer-less result is (re-)stored against them.
         prev_domains = {
             _dom(r[0]) for r in conn.execute(
                 "SELECT taxonomy_id FROM v4_clause_item WHERE file_key=? "
-                "AND family='RW' AND taxonomy_id NOT LIKE 'RW.BUYER%'",
+                "AND family='RW'",
                 (file_key,),
             )
         }
-        # Guard against an incomplete re-extraction wiping existing substantive
-        # reps: if the new result drops sub-domains the doc already has, skip it
-        # (the agent must supply the COMPLETE RW set). --allow-regress overrides.
         new_domains = {_dom(it["taxonomy_id"]) for it in items}
         dropped = prev_domains - new_domains
         if dropped and not allow_regress:
             return {"file_key": file_key, "status": "skipped_regression",
                     "lost_domains": sorted(dropped)}
     if mode == "replace":
-        # Re-extraction focuses on seller/target reps; agents exclude buyer reps.
-        # Preserve existing RW.BUYER* items (and resolved/-TC items) so replace
-        # never drops the buyer's own representations.
+        # Full RW replace including RW.BUYER — the agent supplies the complete set.
+        # Only resolved-candidate/-TC items are preserved (materialized elsewhere).
         keep = _preserved_rw_item_ids(conn, file_key)
         if keep:
             placeholders = ",".join("?" for _ in keep)
             conn.execute(
                 f"DELETE FROM v4_clause_item WHERE file_key=? AND family='RW' "
-                f"AND taxonomy_id NOT LIKE 'RW.BUYER%' AND item_id NOT IN ({placeholders})",
+                f"AND item_id NOT IN ({placeholders})",
                 (file_key, *keep),
             )
         else:
             conn.execute(
-                "DELETE FROM v4_clause_item WHERE file_key=? AND family='RW' "
-                "AND taxonomy_id NOT LIKE 'RW.BUYER%'",
+                "DELETE FROM v4_clause_item WHERE file_key=? AND family='RW'",
                 (file_key,),
             )
     else:  # add: avoid duplicate refs from a prior add run
