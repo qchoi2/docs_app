@@ -1133,3 +1133,13 @@ Gate B에서 환경 진술(¶115) false-absence였고 V4가 RW item 3개만 추�
 
 세션 종료 지점: §9 권고의 안전 완결분(coverage 정직화·게이팅·배치 준비·파일럿 설계) 완료.
 운영 데이터 대량 재추출 실행만 소유자 감독 필요.
+
+### 2026-07-28 — RW 재추출 파일럿 실행 성공 (Claude, opus)
+
+권한 규칙 추가 후(.claude/settings.local.json에 5개 스크립트 allow) 파일럿 실행.
+- `reextract_rw_pilot.py` 실행 → 현대호텔[19cb2dd2] RW item **3→20**, 커버 도메인
+  1(tax만)→13(환경·노무·보험·자산·준법·인허가·중요계약·소송·재무·자본·특수관계인·권한).
+  WAL-safe 백업(catalog.pre_rw_pilot_20260728T002803.sqlite), integrity ok.
+- Gate B 환경 false-absence의 근본(환경 진술 미추출)이 이 문서에서 해소됨. 재추출 루프
+  (정독→매핑→저장→검증) 검증 완료.
+다음: 일반 재추출 저장 도구화 + 733 배치 확대(문서별 정독 추출은 다세션 작업).
