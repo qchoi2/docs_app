@@ -26,17 +26,30 @@
   전 항목 추출 범위에 포함한다. 누적 V4 item **100,207개**, 평가 문서 **968건**,
   pending taxonomy 후보 **29,807개**.
 
-**진행 중 / 다음 단계**
-- **V4-6 확장 배치 계속**: 기존 600건 재처리와 증권계약 포함 300건 적재 완료.
-  다음 순서는 남은 SSA→ATA/BTA→SHA이며, 이후 미처리 증권계약을 포함해 계속 확장한다.
-  pending taxonomy 후보와 partial source는 부재 판정에서 제외하고 `needs_review`로 보존.
-- **taxonomy 후보 검수**: 31,083개 후보의 반복 문구 군집화를 완료하고 신규 leaf
-  5개를 승격했으며, 고신뢰 후보 1,245건을 1,272개 원자 item으로 병합했다.
-  남은 29,807건은 다음 family별 tranche에서 계속 검수한다.
-- **Gate B 정식화**: 현재 recall 평가는 승인 item 기반 회귀이므로 독립 사람검수 골드 필요.
-- **T4 (벡터 하이브리드)**: 미착수. V4-5 게이트 통과·coverage 안정 후 시작(Phase 4).
+### ▶ 재시작 시 여기부터 (Resume — 2026-07-28)
 
-**테스트**: `python -m pytest` → **238 passed, 1 skipped**.
+**Gate B 완료 → §9 결정: 전량 확장 중단, RW 추출 교정 선행.** 근거·경위:
+`.docs/V4_GATE_B_SYNTHESIS_20260728.md`, `.docs/V4_RW_COVERAGE_DEFECT_20260727.md`,
+`.docs/V4_GATE_B_ABSENCE_FINDINGS_20260727.md`, `.docs/PLAN_REVIEW_20260727.md`.
+
+- **부재형 Gate B 전수 검증**: V4 부재정밀도 76%, RW 진술계열 취약(조세 44%·환경 50%),
+  특약·조건 양호(90%대). 근본원인: RW 추출이 실질 진술(IP 1.8%·보험 0.2%·노무 16%) 누락 +
+  coverage 일괄 도장. 검증값 `data/v4_gate_b_verdicts.json`.
+- **적용된 안전장치**: `v4_search.search_clause_absence`에서 RW family는 confirmed_absent 금지
+  → needs_review 강등(CLI/웹/MCP 전파). coverage 정직화 `audit_rw_coverage.py --apply`(733 partial).
+- **진행 중 = RW 재추출** (`.docs/extract_prompt_v4_rw_addendum.md` 기준):
+  도구 `plan_rw_reextraction.py`(--shard k/N)·`store_rw_reextraction.py`(--mode replace|add, DB
+  단일 writer·백업)·`reextract_rw_pilot.py`. 대상 733개(SPA 525 우선). 워크플로: 진술 조항
+  정독→`cs_index/rw_reextract_results/<key>.json`→store(중앙 순차)→`eval_v4_gate.py --pooled`.
+  **처리 완료(tax/env false-absence 수정): 현대호텔·Apollo·Kindle·Jaguar-P (4문서)**.
+- **병렬화**: GPT/Codex를 샤드로 병행 가능. 지시서 `.docs/RW_REEXTRACTION_AGENT_BRIEF.md`.
+  에이전트는 result JSON만 쓰고, DB 저장·commit은 조율자 1명이 직렬(단일 writer).
+- **다음**: 나머지 tax/env false-absence(~9) + 733 전량 재추출 → RW 게이팅 해제 → Gate B 재측정
+  → 확장 재개 판정. rep→covenant 오분류(COV.NON_COMPETE 31%)는 재추출 프롬프트로 시정.
+- **보류**: 전량 확장(§9로 중단), T4(벡터).
+
+**테스트**: `python -m pytest --basetemp=<쓰기가능경로>` → **253 passed, 1 skipped**.
+권한: `.claude/settings.local.json`에 재추출/eval 스크립트 실행 allow 규칙 추가됨.
 - ⚠️ 환경 주의: `AppData\Local\Temp\pytest-of-<user>` 폴더 권한 문제로 pytest가 대량
   `PermissionError`를 낼 수 있다. 이때는 `python -m pytest --basetemp=<쓰기가능경로>`로 우회한다.
   (과거 세션이 이를 우회하려고 repo 안에 `.tmp_pytest_*/`를 만든 흔적이 있었고, 이번에 정리·gitignore 처리했다.)
