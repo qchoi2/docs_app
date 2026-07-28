@@ -51,7 +51,16 @@ V4 진술보장(RW) 추출이 실질 진술(IP·노무·환경·보험·조세 �
   ]
 }
 ```
-- 유효한 RW `taxonomy_id`는 taxonomy 노드다. 확실한 leaf를 모르면 **도메인 노드**를 써라:
+- **얇은/소수지분 계약 처리 (중요)**: 소수지분 매각·간단 계약은 매도인이 **근본적 진술만**
+  제공한다(조직·권한·자격, 대상주식 소유·부담 없음, 위반 없음, 소송 부존재). 이런 경우에도
+  **그 근본적 진술을 반드시 item으로 추출하라**(RW.AUTHORITY / RW.CAPITALIZATION /
+  RW.LITIGATION 등). 조세·환경·노무 같은 회사 진술이 아예 없으면 그 영역은 생략(진짜 부재).
+  → 결과가 완전히 빈 `items: []`가 되는 경우는 **매도인이 실질적으로 아무 진술도 안 할 때뿐**이며,
+  그때는 `"reason"`에 사유를 남겨라(예: `"소수지분 매각: 근본적 진술만 존재 — 회사 진술 없음"` /
+  `"진술보장 조항 없음"`). 근본적 진술이 있는데 빈 결과를 내지 마라.
+- **taxonomy_id**: 확실한 leaf를 모르면 **도메인 노드**를 써라(아래). 존재하지 않는 leaf를
+  지어내지 마라(조율자 store가 미상 leaf를 상위 도메인으로 자동 정규화하지만, 애초에 도메인 노드를
+  쓰는 게 깔끔하다). 유효 도메인 노드:
   `RW.TAX RW.LABOR RW.IP RW.ENVIRONMENT RW.LITIGATION RW.COMPLIANCE RW.PERMITS RW.CONTRACTS
   RW.REAL_ESTATE RW.ASSETS RW.INSURANCE RW.PRIVACY RW.FINANCIAL RW.CAPITALIZATION RW.AUTHORITY
   RW.RELATED_PARTY RW.BENEFITS RW.CUSTOMERS_SUPPLIERS RW.PRODUCTS RW.ABSENCE_OF_CHANGES` (전부 실재).
