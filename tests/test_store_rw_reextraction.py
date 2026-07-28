@@ -41,6 +41,29 @@ def test_store_one_replaces_rw_and_marks_complete(tmp_path):
     assert cov[0] == "complete" and cov[1] == "re-extracted"
 
 
+def test_store_one_add_mode_appends_without_deleting(tmp_path):
+    out = make_index(tmp_path)  # doc a has 1 RW item (RW.LABOR.NO_VIOLATION)
+    data = {
+        "file_key": "a" * 16,
+        "items": [
+            {"taxonomy_id": "RW.ENVIRONMENT", "proposition": "환경 법령 준수",
+             "verbatim": "환경 준수", "loc_start": 3, "statement_polarity": "affirmative"},
+        ],
+    }
+    with closing(sqlite3.connect(out / "catalog.sqlite")) as conn:
+        before = conn.execute(
+            "SELECT COUNT(*) FROM v4_clause_item WHERE file_key=? AND family='RW'", ("a" * 16,)
+        ).fetchone()[0]
+        result = store_one(conn, out, data, _known_rw(conn), mode="add")
+        conn.commit()
+        after = {r[0] for r in conn.execute(
+            "SELECT taxonomy_id FROM v4_clause_item WHERE file_key=? AND family='RW'", ("a" * 16,)
+        )}
+    assert result["status"] == "stored" and result["mode"] == "add"
+    assert result["rw_items"] == before + 1  # appended, not replaced
+    assert "RW.ENVIRONMENT" in after and "RW.LABOR.NO_VIOLATION" in after
+
+
 def test_store_one_rejects_non_rw_taxonomy(tmp_path):
     out = make_index(tmp_path)
     data = {

@@ -73,7 +73,8 @@ def _preserved_rw_item_ids(conn: sqlite3.Connection, file_key: str) -> set:
     return keep
 
 
-def store_one(conn: sqlite3.Connection, out: Path, data: dict, known_rw: set) -> dict:
+def store_one(conn: sqlite3.Connection, out: Path, data: dict, known_rw: set,
+              mode: str = "replace") -> dict:
     file_key = str(data["file_key"])
     items = data.get("items") or []
     if not items:
@@ -94,22 +95,32 @@ def store_one(conn: sqlite3.Connection, out: Path, data: dict, known_rw: set) ->
         "SELECT MAX(taxonomy_version) FROM v4_clause_item"
     ).fetchone()[0] or 19
 
-    keep = _preserved_rw_item_ids(conn, file_key)
-    if keep:
-        placeholders = ",".join("?" for _ in keep)
+    # replace: re-extract the whole RW family (preserving resolved-candidate items).
+    # add: append the supplied items (targeted fix for missed sub-domains); existing
+    #      items and coverage are left as-is.
+    prefix = "RWRX" if mode == "replace" else "RWADD"
+    if mode == "replace":
+        keep = _preserved_rw_item_ids(conn, file_key)
+        if keep:
+            placeholders = ",".join("?" for _ in keep)
+            conn.execute(
+                f"DELETE FROM v4_clause_item WHERE file_key=? AND family='RW' "
+                f"AND item_id NOT IN ({placeholders})",
+                (file_key, *keep),
+            )
+        else:
+            conn.execute(
+                "DELETE FROM v4_clause_item WHERE file_key=? AND family='RW'", (file_key,)
+            )
+    else:  # add: avoid duplicate refs from a prior add run
         conn.execute(
-            f"DELETE FROM v4_clause_item WHERE file_key=? AND family='RW' "
-            f"AND item_id NOT IN ({placeholders})",
-            (file_key, *keep),
-        )
-    else:
-        conn.execute(
-            "DELETE FROM v4_clause_item WHERE file_key=? AND family='RW'", (file_key,)
+            "DELETE FROM v4_clause_item WHERE file_key=? AND family='RW' AND item_ref LIKE 'RWADD-%'",
+            (file_key,),
         )
     now = datetime.now(timezone.utc).isoformat()
     for i, it in enumerate(items, 1):
         rec = {
-            "file_key": file_key, "item_ref": f"RWRX-{i:03d}", "family": "RW",
+            "file_key": file_key, "item_ref": f"{prefix}-{i:03d}", "family": "RW",
             "taxonomy_id": it["taxonomy_id"], "proposition": it["proposition"],
             "statement_polarity": it["statement_polarity"],
             "subject_role": it.get("subject_role"), "counterparty_role": it.get("counterparty_role", "매수인"),
@@ -131,15 +142,16 @@ def store_one(conn: sqlite3.Connection, out: Path, data: dict, known_rw: set) ->
             f"VALUES ({','.join('?' for _ in COLS)})",
             [rec[c] for c in COLS],
         )
-    conn.execute(
-        "UPDATE v4_document_coverage SET body_status='complete', reason=? "
-        "WHERE file_key=? AND family='RW'",
-        (data.get("reason", "RW 하위영역 전수 재추출 (2026-07-28)"), file_key),
-    )
+    if mode == "replace":
+        conn.execute(
+            "UPDATE v4_document_coverage SET body_status='complete', reason=? "
+            "WHERE file_key=? AND family='RW'",
+            (data.get("reason", "RW 하위영역 전수 재추출 (2026-07-28)"), file_key),
+        )
     n = conn.execute(
         "SELECT COUNT(*) FROM v4_clause_item WHERE file_key=? AND family='RW'", (file_key,)
     ).fetchone()[0]
-    return {"file_key": file_key, "status": "stored", "rw_items": n, "added": len(items)}
+    return {"file_key": file_key, "status": "stored", "mode": mode, "rw_items": n, "added": len(items)}
 
 
 def main(argv=None) -> int:
@@ -148,6 +160,8 @@ def main(argv=None) -> int:
     parser.add_argument("--out", type=Path, default=Path("cs_index"))
     parser.add_argument("--result-dir", type=Path, default=Path("cs_index/rw_reextract_results"))
     parser.add_argument("--file-key", help="store only this file_key")
+    parser.add_argument("--mode", choices=["replace", "add"], default="replace",
+                        help="replace = full RW re-extraction; add = append supplied items only")
     args = parser.parse_args(argv)
 
     db = args.out / "catalog.sqlite"
@@ -172,7 +186,7 @@ def main(argv=None) -> int:
         }
         for f in files:
             data = json.loads(f.read_text(encoding="utf-8"))
-            results.append(store_one(conn, args.out, data, known_rw))
+            results.append(store_one(conn, args.out, data, known_rw, mode=args.mode))
         conn.commit()
         integrity = conn.execute("PRAGMA integrity_check").fetchone()[0]
     stored = [r for r in results if r["status"] == "stored"]
