@@ -87,7 +87,7 @@ def _normalize_tid(tid, known_rw: set):
 
 
 def store_one(conn: sqlite3.Connection, out: Path, data: dict, known_rw: set,
-              mode: str = "replace") -> dict:
+              mode: str = "replace", allow_regress: bool = False) -> dict:
     file_key = str(data["file_key"])
     items = data.get("items") or []
     if not items:
@@ -114,10 +114,31 @@ def store_one(conn: sqlite3.Connection, out: Path, data: dict, known_rw: set,
         "SELECT MAX(taxonomy_version) FROM v4_clause_item"
     ).fetchone()[0] or 19
 
+    def _dom(t):
+        p = str(t).split(".")
+        return "RW." + p[1] if len(p) >= 2 else str(t)
+
     # replace: re-extract the whole RW family (preserving resolved-candidate items).
     # add: append the supplied items (targeted fix for missed sub-domains); existing
     #      items and coverage are left as-is.
     prefix = "RWRX" if mode == "replace" else "RWADD"
+    prev_domains = set()
+    if mode == "replace":
+        prev_domains = {
+            _dom(r[0]) for r in conn.execute(
+                "SELECT taxonomy_id FROM v4_clause_item WHERE file_key=? "
+                "AND family='RW' AND taxonomy_id NOT LIKE 'RW.BUYER%'",
+                (file_key,),
+            )
+        }
+        # Guard against an incomplete re-extraction wiping existing substantive
+        # reps: if the new result drops sub-domains the doc already has, skip it
+        # (the agent must supply the COMPLETE RW set). --allow-regress overrides.
+        new_domains = {_dom(it["taxonomy_id"]) for it in items}
+        dropped = prev_domains - new_domains
+        if dropped and not allow_regress:
+            return {"file_key": file_key, "status": "skipped_regression",
+                    "lost_domains": sorted(dropped)}
     if mode == "replace":
         # Re-extraction focuses on seller/target reps; agents exclude buyer reps.
         # Preserve existing RW.BUYER* items (and resolved/-TC items) so replace
@@ -175,7 +196,15 @@ def store_one(conn: sqlite3.Connection, out: Path, data: dict, known_rw: set,
     n = conn.execute(
         "SELECT COUNT(*) FROM v4_clause_item WHERE file_key=? AND family='RW'", (file_key,)
     ).fetchone()[0]
-    return {"file_key": file_key, "status": "stored", "mode": mode, "rw_items": n, "added": len(items)}
+    lost = []
+    if mode == "replace":
+        new_domains = {_dom(t) for t in (it["taxonomy_id"] for it in items)}
+        lost = sorted(prev_domains - new_domains)  # substantive domains dropped
+    res = {"file_key": file_key, "status": "stored", "mode": mode,
+           "rw_items": n, "added": len(items)}
+    if lost:
+        res["lost_domains"] = lost  # potential regression: fewer reps than before
+    return res
 
 
 def main(argv=None) -> int:
@@ -188,6 +217,9 @@ def main(argv=None) -> int:
                         help="replace = full RW re-extraction; add = append supplied items only")
     parser.add_argument("--dry-run", action="store_true",
                         help="validate every result and roll back — no DB change, no backup")
+    parser.add_argument("--allow-regress", action="store_true",
+                        help="store even results that drop sub-domains the doc already has "
+                        "(default: skip such docs to protect existing reps)")
     args = parser.parse_args(argv)
 
     db = args.out / "catalog.sqlite"
@@ -218,7 +250,8 @@ def main(argv=None) -> int:
             sp = conn.execute("SAVEPOINT one")
             try:
                 data = json.loads(f.read_text(encoding="utf-8-sig"))  # tolerate BOM
-                res = store_one(conn, args.out, data, known_rw, mode=args.mode)
+                res = store_one(conn, args.out, data, known_rw, mode=args.mode,
+                                allow_regress=args.allow_regress)
             except Exception as exc:  # isolate a bad result — never abort the batch
                 conn.execute("ROLLBACK TO one")
                 res = {"file_key": fk, "status": "error", "error": str(exc)[:200]}
@@ -233,9 +266,14 @@ def main(argv=None) -> int:
     from collections import Counter
     by_status = Counter(r["status"] for r in results)
     errors = [r for r in results if r["status"] == "error"]
+    regressions = [
+        {"file_key": r["file_key"], "lost_domains": r["lost_domains"]}
+        for r in results if r.get("lost_domains")
+    ]
     print(json.dumps(
         {"dry_run": args.dry_run, "backup": backup_name, "files": len(files),
          "by_status": dict(by_status), "integrity": integrity,
+         "regression_count": len(regressions), "regressions": regressions[:40],
          "errors": errors[:40]},
         ensure_ascii=False, indent=2,
     ))
