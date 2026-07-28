@@ -80,8 +80,17 @@ def main(argv=None) -> int:
         help="k/N — emit only shard k of N (1-indexed), for parallel agents. "
         "Disjoint, priority-balanced (every Nth doc).",
     )
+    parser.add_argument(
+        "--skip-existing",
+        type=Path,
+        help="drop targets that already have a result JSON in this directory "
+        "(avoid re-doing docs other agents finished).",
+    )
     args = parser.parse_args(argv)
     rows = plan(args.out)
+    if args.skip_existing:
+        done = {p.stem for p in args.skip_existing.glob("*.json")}
+        rows = [r for r in rows if r["file_key"] not in done]
     if args.shard:
         k, n = (int(x) for x in args.shard.split("/"))
         if not (1 <= k <= n):

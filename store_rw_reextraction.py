@@ -73,16 +73,35 @@ def _preserved_rw_item_ids(conn: sqlite3.Connection, file_key: str) -> set:
     return keep
 
 
+def _normalize_tid(tid, known_rw: set):
+    """Map an unknown leaf (e.g. a GPT-invented RW.IP.NO_ENCUMBRANCE) to the
+    nearest known RW ancestor (RW.IP). Coverage/absence work at the sub-domain
+    level, so this preserves meaning. Returns None only if nothing resolves."""
+    parts = str(tid or "").split(".")
+    while parts:
+        cand = ".".join(parts)
+        if cand in known_rw:
+            return cand
+        parts.pop()
+    return None
+
+
 def store_one(conn: sqlite3.Connection, out: Path, data: dict, known_rw: set,
               mode: str = "replace") -> dict:
     file_key = str(data["file_key"])
     items = data.get("items") or []
     if not items:
         return {"file_key": file_key, "status": "skipped_no_items"}
+    normalized_count = 0
     for it in items:
         tid = it.get("taxonomy_id")
         if tid not in known_rw:
-            raise ValueError(f"{file_key}: taxonomy_id not a known RW node: {tid}")
+            norm = _normalize_tid(tid, known_rw)
+            if norm is None:
+                raise ValueError(f"{file_key}: taxonomy_id not resolvable to RW: {tid}")
+            if norm != tid:
+                normalized_count += 1
+            it["taxonomy_id"] = norm
         if it.get("statement_polarity") not in POLARITY:
             raise ValueError(f"{file_key}: bad statement_polarity: {it.get('statement_polarity')}")
     row = conn.execute(
@@ -100,17 +119,22 @@ def store_one(conn: sqlite3.Connection, out: Path, data: dict, known_rw: set,
     #      items and coverage are left as-is.
     prefix = "RWRX" if mode == "replace" else "RWADD"
     if mode == "replace":
+        # Re-extraction focuses on seller/target reps; agents exclude buyer reps.
+        # Preserve existing RW.BUYER* items (and resolved/-TC items) so replace
+        # never drops the buyer's own representations.
         keep = _preserved_rw_item_ids(conn, file_key)
         if keep:
             placeholders = ",".join("?" for _ in keep)
             conn.execute(
                 f"DELETE FROM v4_clause_item WHERE file_key=? AND family='RW' "
-                f"AND item_id NOT IN ({placeholders})",
+                f"AND taxonomy_id NOT LIKE 'RW.BUYER%' AND item_id NOT IN ({placeholders})",
                 (file_key, *keep),
             )
         else:
             conn.execute(
-                "DELETE FROM v4_clause_item WHERE file_key=? AND family='RW'", (file_key,)
+                "DELETE FROM v4_clause_item WHERE file_key=? AND family='RW' "
+                "AND taxonomy_id NOT LIKE 'RW.BUYER%'",
+                (file_key,),
             )
     else:  # add: avoid duplicate refs from a prior add run
         conn.execute(
@@ -162,6 +186,8 @@ def main(argv=None) -> int:
     parser.add_argument("--file-key", help="store only this file_key")
     parser.add_argument("--mode", choices=["replace", "add"], default="replace",
                         help="replace = full RW re-extraction; add = append supplied items only")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="validate every result and roll back — no DB change, no backup")
     args = parser.parse_args(argv)
 
     db = args.out / "catalog.sqlite"
@@ -173,11 +199,14 @@ def main(argv=None) -> int:
         print(json.dumps({"stored": 0, "note": "no result files"}, ensure_ascii=False))
         return 0
 
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
-    backup = args.out / f".backups/catalog.pre_rw_reextract_{stamp}.sqlite"
-    backup.parent.mkdir(parents=True, exist_ok=True)
-    with closing(sqlite3.connect(db)) as s, closing(sqlite3.connect(backup)) as d:
-        s.backup(d)
+    backup_name = None
+    if not args.dry_run:
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
+        backup = args.out / f".backups/catalog.pre_rw_reextract_{stamp}.sqlite"
+        backup.parent.mkdir(parents=True, exist_ok=True)
+        with closing(sqlite3.connect(db)) as s, closing(sqlite3.connect(backup)) as d:
+            s.backup(d)
+        backup_name = backup.name
 
     results = []
     with closing(sqlite3.connect(db)) as conn:
@@ -185,14 +214,29 @@ def main(argv=None) -> int:
             r[0] for r in conn.execute("SELECT taxonomy_id FROM v4_taxonomy_node WHERE family='RW'")
         }
         for f in files:
-            data = json.loads(f.read_text(encoding="utf-8"))
-            results.append(store_one(conn, args.out, data, known_rw, mode=args.mode))
-        conn.commit()
-        integrity = conn.execute("PRAGMA integrity_check").fetchone()[0]
-    stored = [r for r in results if r["status"] == "stored"]
+            fk = f.stem
+            sp = conn.execute("SAVEPOINT one")
+            try:
+                data = json.loads(f.read_text(encoding="utf-8-sig"))  # tolerate BOM
+                res = store_one(conn, args.out, data, known_rw, mode=args.mode)
+            except Exception as exc:  # isolate a bad result — never abort the batch
+                conn.execute("ROLLBACK TO one")
+                res = {"file_key": fk, "status": "error", "error": str(exc)[:200]}
+            conn.execute("RELEASE one")
+            results.append(res)
+        if args.dry_run:
+            conn.rollback()
+            integrity = "n/a (dry-run)"
+        else:
+            conn.commit()
+            integrity = conn.execute("PRAGMA integrity_check").fetchone()[0]
+    from collections import Counter
+    by_status = Counter(r["status"] for r in results)
+    errors = [r for r in results if r["status"] == "error"]
     print(json.dumps(
-        {"backup": backup.name, "stored_count": len(stored), "integrity": integrity,
-         "results": results},
+        {"dry_run": args.dry_run, "backup": backup_name, "files": len(files),
+         "by_status": dict(by_status), "integrity": integrity,
+         "errors": errors[:40]},
         ensure_ascii=False, indent=2,
     ))
     return 0
