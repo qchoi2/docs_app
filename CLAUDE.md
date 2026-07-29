@@ -17,24 +17,31 @@ doc_meta·read_contract.py 구축 후 활성화._
 - `term_dict.yaml` — 조항 용어 동의어 사전 (국·영문)
 
 ## 도구
-- `python3 search_contracts.py --out . [옵션] --json`
+**경로 규칙 (2026-07-29 사고 후 고정)**: 모든 도구는 **저장소 루트에서 실행**하며
+`--out`은 항상 `cs_index`다. **`--out .`을 쓰지 마라.** 임시 `python -c "sqlite3.connect(...)"`
+질의도 경로를 반드시 `cs_index/catalog.sqlite`로 적고 `file:...?mode=ro` URI로 열어라 —
+상대 경로 `'catalog.sqlite'`는 파일이 없으면 **조용히 빈 DB를 새로 만든다**(2026-07-29
+실제 사고: 루트에 0바이트 catalog.sqlite 생성). 지금은 읽기 경로가 `색인 DB가 없습니다`
+오류로 즉시 실패하지만, ad-hoc sqlite3 호출은 여전히 스스로 조심해야 한다.
+
+- `python3 search_contracts.py --out cs_index [옵션] --json`
   - 메타: `--type SPA --lang 국문 --limit 10` / `--exclude-drafts` (`--exclude-draft`는 alias) / `--expand strict|normal|broad`
   - 본문: `--kw "earn-out"` (AND 중첩 가능). **검색 전 term_dict.yaml에서
     동의어를 확인하고 변이를 함께 검색하라** (예: earn-out → 언아웃,
     조건부 대금, contingent consideration)
   - 출력의 file_key를 반드시 보존하라 — 답변 인용에 필요
   - JSON의 `why`, `score_breakdown`, `snippet_paras`를 우선 읽고, 결과 선정 이유를 임의로 추측하지 마라
-- `python3 inspect_file.py --out . --file-key K [--show-dup-group]`
+- `python3 inspect_file.py --out cs_index --file-key K [--show-dup-group]`
   - 특정 파일의 분류·중복·실패사유·파일럿 batch_label을 점검한다
-- `python3 open_text.py --out . --file-key K --para N --context 3`
+- `python3 open_text.py --out cs_index --file-key K --para N --context 3`
   - 검색 결과의 ¶ 주변만 읽는다. 원문 전체를 cat 하지 마라
-- `python3 open_text.py --out . --file-key K --search TERM --context 3`
+- `python3 open_text.py --out cs_index --file-key K --search TERM --context 3`
   - ¶번호를 모를 때 txt 캐시에서 해당 용어 주변만 읽는다
 - [T3] `python3 read_contract.py --file-key K --section 손해배상`
   - 조항 단위 부분 읽기. **원문 파일 전체를 cat 하지 마라.**
   - T3 구축 전에는 txt 캐시에서 해당 조항 부근만 grep -n 컨텍스트로 읽어라
 - doc_meta 조회는 sqlite3 직접 질의 가능:
-  `sqlite3 catalog.sqlite "SELECT ... FROM doc_meta WHERE ..."`
+  `sqlite3 cs_index/catalog.sqlite "SELECT ... FROM doc_meta WHERE ..."`
 
 ## 워크플로우 (반드시 이 순서)
 0. **질의 해석** — 질의를 term_dict.yaml의 canonical 태그로 정규화하라.
@@ -88,7 +95,7 @@ doc_meta·read_contract.py 구축 후 활성화._
 - "이 계약 요약해줘" → 해당 문서 doc_meta 전체 + 필요 조항 부분 정독
 
 ## 질의 로그
-`search_contracts.py`의 자동 실행 로그는 `query_log.jsonl`에 남는다. 너 또는 `answer_quick.py`가 최종 답변을 구성한 뒤에는 `agent_log.jsonl`에 한 줄 기록하라:
+`search_contracts.py`의 자동 실행 로그는 `cs_index/query_log.jsonl`에 남는다. 너 또는 `answer_quick.py`가 최종 답변을 구성한 뒤에는 `cs_index/agent_log.jsonl`에 한 줄 기록하라:
 `{"ts": ..., "query": 사용자 질의, "filters": ..., "tier_used": T1/T2/T3, "n_read": 정독 문서수,
 "result_count": n, "outcome": ok/partial/not_found, "gap": 못 잡은 이유(있으면)}`
 이 로그는 골든 세트 보강과 T4 필요성 판정의 근거다.
@@ -103,7 +110,7 @@ doc_meta·read_contract.py 구축 후 활성화._
 ## term_dict 확장 제안 (2026-07-10 소유자 지시로 추가)
 검색이 표현 변이 때문에 빈약하다고 판단되면(코퍼스에 분명히 있을 개념이 0~소수 건),
 동의어 확장을 넓혀 재시도한 뒤에도 부족하면 **term_dict 확장을 적극 제안하라**:
-- `python3 term_dict_tools.py --suggest --out .`을 실행해 `pending_terms.yaml`에
+- `python3 term_dict_tools.py --suggest --out cs_index`을 실행해 `pending_terms.yaml`에
   후보를 남기거나, 답변 말미에 "term_dict 추가 후보: <표현> (근거: 시도한 검색·결과 수)"를 명시한다.
 - **data/term_dict.yaml을 직접 수정하지 마라.** 병합은 소유자가 pending_terms.yaml을
   검토·승인한 뒤 수행하고 dict_version을 올린다. 병합 전후 eval_search로 회귀를 확인한다.
