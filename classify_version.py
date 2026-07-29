@@ -24,7 +24,9 @@ Usage:
   python classify_version.py --out cs_index --priority OUT.json  # 재추출 우선순위(체결본 우선 dedup)
 """
 import argparse
+import collections
 import json
+import re
 import sqlite3
 from contextlib import closing
 from datetime import datetime, timezone
@@ -82,6 +84,37 @@ def classify_version(filename: str) -> str:
     return "unknown"
 
 
+def _markup_round(filename: str):
+    """파일명의 mark-up 라운드 번호(1st/2nd/3rd → 1/2/3). 없으면 None."""
+    m = re.search(r"(\d+)\s*(?:st|nd|rd|th)\b", (filename or "").lower())
+    return int(m.group(1)) if m else None
+
+
+def _resolve_markup_parties(base: dict, groups: dict) -> None:
+    """당사자 미상 mark-up(markup_unknown)의 당사자를, 같은 거래(project)의 초안
+    작성자와 라운드 패리티로 추론한다. 초안 작성자의 상대방이 1st mark-up을 하고,
+    작성자 본인이 2nd mark-up(재수정)을 한다 → 홀수 라운드=상대방, 짝수=작성자.
+    파일명에 당사자가 명시된 건 그대로 두고, 미상 + 라운드번호 있는 것만 보정한다.
+    초안 작성자를 특정할 수 없는 거래는 markup_unknown으로 남긴다."""
+    for members in groups.values():
+        authors = set()
+        for fk in members:
+            vr = base[fk][0]
+            if vr == "seller_draft":
+                authors.add("seller")
+            elif vr == "buyer_draft":
+                authors.add("buyer")
+        if len(authors) != 1:
+            continue                       # 초안 작성자 불명확 → 보정 안 함
+        author = next(iter(authors))
+        opponent = "buyer" if author == "seller" else "seller"
+        for fk in members:
+            vr, rnd, _ = base[fk]
+            if vr == "markup_unknown" and rnd:
+                who = opponent if rnd % 2 == 1 else author
+                base[fk][0] = f"{who}_markup"
+
+
 def apply_to_db(out: Path) -> dict:
     db = out / "catalog.sqlite"
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
@@ -94,8 +127,15 @@ def apply_to_db(out: Path) -> dict:
         cols = {r[1] for r in conn.execute("PRAGMA table_info(files)")}
         if "version_role" not in cols:
             conn.execute("ALTER TABLE files ADD COLUMN version_role TEXT")
-        for fk, fn in conn.execute("SELECT file_key, filename FROM files").fetchall():
-            vr = classify_version(fn)
+        base = {}                          # file_key -> [role, round, filename]
+        groups = collections.defaultdict(list)
+        for fk, fn, path, ctype, lang in conn.execute(
+            "SELECT file_key, filename, path, ctype, lang FROM files"
+        ).fetchall():
+            base[fk] = [classify_version(fn), _markup_round(fn), fn]
+            groups[(ctype, lang, _project_key(path or ""))].append(fk)
+        _resolve_markup_parties(base, groups)   # 라운드 패리티로 당사자 보정
+        for fk, (vr, _, _) in base.items():
             conn.execute("UPDATE files SET version_role=? WHERE file_key=?", (vr, fk))
             counts[vr] = counts.get(vr, 0) + 1
         conn.commit()
