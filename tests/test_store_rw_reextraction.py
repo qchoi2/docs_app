@@ -103,6 +103,59 @@ def test_full_read_marker_overrides_regression(tmp_path):
     assert after == {"RW.TAX"}  # proofread set fully replaced the old auto set
 
 
+def test_gate_collapses_exact_duplicate_items(tmp_path):
+    out = make_index(tmp_path)  # doc b has no RW items -> no regression on replace
+    dup = {"taxonomy_id": "RW.TAX", "proposition": "조세 신고·납부 완료",
+           "verbatim": "세금 납부", "loc_start": 8, "loc_end": 8,
+           "statement_polarity": "affirmative", "subject_role": "대상회사"}
+    data = {"file_key": "b" * 16, "items": [dict(dup), dict(dup),  # byte-identical pair
+             {"taxonomy_id": "RW.LABOR.NO_VIOLATION", "proposition": "노무 위반 없음",
+              "verbatim": "위반 없음", "loc_start": 5, "loc_end": 5,
+              "statement_polarity": "none_exist", "subject_role": "대상회사"}]}
+    with closing(sqlite3.connect(out / "catalog.sqlite")) as conn:
+        result = store_one(conn, out, data, _known_rw(conn))
+        conn.commit()
+        n = conn.execute(
+            "SELECT COUNT(*) FROM v4_clause_item WHERE file_key=? AND family='RW'", ("b" * 16,)
+        ).fetchone()[0]
+    assert result["status"] == "stored"
+    assert result["rw_items"] == 2  # identical pair collapsed to one
+    assert result["gate_flags"]["deduped"] == 1
+    assert n == 2
+
+
+def test_gate_flags_duplicate_verbatim_without_dropping(tmp_path):
+    out = make_index(tmp_path)
+    # same verbatim + same taxonomy + overlapping ¶, DIFFERENT proposition:
+    # not an exact duplicate (proposition differs) so both are kept, but flagged.
+    data = {"file_key": "b" * 16, "items": [
+        {"taxonomy_id": "RW.TAX", "proposition": "명제 A", "verbatim": "동일한 세무 문장",
+         "loc_start": 8, "loc_end": 8, "statement_polarity": "affirmative"},
+        {"taxonomy_id": "RW.TAX", "proposition": "명제 B", "verbatim": "동일한 세무 문장",
+         "loc_start": 8, "loc_end": 8, "statement_polarity": "affirmative"}]}
+    with closing(sqlite3.connect(out / "catalog.sqlite")) as conn:
+        result = store_one(conn, out, data, _known_rw(conn))
+        conn.commit()
+    assert result["status"] == "stored"
+    assert result["rw_items"] == 2  # both kept — distinct propositions preserved
+    assert "duplicate_verbatim" in result["gate_flags"]
+
+
+def test_gate_flags_shotgun_density(tmp_path):
+    out = make_index(tmp_path)
+    # 8 distinct-verbatim items sharing one ¶ -> over-segmentation density flag.
+    items = [{"taxonomy_id": "RW.TAX", "proposition": f"명제 {i}",
+              "verbatim": f"세무 관련 문장 번호 {i}", "loc_start": 8, "loc_end": 8,
+              "statement_polarity": "affirmative"} for i in range(8)]
+    data = {"file_key": "b" * 16, "items": items}
+    with closing(sqlite3.connect(out / "catalog.sqlite")) as conn:
+        result = store_one(conn, out, data, _known_rw(conn))
+        conn.commit()
+    assert result["status"] == "stored"  # flagged, never blocked
+    assert result["gate_flags"]["dense_paragraphs"][0]["item_count"] == 8
+    assert result["gate_flags"]["shotgun_severe"] == 8
+
+
 def test_store_one_rejects_non_rw_taxonomy(tmp_path):
     out = make_index(tmp_path)
     data = {
