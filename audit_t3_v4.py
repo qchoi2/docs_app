@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import sqlite3
-from collections import Counter
+from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Dict, List, Mapping, Optional
 
@@ -334,6 +334,186 @@ def atomicity_issues(
     return issues
 
 
+# Over-extraction / over-segmentation flag thresholds. These are advisory review
+# flags (never a hard failure), symmetric to the under-extraction checks above.
+OVERSEGMENTATION_DENSITY_THRESHOLD = 5  # flag a ¶ carrying >= this many items (one family)
+OVERSEGMENTATION_OVERLAP_JACCARD = 0.5  # flag distinct-verbatim item pairs whose ¶ spans
+#                                         overlap at/above this Jaccard ratio
+OVERSEGMENTATION_MIN_SUBSTRING_LEN = 8  # ignore trivially-short substring "duplicates"
+
+
+def _item_span(item: Mapping[str, object]) -> Optional[tuple]:
+    try:
+        start = int(item["loc_start"])
+        end = int(item["loc_end"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    if end < start:
+        return None
+    return start, end
+
+
+def _ranges_overlap(a: Mapping[str, object], b: Mapping[str, object]) -> bool:
+    span_a = _item_span(a)
+    span_b = _item_span(b)
+    if span_a is None or span_b is None:
+        return False
+    return span_a[0] <= span_b[1] and span_b[0] <= span_a[1]
+
+
+def oversegmentation_issues(
+    data: Mapping[str, object],
+    *,
+    density_threshold: int = OVERSEGMENTATION_DENSITY_THRESHOLD,
+    overlap_jaccard: float = OVERSEGMENTATION_OVERLAP_JACCARD,
+) -> List[dict]:
+    """Flag likely over-extraction: over-segmentation and duplicate tagging.
+
+    Symmetric to ``atomicity_issues`` (which only catches under-extraction). Every
+    finding here is advisory — surfaced for human review, never a hard failure.
+    Findings are family-agnostic in logic but reported per family, and each carries
+    the offending ¶ plus item_refs so a human can inspect.
+    """
+
+    issues: List[dict] = []
+    indexed: List[tuple] = []
+    for index, item in enumerate(data.get("items") or []):
+        if not isinstance(item, dict):
+            continue
+        ref = str(item.get("item_ref") or f"#{index}")
+        indexed.append((index, ref, item))
+
+    # (a) DENSITY: many items sharing a single paragraph (loc_start) in one family.
+    density: Dict[tuple, List[str]] = defaultdict(list)
+    for _index, ref, item in indexed:
+        family = str(item.get("family") or "")
+        try:
+            loc_start = int(item["loc_start"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        density[(family, loc_start)].append(ref)
+    for (family, loc_start), refs in sorted(density.items()):
+        if len(refs) >= density_threshold:
+            issues.append(
+                {
+                    "code": "paragraph_oversegmented",
+                    "detail": {
+                        "family": family,
+                        "loc_start": loc_start,
+                        "item_count": len(refs),
+                        "item_refs": refs,
+                    },
+                }
+            )
+
+    # (b) DUPLICATE: identical (normalized-whitespace) or contained verbatim within
+    # the same family — likely the same text tagged twice.
+    by_family: Dict[str, List[tuple]] = defaultdict(list)
+    for _index, ref, item in indexed:
+        family = str(item.get("family") or "")
+        compact = _compact(item.get("verbatim"))
+        if not compact:
+            continue
+        by_family[family].append((ref, compact, item))
+    for family, entries in sorted(by_family.items()):
+        # Key on (verbatim, taxonomy_id): the same sentence mapped to *different*
+        # taxonomy leaves is legitimate atomic decomposition (one clause carrying
+        # several distinct propositions), not a duplicate. Only identical verbatim
+        # under the *same* taxonomy node is "the same text tagged twice".
+        exact: Dict[tuple, List[tuple]] = defaultdict(list)
+        for ref, compact, item in entries:
+            exact[(compact, str(item.get("taxonomy_id") or ""))].append((ref, item))
+        for _key, members in exact.items():
+            if len(members) < 2:
+                continue
+            # Identical verbatim alone is not proof of over-extraction — the same
+            # boilerplate can legitimately recur at different paragraphs. Only the
+            # members that also share an OVERLAPPING loc range are "the same text
+            # tagged twice"; that is what we flag.
+            overlapping_refs = []
+            for i in range(len(members)):
+                ref_i, item_i = members[i]
+                if any(
+                    _ranges_overlap(item_i, members[j][1])
+                    for j in range(len(members))
+                    if j != i
+                ):
+                    overlapping_refs.append(ref_i)
+            if len(overlapping_refs) >= 2:
+                sample = members[0][1]
+                issues.append(
+                    {
+                        "code": "duplicate_verbatim",
+                        "detail": {
+                            "family": family,
+                            "item_refs": overlapping_refs,
+                            "loc_start": sample.get("loc_start"),
+                            "verbatim": str(sample.get("verbatim") or "")[:120],
+                        },
+                    }
+                )
+        seen_pairs = set()
+        for i in range(len(entries)):
+            ref_i, comp_i, item_i = entries[i]
+            for j in range(i + 1, len(entries)):
+                ref_j, comp_j, item_j = entries[j]
+                if comp_i == comp_j:
+                    continue  # already reported as an exact duplicate
+                shorter = comp_i if len(comp_i) <= len(comp_j) else comp_j
+                if len(shorter) < OVERSEGMENTATION_MIN_SUBSTRING_LEN:
+                    continue
+                if (comp_i in comp_j or comp_j in comp_i) and _ranges_overlap(item_i, item_j):
+                    key = tuple(sorted((ref_i, ref_j)))
+                    if key in seen_pairs:
+                        continue
+                    seen_pairs.add(key)
+                    issues.append(
+                        {
+                            "code": "duplicate_verbatim_substring",
+                            "detail": {"family": family, "item_refs": [ref_i, ref_j]},
+                        }
+                    )
+
+    # (c) OVERLAP: distinct-verbatim item pairs whose ¶ spans overlap heavily.
+    fam_spans: Dict[str, List[tuple]] = defaultdict(list)
+    for _index, ref, item in indexed:
+        span = _item_span(item)
+        if span is None:
+            continue
+        fam_spans[str(item.get("family") or "")].append(
+            (ref, span[0], span[1], _compact(item.get("verbatim")))
+        )
+    for family, spans in sorted(fam_spans.items()):
+        for i in range(len(spans)):
+            ref_i, s_i, e_i, comp_i = spans[i]
+            set_i = set(range(s_i, e_i + 1))
+            for j in range(i + 1, len(spans)):
+                ref_j, s_j, e_j, comp_j = spans[j]
+                if comp_i and comp_j and (
+                    comp_i == comp_j or comp_i in comp_j or comp_j in comp_i
+                ):
+                    continue  # duplicate content, already covered by check (b)
+                set_j = set(range(s_j, e_j + 1))
+                intersection = set_i & set_j
+                if not intersection:
+                    continue
+                jaccard = len(intersection) / len(set_i | set_j)
+                if jaccard >= overlap_jaccard:
+                    issues.append(
+                        {
+                            "code": "loc_range_overlap",
+                            "detail": {
+                                "family": family,
+                                "item_refs": [ref_i, ref_j],
+                                "loc_a": [s_i, e_i],
+                                "loc_b": [s_j, e_j],
+                                "jaccard": round(jaccard, 2),
+                            },
+                        }
+                    )
+    return issues
+
+
 def audit_v4(manifest_path: Path, *, out: Path, input_dir: Path, result_dir: Path, report_path: Path) -> dict:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     if not isinstance(manifest, dict) or not isinstance(manifest.get("items"), list):
@@ -372,17 +552,24 @@ def audit_v4(manifest_path: Path, *, out: Path, input_dir: Path, result_dir: Pat
                 + document_coverage_issues(data)
                 + atomicity_issues(data, source, parents)
             )
+            # Over-extraction is an advisory flag: reported per row and rolled up,
+            # but deliberately kept out of `issues` so it never flips pass->review
+            # or blocks storage (symmetric human-review signal, not a hard failure).
+            oversegmentation = oversegmentation_issues(data)
             needs_review = bool(issues) or any(item.get("confidence") == "low" or item.get("review_status") == "needs_review" for item in data["items"]) or bool(data.get("taxonomy_candidates"))
             status = "review" if needs_review else "pass"
-            rows.append({"file_key": key, "status": status, "item_count": len(data["items"]), "issues": issues})
+            rows.append({"file_key": key, "status": status, "item_count": len(data["items"]), "issues": issues, "oversegmentation": oversegmentation})
             counts[status] += 1
+            if oversegmentation:
+                counts["oversegmentation_docs"] += 1
+            counts["oversegmentation_findings"] += len(oversegmentation)
         except (OSError, ValueError, V4SchemaError, json.JSONDecodeError) as exc:
             rows.append({"file_key": key, "status": "error", "issues": [{"code": "invalid_result", "detail": str(exc)}]})
             counts["error"] += 1
     payload = {
         "meta_schema_version": 4,
         "taxonomy_count": len(known),
-        "summary": {"total": len(rows), "pass": counts["pass"], "review": counts["review"], "pending": counts["pending"], "error": counts["error"]},
+        "summary": {"total": len(rows), "pass": counts["pass"], "review": counts["review"], "pending": counts["pending"], "error": counts["error"], "oversegmentation_docs": counts["oversegmentation_docs"], "oversegmentation_findings": counts["oversegmentation_findings"]},
         "items": rows,
     }
     report_path.parent.mkdir(parents=True, exist_ok=True)
