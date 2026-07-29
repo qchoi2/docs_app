@@ -200,6 +200,49 @@ queries:
     check: 배상 조항에 pro/anti-sandbagging 명시가 실제로 없나
     pool_verified: { correct: [], incorrect: [], unknown: [] }
 
+  # RW 진술보장 하위도메인 부재형 (2026-07-29 추가).
+  # ★ 이 4개는 RW 재추출 착지 시점의 측정을 위한 미리 심은 슬롯이다.
+  #   RW family는 하위도메인 커버리지 미검증 상태(ABSENCE_UNVERIFIED_FAMILIES)라
+  #   confirmed_absent가 0으로 게이트된다 → precision은 재추출 전까지 산출 불가.
+  #   재추출 후 eval_v4_gate.py --pooled --ungate 로 confirmed_absent를 얻고,
+  #   소유자가 pool을 검증해 pool_verified를 채운 뒤에야 유효 신호가 된다.
+  #   재추출 전 낮은/미산출 precision을 릴리스 신호로 읽지 마라.
+  - id: V4A09
+    intent: absence
+    family: RW
+    topic: 지식재산권
+    taxonomy: RW.IP
+    query: "지식재산권에 관한 진술보장이 없는 계약을 찾아줘"
+    check: 진술보장 영역에 지식재산(IP) 도메인 진술이 실제로 없나
+    pool_verified: { correct: [], incorrect: [], unknown: [] }
+
+  - id: V4A10
+    intent: absence
+    family: RW
+    topic: 보험
+    taxonomy: RW.INSURANCE
+    query: "보험에 관한 진술보장이 없는 계약을 찾아줘"
+    check: 진술보장 영역에 보험 도메인 진술이 실제로 없나
+    pool_verified: { correct: [], incorrect: [], unknown: [] }
+
+  - id: V4A11
+    intent: absence
+    family: RW
+    topic: 노무·근로
+    taxonomy: RW.LABOR
+    query: "노무·근로에 관한 진술보장이 없는 계약을 찾아줘"
+    check: 진술보장 영역에 인사·노무 도메인 진술이 실제로 없나
+    pool_verified: { correct: [], incorrect: [], unknown: [] }
+
+  - id: V4A12
+    intent: absence
+    family: RW
+    topic: 소송·분쟁
+    taxonomy: RW.LITIGATION
+    query: "소송·분쟁에 관한 진술보장이 없는 계약을 찾아줘"
+    check: 진술보장 영역에 소송·분쟁 도메인 진술이 실제로 없나
+    pool_verified: { correct: [], incorrect: [], unknown: [] }
+
   # ---------------- 비교형 (comparison) ----------------
   # 비교표의 각 셀(계약×항목)이 근거와 함께 정확한지 소유자가 확인.
   - id: V4C01
