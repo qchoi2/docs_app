@@ -144,6 +144,29 @@ def test_rw_absence_is_demoted_to_needs_review(tmp_path):
     assert "rw_absence_unverified_demoted_to_needs_review" in result["warnings"]
 
 
+def test_verified_rw_subdomain_confirms_absent(tmp_path, monkeypatch):
+    # Once a sub-domain passes re-verification it joins ABSENCE_VERIFIED_SUBDOMAINS
+    # and may confirm absence again (the 선(先)해제 exception, V4_PLAN §9.1 #3).
+    import v4_search
+    monkeypatch.setattr(v4_search, "ABSENCE_VERIFIED_SUBDOMAINS", {"RW.LABOR"})
+    out = make_index(tmp_path)
+    result = search_clause_absence(out, "RW.LABOR.NO_VIOLATION")
+    # doc b: complete RW coverage, no labor item -> now confirmed_absent, not gated.
+    assert [row["file_key"] for row in result["confirmed_absent"]] == ["b" * 16]
+    assert "rw_absence_unverified_demoted_to_needs_review" not in result["warnings"]
+
+
+def test_unverified_rw_subdomain_stays_gated(tmp_path, monkeypatch):
+    # Verifying one sub-domain must NOT open the others: a query on a still-unverified
+    # RW sub-domain is demoted to needs_review as before.
+    import v4_search
+    monkeypatch.setattr(v4_search, "ABSENCE_VERIFIED_SUBDOMAINS", {"RW.LABOR"})
+    out = make_index(tmp_path)
+    result = search_clause_absence(out, "RW.TAX")
+    assert result["confirmed_absent"] == []
+    assert "rw_absence_unverified_demoted_to_needs_review" in result["warnings"]
+
+
 def test_non_rw_family_confirms_absent(tmp_path):
     # CP is a covenant/condition family (not gated); complete coverage with no
     # CP item still proves absence.

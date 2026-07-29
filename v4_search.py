@@ -739,6 +739,21 @@ def search_clause_items(
 # RW absence is demoted to needs_review. Covenant/condition families stay trusted.
 ABSENCE_UNVERIFIED_FAMILIES = {"RW"}
 
+# Sub-domains inside an otherwise-unverified family that HAVE passed a per-sub-domain
+# coverage re-verification (re-extraction complete + absence pool verified with
+# recorded evidence) and so MAY confirm absence again — the "선(先)해제" exception
+# (V4_PLAN §9.1 #3). A sub-domain is admitted ONLY once its golden absence query's
+# pool_verified is populated; an empty set keeps the whole family gated. Keyed by the
+# 2-segment sub-domain id (e.g. "RW.ENVIRONMENT").
+ABSENCE_VERIFIED_SUBDOMAINS: set[str] = set()
+
+
+def _absence_subdomain(taxonomy_id: str) -> str:
+    """2-segment sub-domain of a taxonomy id (RW.ENVIRONMENT.PERMITS -> RW.ENVIRONMENT;
+    the bare family root RW -> RW, which no sub-domain exception can match)."""
+    parts = str(taxonomy_id).split(".")
+    return ".".join(parts[:2]) if len(parts) >= 2 else str(taxonomy_id)
+
 
 def search_clause_absence(
     out: Path,
@@ -811,7 +826,13 @@ def search_clause_absence(
         coverage_by_file = _bulk_coverage_states(
             conn, files, str(node["family"])
         )
-        family_gated = str(node["family"]) in ABSENCE_UNVERIFIED_FAMILIES
+        # Family is gated UNLESS the queried sub-domain has been re-verified. A query
+        # at the family root spans unverified sub-domains too, so it stays gated; a
+        # query at/below a verified sub-domain (whole subtree ⊆ that sub-domain) opens.
+        family_gated = (
+            str(node["family"]) in ABSENCE_UNVERIFIED_FAMILIES
+            and _absence_subdomain(str(node["taxonomy_id"])) not in ABSENCE_VERIFIED_SUBDOMAINS
+        )
         absent: list[dict] = []
         needs_review: list[dict] = []
         present_excluded = 0
