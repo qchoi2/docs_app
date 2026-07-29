@@ -15,6 +15,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable
 
+from lib.catalog import catalog_path, connect_catalog
+from lib.v4_candidate_policy import strip_candidate_prefix
 from v4_schema import initialize_v4_schema, normalize_alias
 
 
@@ -37,7 +39,9 @@ def utc_now() -> str:
 
 
 def connect_admin(out: Path) -> sqlite3.Connection:
-    conn = sqlite3.connect(Path(out) / "catalog.sqlite", timeout=10)
+    # connect_catalog refuses to create a missing catalog: admin writes must
+    # land in the real index, never in an empty file conjured by a bad --out.
+    conn = connect_catalog(catalog_path(out), timeout=10)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys=ON")
     conn.execute("PRAGMA busy_timeout=10000")
@@ -455,7 +459,7 @@ def _materialize_candidate_items(
                     row["source_name"],
                     row["source_ref"] or f"¶{row['loc_start']}",
                     row["parent_clause_ref"]
-                    or str(row["proposed_ko"]).removeprefix("검토후보: ").strip()
+                    or strip_candidate_prefix(row["proposed_ko"])
                     or None,
                     None,
                     json.dumps(qualifier, ensure_ascii=False, sort_keys=True),

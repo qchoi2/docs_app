@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
+from lib import v4_candidate_policy
 from review_rw_leaf_gaps import LEAVES as RW_REFINEMENT_LEAVES
 
 
@@ -965,6 +966,14 @@ def initialize_v4_schema(
     _ensure_column(conn, "v4_taxonomy_candidate", "taxonomy_version", "INTEGER")
     _ensure_column(conn, "v4_taxonomy_candidate", "extractor_version", "TEXT")
     _ensure_column(conn, "v4_taxonomy_candidate", "prompt_version", "TEXT")
+    # Candidate admission policy (V4_PLAN §9.2 T-D / PLAN_REVIEW 교정 A·B):
+    # the normalized key on which cross-document recurrence is counted.
+    _ensure_column(conn, "v4_taxonomy_candidate", "recurrence_key", "TEXT")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_v4_candidate_recurrence_key_col "
+        "ON v4_taxonomy_candidate(recurrence_key)"
+    )
+    v4_candidate_policy.ensure_recurrence_table(conn)
     conn.execute(
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_v4_item_ref "
         "ON v4_clause_item(file_key,item_ref)"
@@ -1250,6 +1259,68 @@ def absence_is_provable(coverage: Mapping[str, object]) -> bool:
     return coverage.get("body_status") == "complete" and coverage.get("annex_status") in ("complete", "no_annex")
 
 
+def _apply_candidate_admission(
+    conn: sqlite3.Connection,
+    *,
+    file_key: str,
+    data: Mapping[str, object],
+) -> Tuple[List[Tuple[Mapping[str, object], v4_candidate_policy.Admission]], List[dict]]:
+    """Split proposed candidates into admitted rows and absorbed catch-all items.
+
+    This is the single admission gate: ``replace_v4_result`` is the only code
+    path that inserts into ``v4_taxonomy_candidate``, so every writer
+    (``store_v4_results``, the re-extraction stores, the expansion runners)
+    shares this rule without holding a copy of it.
+
+    See ``lib/v4_candidate_policy`` for the predicate.  Rejected candidates are
+    not discarded: they become ``v4_clause_item`` rows under the family
+    catch-all node, which keeps their text in ``v4_item_fts`` (V4_PLAN 원칙 5).
+    """
+
+    proposed = list(data.get("taxonomy_candidates") or [])
+    v4_candidate_policy.ensure_recurrence_table(conn)
+    v4_candidate_policy.clear_document_recurrence(conn, file_key)
+    if not proposed:
+        return [], []
+
+    keys = [
+        v4_candidate_policy.recurrence_key(
+            str(candidate["family"]), str(candidate["verbatim"])
+        )
+        for candidate in proposed
+    ]
+    for candidate, key in zip(proposed, keys):
+        v4_candidate_policy.record_recurrence(
+            conn,
+            file_key=file_key,
+            family=str(candidate["family"]),
+            recurrence_key=key,
+        )
+    counts = v4_candidate_policy.document_counts(conn, keys)
+
+    admitted: List[Tuple[Mapping[str, object], v4_candidate_policy.Admission]] = []
+    absorbed: List[dict] = []
+    for candidate, key in zip(proposed, keys):
+        admission = v4_candidate_policy.admit(
+            family=str(candidate["family"]),
+            verbatim=str(candidate["verbatim"]),
+            recommended_parent_id=candidate.get("recommended_parent_id"),
+            document_count=counts.get(key, 1),
+        )
+        if admission.admitted:
+            admitted.append((candidate, admission))
+            continue
+        absorbed.append(
+            v4_candidate_policy.absorbed_item(
+                candidate,
+                family=str(candidate["family"]),
+                item_ref=f"{candidate['family']}-ABS{len(absorbed) + 1:05d}",
+                admission=admission,
+            )
+        )
+    return admitted, absorbed
+
+
 def replace_v4_result(
     conn: sqlite3.Connection,
     *,
@@ -1312,7 +1383,11 @@ def replace_v4_result(
         (file_key,),
     )
 
-    for item in data["items"]:
+    admitted_candidates, absorbed_items = _apply_candidate_admission(
+        conn, file_key=file_key, data=data
+    )
+
+    for item in [*data["items"], *absorbed_items]:
         conn.execute(
             """
             INSERT INTO v4_clause_item(
@@ -1408,17 +1483,19 @@ def replace_v4_result(
             ),
         )
 
-    for candidate in data.get("taxonomy_candidates") or []:
+    touched_keys: set[str] = set()
+    for candidate, admission in admitted_candidates:
+        touched_keys.add(admission.recurrence_key)
         conn.execute(
             """
             INSERT INTO v4_taxonomy_candidate(
               proposed_ko,proposed_en,family,recommended_parent_id,
               distinction_reason,evidence_file_key,loc_start,loc_end,verbatim,
-              document_count,nearest_taxonomy_id,source_kind,source_id,
+              document_count,recurrence_key,nearest_taxonomy_id,source_kind,source_id,
               source_name,source_ref,parent_clause_ref,qualifier_json,txt_hash,
               taxonomy_version,extractor_version,prompt_version,status,resolution_json,
               created_at,updated_at
-            ) VALUES (?,?,?,?,?,?,?,?,?,1,?,?,?,?,?,?,?,?,?,?,?,'pending','{}',?,?)
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'pending','{}',?,?)
             """,
             (
                 candidate["proposed_ko"],
@@ -1430,6 +1507,8 @@ def replace_v4_result(
                 candidate["loc_start"],
                 candidate["loc_end"],
                 candidate["verbatim"],
+                max(1, admission.document_count),
+                admission.recurrence_key,
                 candidate["nearest_taxonomy_id"],
                 candidate.get("source_kind", "body"),
                 candidate.get("source_id"),
@@ -1449,6 +1528,11 @@ def replace_v4_result(
                 now,
             ),
         )
+    # Storing this document can push an existing key over the generality
+    # threshold, so refresh every affected key rather than only this document's
+    # rows (V4_PLAN §2 "발견 문서 수 자동 갱신").
+    if touched_keys:
+        v4_candidate_policy.sync_document_counts(conn, sorted(touched_keys))
 
     # A document refresh must not erase evidence previously resolved through
     # the taxonomy queue. Reuse an equivalent freshly extracted item when one

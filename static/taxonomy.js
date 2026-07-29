@@ -203,7 +203,8 @@ function openAction(action) {
     );
     const first = clusters[0];
     $("promote-id").value = `${family}.`;
-    $("promote-ko").value = first.proposed_ko?.replace(/^검토후보:\s*/, "") || "";
+    $("promote-ko").value =
+      first.proposed_ko?.replace(/^(?:검토후보|정의용어 후보):\s*/, "") || "";
     $("promote-en").value = first.proposed_en || "";
     $("promote-definition").value = "";
     $("promote-aliases").value = clusters

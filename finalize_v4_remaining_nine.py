@@ -16,6 +16,7 @@ from collections import Counter
 from pathlib import Path
 
 from lib.console import configure_utf8_stdio
+from lib.v4_candidate_policy import candidate_name, strip_candidate_prefix
 from propose_v4_remaining_nine import FAMILIES, REMAINING_KEYS, substantive
 from v4_schema import initialize_v4_schema, taxonomy_ids, validate_v4_result
 
@@ -890,7 +891,7 @@ def candidate_item(candidate: dict, taxonomy_id: str, item_ref: str, family: str
         "source_name": candidate.get("source_name"),
         "source_ref": candidate.get("source_ref") or f"¶{candidate['loc_start']}",
         "parent_clause_ref": candidate.get("parent_clause_ref")
-        or str(candidate.get("proposed_ko") or "").removeprefix("검토후보: ").strip()
+        or strip_candidate_prefix(candidate.get("proposed_ko"))
         or None,
         "related_item_ref": None,
         "qualifier": {
@@ -1051,7 +1052,9 @@ def finalize_result(
             unresolved.append(
                 {
                     **body_candidate,
-                    "proposed_ko": f"검토후보: 본문 ¶{para} 명제",
+                    "proposed_ko": candidate_name(
+                        family, text, source_name="본문", loc_start=para
+                    ),
                     "proposed_en": None,
                     "family": family,
                     "recommended_parent_id": family,
@@ -1103,7 +1106,9 @@ def finalize_result(
         unresolved.append(
             {
                 **body_candidate,
-                "proposed_ko": f"검토후보: 본문 ¶{para} 명제",
+                "proposed_ko": candidate_name(
+                    family, text, source_name="본문", loc_start=para
+                ),
                 "proposed_en": None,
                 "family": family,
                 "recommended_parent_id": family,
@@ -1191,8 +1196,11 @@ def finalize_result(
         candidate_family = infer_source_candidate_family(text, linked_families)
         source_candidate.update(
             {
-                "proposed_ko": (
-                    f"검토후보: {representative['source_name']} ¶{para} 별지 명제"
+                "proposed_ko": candidate_name(
+                    candidate_family,
+                    text,
+                    source_name=str(representative["source_name"]),
+                    loc_start=para,
                 ),
                 "proposed_en": None,
                 "family": candidate_family,
