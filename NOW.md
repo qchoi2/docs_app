@@ -18,6 +18,18 @@ _이 수치를 손으로 베끼지 말 것 — `python burndown.py --out cs_inde
 
 ---
 
+## ⛳ 소유자 승인 대기 (DB 쓰기 — 조율자가 단일 writer로 실행)
+
+다른 세션이 DB를 만지고 있지 않을 때 실행한다. 2026-07-29 세션 종료 시점에 다른 세션의
+`v4_clause_item` dedup 흔적(`scratchpad/dedup_removed_*.jsonl`)이 있었다.
+
+| # | 작업 | 명령 | 승인 |
+|---|---|---|---|
+| 1 | 버전 분류 백필(additive·백업·멱등) — 실행 전까지 버전 신뢰도가 "미백필"로 표시됨 | `python classify_version.py --out cs_index --dry-run` → `--apply` | 대기 |
+| 2 | T-D backfill + 재분류 — **두 단계를 반드시 함께**(백필 단독은 22쌍 감소) | `backfill_v4_candidate_recurrence.py` → `reclassify_v4_candidate_backlog.py` (각각 dry-run 후 `--apply`) | dry-run 리포트 검토 후 |
+
+---
+
 ## 지금 진행 중 (In flight)
 
 | 작업 | 담당 | 상태 | 근거문서 |
