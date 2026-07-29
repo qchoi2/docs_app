@@ -25,6 +25,7 @@ class V4McpService:
         text: Optional[str] = None,
         ctype: Optional[str] = None,
         lang: Optional[str] = None,
+        version: Optional[str] = None,
         include_descendants: bool = True,
         item_absent: bool = False,
         limit: int = 50,
@@ -38,6 +39,7 @@ class V4McpService:
                 polarity=polarity,
                 ctype=ctype,
                 lang=lang,
+                version=version,
                 include_descendants=include_descendants,
                 limit=limit,
             )
@@ -50,6 +52,7 @@ class V4McpService:
             text=text,
             ctype=ctype,
             lang=lang,
+            version=version,
             include_descendants=include_descendants,
             limit=limit,
             offset=offset,
@@ -91,12 +94,13 @@ def register_v4_tools(mcp: Any, out: Path, annotations: Any = None) -> V4McpServ
         text: Optional[str] = None,
         ctype: Optional[str] = None,
         lang: Optional[str] = None,
+        version: Optional[str] = None,
         include_descendants: bool = True,
         item_absent: bool = False,
         limit: int = 50,
         offset: int = 0,
     ) -> dict[str, Any]:
-        """Search approved V4 atomic items. If item_absent is true, only complete current body/annex coverage can produce confirmed_absent; all other non-matches are needs_review."""
+        """Search approved V4 atomic items. If item_absent is true, only complete current body/annex coverage can produce confirmed_absent; all other non-matches are needs_review. version filters by contract version-role (execution/buyer_draft/... or Korean labels, comma-separated)."""
         return service.search_clause_items(
             taxonomy_id,
             polarity=polarity,
@@ -105,6 +109,7 @@ def register_v4_tools(mcp: Any, out: Path, annotations: Any = None) -> V4McpServ
             text=text,
             ctype=ctype,
             lang=lang,
+            version=version,
             include_descendants=include_descendants,
             item_absent=item_absent,
             limit=limit,

@@ -46,6 +46,61 @@ VERSION_LABELS = {
     "unknown": "버전 미상",
 }
 
+def _normalize_version_token(value: str) -> str:
+    """검색 버전 필터 매칭용 정규화: 공백 축약 + casefold."""
+    return " ".join(str(value or "").split()).casefold()
+
+
+def build_version_lookup() -> dict:
+    """정규화된 role key / 한글 라벨(공백 포함·미포함) → canonical role key 역인덱스.
+
+    검색 도구의 --version 필터가 role key("buyer_draft")와 한글 라벨("매수인 초안"),
+    공백 없는 변형("매수인초안")을 모두 받도록 한다. VERSION_LABELS를 단일 출처로 사용."""
+    lookup: dict = {}
+    for role, label in VERSION_LABELS.items():
+        lookup[_normalize_version_token(role)] = role
+        lookup[_normalize_version_token(label)] = role
+        lookup["".join(str(label).split()).casefold()] = role  # 공백 제거 변형
+    return lookup
+
+
+def version_label(role) -> str:
+    """role key → 한글 표시 라벨. 미분류(None/빈값)는 None, 미지의 값은 원문 유지."""
+    if role in (None, ""):
+        return None
+    return VERSION_LABELS.get(role, role)
+
+
+def resolve_version_filter(value) -> list:
+    """--version 값(콤마 구분 가능)을 canonical role key 리스트로 파싱한다.
+
+    role key 또는 한글 라벨(공백 유무 무관)을 받아 정규화한다. 알 수 없는 값은
+    유효 옵션 목록과 함께 ValueError를 던진다. None/빈 입력은 None(필터 없음)."""
+    if value is None:
+        return None
+    if isinstance(value, (list, tuple)):
+        tokens = [str(item) for item in value]
+    else:
+        tokens = str(value).split(",")
+    lookup = build_version_lookup()
+    roles: list = []
+    for token in tokens:
+        token = token.strip()
+        if not token:
+            continue
+        role = lookup.get(_normalize_version_token(token))
+        if role is None:
+            valid_keys = ", ".join(VERSION_LABELS.keys())
+            valid_labels = ", ".join(VERSION_LABELS.values())
+            raise ValueError(
+                f"Unknown version '{token}'. "
+                f"Valid role keys: {valid_keys}. Valid labels: {valid_labels}."
+            )
+        if role not in roles:
+            roles.append(role)
+    return roles or None
+
+
 # 정독 우선순위: 낮을수록 먼저. 체결본이 최우선, 그 다음 초안, mark-up/bidding 순.
 VERSION_RANK = {
     "execution": 0,

@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS files (
   content_hash TEXT, dup_group TEXT,
   is_draft    INTEGER,           -- 1/0/NULL(판별불가)
   version_hint TEXT,
+  version_role TEXT,             -- classify_version.py: execution/buyer_draft/... (검색 버전 필터)
   indexed_at  TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_meta ON files(ctype, lang, status);

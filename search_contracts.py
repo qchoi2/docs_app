@@ -12,6 +12,7 @@ from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 import yaml
 
+from classify_version import resolve_version_filter, version_label
 from lib.console import configure_utf8_stdio
 from lib.normalize import normalize
 
@@ -185,6 +186,7 @@ def search_contracts(
     exclude_drafts: bool = False,
     show_duplicates: bool = False,
     read_only: bool = False,
+    version: Optional[object] = None,
     clause: Optional[str] = None,
     clause_present: bool = False,
     clause_absent: bool = False,
@@ -201,6 +203,7 @@ def search_contracts(
     forum: Optional[str] = None,
 ) -> Tuple[Dict[str, object], int]:
     keywords = keywords or []
+    version_roles = resolve_version_filter(version)
     db_path = out / "catalog.sqlite"
     if not db_path.exists():
         raise FileNotFoundError(f"catalog.sqlite not found: {db_path}")
@@ -332,6 +335,11 @@ def search_contracts(
             params.append(lang)
         if exclude_drafts:
             filters.append("(is_draft IS NULL OR is_draft != 1)")
+        if version_roles:
+            filters.append(
+                "version_role IN (%s)" % ",".join("?" for _ in version_roles)
+            )
+            params.extend(version_roles)
         sql = f"SELECT * FROM files WHERE {' AND '.join(filters)}"
         file_rows = conn.execute(sql, params).fetchall()
 
@@ -366,6 +374,8 @@ def search_contracts(
                 why.append(f"{ctype} 유형 필터 일치")
             if lang and row["lang"] == lang:
                 why.append(f"{lang} 언어 필터 일치")
+            if version_roles and row["version_role"] in version_roles:
+                why.append(f"{version_label(row['version_role'])} 버전 필터 일치")
             if clause_tag:
                 why.append(f"{clause_tag} 조항 {clause_mode}")
             if structured_filters:
@@ -378,6 +388,8 @@ def search_contracts(
                 "lang": row["lang"],
                 "is_draft": row["is_draft"],
                 "version_hint": row["version_hint"],
+                "version_role": row["version_role"],
+                "version_label": version_label(row["version_role"]),
                 "dup_group": row["dup_group"],
                 "dup_count": dup_counts.get(row["dup_group"], 1),
                 "dup_representative_reason": representative_reason(row),
@@ -911,6 +923,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--exclude-drafts", action="store_true")
     parser.add_argument("--exclude-draft", action="store_true")
     parser.add_argument("--show-duplicates", action="store_true")
+    parser.add_argument("--version",
+                        help="버전 필터: role key(execution/buyer_draft/...) 또는 "
+                             "한글 라벨(체결본/매수인 초안/...). 콤마로 다중 지정.")
     parser.add_argument("--clause")
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--present", action="store_true")
@@ -951,6 +966,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                 "polarity": args.polarity,
                 "ctype": args.ctype,
                 "lang": args.lang,
+                "version": args.version,
                 "include_descendants": not args.exact_item,
                 "show_duplicates": args.show_duplicates,
                 "limit": args.limit,
@@ -979,6 +995,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                 no_expand=args.no_expand,
                 exclude_drafts=args.exclude_drafts or args.exclude_draft,
                 show_duplicates=args.show_duplicates,
+                version=args.version,
                 clause=args.clause,
                 clause_present=args.present,
                 clause_absent=args.absent,
@@ -1018,7 +1035,8 @@ def main(argv: Optional[List[str]] = None) -> int:
             print("No results")
     else:
         for item in result["results"]:
-            print(f"{item['file_key']} {item['path']} {item['snippet']}")
+            version = item.get("version_label") or item.get("version_role") or "-"
+            print(f"{item['file_key']} [{version}] {item['path']} {item['snippet']}")
         if not result["results"]:
             print("No results")
     return 0

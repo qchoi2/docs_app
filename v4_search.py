@@ -14,6 +14,7 @@ from contextlib import closing
 from pathlib import Path
 from typing import Iterable, Sequence
 
+from classify_version import resolve_version_filter, version_label
 from lib.console import configure_utf8_stdio
 
 
@@ -146,10 +147,19 @@ def taxonomy_descendants(
     return [str(row[0]) for row in rows]
 
 
+def _resolve_version(version) -> list | None:
+    """Parse a --version value into role keys, re-raising as V4SearchError."""
+    try:
+        return resolve_version_filter(version)
+    except ValueError as exc:
+        raise V4SearchError(str(exc))
+
+
 def _file_filters(
     *,
     ctype: str | None,
     lang: str | None,
+    version_roles: Sequence[str] | None = None,
     file_keys: Sequence[str] | None = None,
 ) -> tuple[list[str], list[object]]:
     clauses = ["f.status!='missing'"]
@@ -160,6 +170,11 @@ def _file_filters(
     if lang:
         clauses.append("f.lang=?")
         params.append(lang)
+    if version_roles:
+        clauses.append(
+            "f.version_role IN (%s)" % ",".join("?" for _ in version_roles)
+        )
+        params.extend(version_roles)
     if file_keys is not None:
         if not file_keys:
             return clauses + ["0"], params
@@ -417,6 +432,7 @@ def _item_dict(row: sqlite3.Row) -> dict:
         if item["freshness"] == "current"
         else "v4_atomic_item_stale"
     )
+    item["version_label"] = version_label(item.get("version_role"))
     return item
 
 
@@ -430,6 +446,7 @@ def search_clause_items(
     text: str | None = None,
     ctype: str | None = None,
     lang: str | None = None,
+    version: str | Sequence[str] | None = None,
     include_descendants: bool = True,
     show_duplicates: bool = False,
     limit: int = 50,
@@ -438,6 +455,7 @@ def search_clause_items(
     """Return approved atomic items and their source coordinates."""
     if polarity and polarity not in POLARITIES:
         raise V4SearchError("Unknown statement polarity.")
+    version_roles = _resolve_version(version)
     limit = _bounded_int(limit, "limit", 50, MAX_LIMIT)
     offset = _offset_int(offset)
     with closing(connect_v4_ro(out)) as conn:
@@ -445,7 +463,9 @@ def search_clause_items(
         subtree = taxonomy_descendants(
             conn, str(node["taxonomy_id"]), include_descendants
         )
-        clauses, params = _file_filters(ctype=ctype, lang=lang)
+        clauses, params = _file_filters(
+            ctype=ctype, lang=lang, version_roles=version_roles
+        )
         clauses.extend(
             [
                 "i.review_status='approved'",
@@ -478,7 +498,7 @@ def search_clause_items(
                    i.loc_start,i.loc_end,i.confidence,i.txt_hash,
                    i.taxonomy_version,i.extractor_version,i.review_status,
                    f.path,f.filename,f.ctype,f.lang,f.status,f.content_hash,
-                   f.dup_group,f.is_draft,f.version_hint
+                   f.dup_group,f.is_draft,f.version_hint,f.version_role
             FROM v4_clause_item i
             JOIN v4_taxonomy_node n ON n.taxonomy_id=i.taxonomy_id
             JOIN files f ON f.file_key=i.file_key
@@ -537,6 +557,7 @@ def search_clause_items(
                 "text": text,
                 "ctype": ctype,
                 "lang": lang,
+                "version": version_roles,
             },
             "total_items": total_items,
             "total_documents": total_documents,
@@ -573,6 +594,7 @@ def search_clause_absence(
     polarity: str | None = None,
     ctype: str | None = None,
     lang: str | None = None,
+    version: str | Sequence[str] | None = None,
     include_descendants: bool = True,
     show_duplicates: bool = False,
     limit: int = 50,
@@ -585,17 +607,21 @@ def search_clause_absence(
     """
     if polarity and polarity not in POLARITIES:
         raise V4SearchError("Unknown statement polarity.")
+    version_roles = _resolve_version(version)
     limit = _bounded_int(limit, "limit", 50, MAX_LIMIT)
     with closing(connect_v4_ro(out)) as conn:
         node = resolve_taxonomy(conn, taxonomy_id)
         subtree = taxonomy_descendants(
             conn, str(node["taxonomy_id"]), include_descendants
         )
-        clauses, params = _file_filters(ctype=ctype, lang=lang)
+        clauses, params = _file_filters(
+            ctype=ctype, lang=lang, version_roles=version_roles
+        )
         rows = conn.execute(
             f"""
             SELECT f.file_key,f.path,f.filename,f.ctype,f.lang,f.status,
-                   f.content_hash,f.dup_group,f.is_draft,f.version_hint
+                   f.content_hash,f.dup_group,f.is_draft,f.version_hint,
+                   f.version_role
             FROM files f
             WHERE {' AND '.join(clauses)}
             ORDER BY f.file_key
@@ -645,6 +671,7 @@ def search_clause_absence(
                 }
             result = {
                 **file_row,
+                "version_label": version_label(file_row.get("version_role")),
                 "taxonomy_id": node["taxonomy_id"],
                 "family": node["family"],
                 "coverage": coverage,
@@ -667,6 +694,7 @@ def search_clause_absence(
                 "polarity": polarity,
                 "ctype": ctype,
                 "lang": lang,
+                "version": version_roles,
             },
             "confirmed_absent_count": len(absent),
             "needs_review_count": len(needs_review),
@@ -706,7 +734,7 @@ def compare_clause_items(
         rows = conn.execute(
             f"""
             SELECT file_key,path,filename,ctype,lang,status,content_hash,
-                   dup_group,is_draft,version_hint
+                   dup_group,is_draft,version_hint,version_role
             FROM files WHERE file_key IN ({placeholders}) AND status!='missing'
             """,
             keys,
@@ -757,9 +785,11 @@ def compare_clause_items(
                 state = "confirmed_absent"
             else:
                 state = "needs_review"
+            file_info = dict(file_row)
+            file_info["version_label"] = version_label(file_info.get("version_role"))
             comparison.append(
                 {
-                    "file": dict(file_row),
+                    "file": file_info,
                     "state": state,
                     "items": items,
                     "coverage": coverage,
@@ -800,6 +830,9 @@ def build_parser() -> argparse.ArgumentParser:
     present.add_argument("--text")
     present.add_argument("--type", dest="ctype")
     present.add_argument("--lang")
+    present.add_argument("--version",
+                         help="버전 필터: role key 또는 한글 라벨(콤마로 다중). "
+                              "예: buyer_draft / '매수인 초안,매도인 초안'")
     present.add_argument("--show-duplicates", action="store_true")
     present.add_argument("--limit", type=int, default=50)
     present.add_argument("--offset", type=int, default=0)
@@ -808,6 +841,8 @@ def build_parser() -> argparse.ArgumentParser:
     _add_common(absent)
     absent.add_argument("--type", dest="ctype")
     absent.add_argument("--lang")
+    absent.add_argument("--version",
+                        help="버전 필터: role key 또는 한글 라벨(콤마로 다중).")
     absent.add_argument("--show-duplicates", action="store_true")
     absent.add_argument("--limit", type=int, default=50)
     absent.add_argument("--json", action="store_true", default=argparse.SUPPRESS)
@@ -835,6 +870,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 text=args.text,
                 ctype=args.ctype,
                 lang=args.lang,
+                version=args.version,
                 show_duplicates=args.show_duplicates,
                 limit=args.limit,
                 offset=args.offset,
@@ -846,6 +882,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 args.taxonomy_id,
                 ctype=args.ctype,
                 lang=args.lang,
+                version=args.version,
                 show_duplicates=args.show_duplicates,
                 limit=args.limit,
                 **common,
@@ -865,10 +902,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             f"{result['total_items']} items / {result['total_documents']} documents"
         )
         for item in result["results"]:
+            version = item.get("version_label") or item.get("version_role") or "-"
             print(
                 f"[{item['file_key']}] {item['item_ref']} "
                 f"{item['taxonomy_id']} ¶{item['loc_start']}-{item['loc_end']} "
-                f"({item['freshness']})"
+                f"({item['freshness']}) [{version}]"
             )
     elif args.command == "absent":
         print(
@@ -877,7 +915,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             f"needs_review={result['needs_review_count']}"
         )
         for item in result["confirmed_absent"]:
-            print(f"[{item['file_key']}] confirmed_absent {item['path']}")
+            version = item.get("version_label") or item.get("version_role") or "-"
+            print(f"[{item['file_key']}] confirmed_absent [{version}] {item['path']}")
     else:
         for item in result["comparison"]:
             print(f"[{item['file']['file_key']}] {item['state']}")

@@ -32,6 +32,7 @@ def handle_v4_item_search(app, match, query, body):
             "polarity": body.get("polarity") or None,
             "ctype": body.get("ctype") or None,
             "lang": body.get("lang") or None,
+            "version": body.get("version") or None,
             "include_descendants": body.get("include_descendants", True) is not False,
             "show_duplicates": body.get("show_duplicates", False) is True,
             "limit": body.get("limit", 50),
