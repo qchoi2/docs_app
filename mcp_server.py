@@ -17,6 +17,7 @@ from contextlib import closing
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from classify_version import resolve_version_filter
 from inspect_file import inspect_file
 from lib.console import configure_utf8_stdio
 from open_text import open_text
@@ -119,6 +120,7 @@ class ContractMcpService:
         survival_months_max: Optional[int] = None,
         governing_law: Optional[str] = None,
         forum: Optional[str] = None,
+        version: Optional[str] = None,
     ) -> Dict[str, Any]:
         terms = keywords or []
         if not isinstance(terms, list) or any(not isinstance(item, str) for item in terms):
@@ -132,6 +134,12 @@ class ContractMcpService:
             raise McpServiceError("clause is required when clause_absent is true")
         limit = self._bounded_int(limit, "limit", 1, MAX_RESULTS)
         context = self._bounded_int(context, "context", 0, MAX_SEARCH_CONTEXT)
+        # 버전 필터는 run_contract_search가 내부적으로 파싱한다. 잘못된 값은
+        # 서버를 죽이지 말고 CLI와 동일한 안내 메시지(ValueError)를 반환한다.
+        try:
+            version_roles = resolve_version_filter(version)
+        except ValueError as exc:
+            raise McpServiceError(str(exc)) from None
 
         result, _returned = run_contract_search(
             self.out,
@@ -159,7 +167,11 @@ class ContractMcpService:
             survival_months_max=survival_months_max,
             governing_law=governing_law,
             forum=forum,
+            version=version,
         )
+        # 요청한 버전 필터가 어떤 canonical role로 해석됐는지 에이전트에 알려준다.
+        if version_roles is not None and isinstance(result.get("query"), dict):
+            result["query"]["version"] = version_roles
         result["mcp_guidance"] = {
             "citation_format": "[file_key]",
             "corpus_scope": "현재 색인된 문서 기준",
@@ -322,8 +334,9 @@ def build_mcp(service: ContractMcpService):
         survival_months_max: Optional[int] = None,
         governing_law: Optional[str] = None,
         forum: Optional[str] = None,
+        version: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Search indexed contracts. Keywords use AND semantics; term_dict expansion is on by default. A clause means evaluated-present unless clause_absent is true. T3 v3 filters cover parties, consideration, indemnity cap, survival, governing law, and forum; older metadata is reported as unevaluated. Preserve file_key and evidence in the answer."""
+        """Search indexed contracts. Keywords use AND semantics; term_dict expansion is on by default. A clause means evaluated-present unless clause_absent is true. T3 v3 filters cover parties, consideration, indemnity cap, survival, governing law, and forum; older metadata is reported as unevaluated. version filters by contract version role: accepts role keys (execution, buyer_draft, seller_draft, buyer_markup, seller_markup, draft_unknown, markup_unknown, buyer_ver, seller_ver, bidding, unknown) or their Korean labels (체결본, 매수인 초안, 매도인 초안, 매수인 mark-up, 매도인 mark-up, ...); comma-separated values are OR-combined. Preserve file_key and evidence in the answer."""
         return service.search(
             keywords=keywords,
             ctype=ctype,
@@ -347,6 +360,7 @@ def build_mcp(service: ContractMcpService):
             survival_months_max=survival_months_max,
             governing_law=governing_law,
             forum=forum,
+            version=version,
         )
 
     @mcp.tool(

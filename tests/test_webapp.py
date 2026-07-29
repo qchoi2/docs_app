@@ -262,6 +262,36 @@ def test_web_search_accepts_v3_structured_filters(tmp_path):
     assert status == 400 and data["error"]["code"] == "VALIDATION_ERROR"
 
 
+def test_web_search_filters_by_version_role(tmp_path):
+    app = make_app(tmp_path)
+    out = tmp_path / "cs_index"
+    with closing(sqlite3.connect(out / "catalog.sqlite")) as conn:
+        conn.execute("UPDATE files SET version_role='execution' WHERE file_key=?", ("a" * 16,))
+        conn.execute("UPDATE files SET version_role='buyer_draft' WHERE file_key=?", ("b" * 16,))
+        conn.commit()
+
+    # role key로 필터: 매수인 초안(b)만 남는다.
+    status, data = get_json(app, "POST", "/api/search", body={
+        "kw": ["손해배상"], "no_expand": True, "show_duplicates": True,
+        "version": "buyer_draft",
+    })
+    assert status == 200 and data["total"] == 1
+    assert data["results"][0]["file_key"] == "b" * 16
+
+    # 한글 라벨도 동일하게 동작한다.
+    status, data = get_json(app, "POST", "/api/search", body={
+        "kw": ["손해배상"], "no_expand": True, "show_duplicates": True,
+        "version": "매수인 초안",
+    })
+    assert status == 200 and data["total"] == 1
+    assert data["results"][0]["file_key"] == "b" * 16
+
+    # 잘못된 버전 값은 500이 아니라 400 안내 오류로 돌려준다.
+    status, data = get_json(app, "POST", "/api/search", body={"version": "not-a-version"})
+    assert status == 400 and data["error"]["code"] == "VALIDATION_ERROR"
+    assert "Valid role keys" in data["error"]["message"]
+
+
 def test_setup_exposes_gui_index_modes():
     from pathlib import Path
     static_dir = Path(__file__).resolve().parent.parent / "static"

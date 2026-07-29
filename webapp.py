@@ -32,6 +32,7 @@ from typing import Dict, List, Optional, Tuple
 from urllib.parse import parse_qs
 from wsgiref.simple_server import make_server
 
+from classify_version import resolve_version_filter
 from index_contracts import IndexOptions, index_contracts
 from lib.console import configure_utf8_stdio
 from lib.jobs import JobError, JobQueue
@@ -182,6 +183,15 @@ def validated_search_params(body: Dict[str, object]) -> Dict[str, object]:
     if expand not in EXPAND_MODES:
         raise ApiError(400, "VALIDATION_ERROR", "'expand' must be strict|normal|broad.")
 
+    version = opt_str("version")
+    if version is not None:
+        # search_contracts가 내부적으로 파싱하지만, 잘못된 값이 500이 되지 않도록
+        # 경계에서 검증해 CLI와 동일한 안내 메시지를 400으로 돌려준다.
+        try:
+            resolve_version_filter(version)
+        except ValueError as exc:
+            raise ApiError(400, "VALIDATION_ERROR", str(exc))
+
     clause_present = opt_bool("clause_present")
     clause_absent = opt_bool("clause_absent")
     clause = opt_str("clause")
@@ -223,6 +233,7 @@ def validated_search_params(body: Dict[str, object]) -> Dict[str, object]:
         "survival_months_max": opt_optional_int("survival_months_max"),
         "governing_law": opt_str("governing_law"),
         "forum": opt_str("forum"),
+        "version": version,
         "context": opt_int("context", 1, 0, 5),
         "limit": opt_int("limit", 20, 1, MAX_LIMIT),
         "offset": opt_int("offset", 0, 0, 10000),
@@ -258,6 +269,7 @@ def run_search(out: Path, params: Dict[str, object]) -> Dict[str, object]:
         survival_months_max=params["survival_months_max"],
         governing_law=params["governing_law"],
         forum=params["forum"],
+        version=params["version"],
     )
     result["results"] = result["results"][offset:offset + limit]
     result["limit"] = limit

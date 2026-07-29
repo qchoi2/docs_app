@@ -159,6 +159,46 @@ def test_service_search_exposes_v3_structured_filters(tmp_path):
     assert result["total"] == 1
     assert result["results"][0]["structured"]["손해배상"]["normalized"]["cap_pct_of_price"] == 10
 
+def _set_version_roles(out, roles):
+    with closing(sqlite3.connect(out / "catalog.sqlite")) as conn:
+        for key, role in roles.items():
+            conn.execute("UPDATE files SET version_role=? WHERE file_key=?", (role, key))
+        conn.commit()
+
+
+def test_service_search_filters_by_version_role(tmp_path):
+    out = make_corpus(tmp_path)
+    _set_version_roles(out, {FILE_KEY: "execution", DUP_KEY: "buyer_draft"})
+    service = ContractMcpService(out)
+
+    # role key로 필터: 매수인 초안(DUP_KEY)만 남는다.
+    by_key = service.search(keywords=["목적"], no_expand=True, show_duplicates=True,
+                            version="buyer_draft", limit=5)
+    assert by_key["total"] == 1
+    assert by_key["results"][0]["file_key"] == DUP_KEY
+    # 해석된 canonical role을 query echo로 돌려준다.
+    assert by_key["query"]["version"] == ["buyer_draft"]
+
+    # 한글 라벨(공백 포함)도 동일하게 동작한다.
+    by_label = service.search(keywords=["목적"], no_expand=True, show_duplicates=True,
+                              version="매수인 초안", limit=5)
+    assert by_label["total"] == 1
+    assert by_label["results"][0]["file_key"] == DUP_KEY
+
+    # 다른 버전(체결본)은 FILE_KEY만 남는다.
+    execution = service.search(keywords=["목적"], no_expand=True, show_duplicates=True,
+                               version="execution", limit=5)
+    assert {row["file_key"] for row in execution["results"]} == {FILE_KEY}
+
+
+def test_service_search_rejects_unknown_version(tmp_path):
+    service = ContractMcpService(make_corpus(tmp_path))
+    with pytest.raises(McpServiceError) as excinfo:
+        service.search(keywords=["목적"], version="not-a-version")
+    # CLI와 동일한 안내(유효 옵션 목록)를 담는다.
+    assert "Valid role keys" in str(excinfo.value)
+
+
 def test_service_rejects_unsafe_or_ambiguous_reads(tmp_path):
     service = ContractMcpService(make_corpus(tmp_path))
     with pytest.raises(McpServiceError):
