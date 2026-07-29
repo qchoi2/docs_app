@@ -32,6 +32,8 @@ CREATE TABLE IF NOT EXISTS files (
   is_draft    INTEGER,           -- 1/0/NULL(판별불가)
   version_hint TEXT,
   version_role TEXT,             -- classify_version.py: execution/buyer_draft/... (검색 버전 필터)
+  version_basis TEXT,            -- version_role 분류 근거 JSON (source_signals와 같은 형식)
+  version_confidence TEXT,       -- high/med/low. NULL=아직 백필 안 됨(확신으로 읽지 말 것)
   indexed_at  TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_meta ON files(ctype, lang, status);
@@ -65,6 +67,53 @@ CREATE TABLE IF NOT EXISTS clause_index (
 
 class CatalogError(RuntimeError):
     """Raised when the catalog database cannot be initialized."""
+
+
+class CatalogNotFoundError(CatalogError, FileNotFoundError):
+    """Raised when a read path points at a catalog that does not exist.
+
+    Also a ``FileNotFoundError`` so the existing ``except FileNotFoundError``
+    handlers in webapp.py / mcp_server.py keep working unchanged.
+
+    ``sqlite3.connect()`` silently CREATEs a missing file, so a tool run with
+    the wrong ``--out`` used to produce an empty second database (observed
+    2026-07-29: a bare ``sqlite3.connect('catalog.sqlite')`` from the repo root
+    left a 0-byte ``catalog.sqlite`` beside the real ``cs_index/catalog.sqlite``)
+    and then report an empty corpus. Read paths must fail loudly instead.
+    """
+
+
+def catalog_path(out: Union[str, Path]) -> Path:
+    """Return the catalog file inside an ``--out`` directory."""
+
+    return Path(out) / "catalog.sqlite"
+
+
+def require_catalog(db_path: Union[str, Path]) -> Path:
+    """Return ``db_path`` only if it is an existing, non-empty catalog file.
+
+    Never creates anything. Raises :class:`CatalogNotFoundError` with an
+    actionable message otherwise.
+    """
+
+    path = Path(db_path)
+    if not path.exists():
+        raise CatalogNotFoundError(
+            f"색인 DB가 없습니다: {path} — --out 경로를 확인하세요 "
+            "(색인은 보통 cs_index/catalog.sqlite 입니다). "
+            "새 색인을 만들려면 index_contracts.py를 사용하세요."
+        )
+    if path.is_dir():
+        raise CatalogNotFoundError(
+            f"색인 DB가 없습니다: {path} — 디렉터리입니다. --out 경로를 확인하세요."
+        )
+    if path.stat().st_size == 0:
+        raise CatalogNotFoundError(
+            f"색인 DB가 없습니다: {path} — 0바이트 빈 파일입니다. "
+            "--out 경로를 확인하세요 (잘못된 경로로 실행해 생긴 껍데기 파일일 수 "
+            "있습니다; 지운 뒤 올바른 --out으로 다시 실행하세요)."
+        )
+    return path
 
 
 def _trigram_error(detail: str) -> CatalogError:
@@ -105,11 +154,31 @@ def initialize_catalog(db_path: Union[str, Path]) -> Path:
     return path.resolve()
 
 
-def connect_catalog(db_path: Union[str, Path]) -> sqlite3.Connection:
-    """Open a catalog connection after validating trigram support."""
+def connect_catalog(
+    db_path: Union[str, Path],
+    *,
+    read_only: bool = False,
+    create: bool = False,
+    timeout: Optional[float] = None,
+    verify_trigram: bool = False,
+) -> sqlite3.Connection:
+    """Open the catalog, refusing to conjure a missing database.
 
-    ensure_trigram_available()
-    return sqlite3.connect(db_path)
+    ``create=True`` is the only way to get the old creating behaviour and is
+    reserved for the deliberate build paths (index_contracts.py); every read
+    path leaves it at False so a wrong ``--out`` raises
+    :class:`CatalogNotFoundError` instead of leaving an empty database behind.
+    """
+
+    if verify_trigram:
+        ensure_trigram_available()
+    if not create:
+        db_path = require_catalog(db_path)
+    kwargs = {} if timeout is None else {"timeout": timeout}
+    if read_only:
+        uri = f"file:{Path(db_path).as_posix()}?mode=ro"
+        return sqlite3.connect(uri, uri=True, **kwargs)
+    return sqlite3.connect(db_path, **kwargs)
 
 
 def _main(argv: Optional[List[str]] = None) -> int:

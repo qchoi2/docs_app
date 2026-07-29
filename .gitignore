@@ -11,6 +11,17 @@ contract_docs/
 # --- DB safety snapshots created by V4 store/backup runs (can be multi-GB) ---
 .backups/
 
+# --- Repo-root DB / log strays ---
+# The index lives in cs_index/. A catalog.sqlite at the repo root is always a
+# mistake (a tool run with the wrong --out); lib.catalog.require_catalog now
+# refuses to create one, but never risk committing a multi-GB DB by accident.
+/*.sqlite
+/*.sqlite-wal
+/*.sqlite-shm
+# Runtime agent answer log — the real one is cs_index/agent_log.jsonl.
+/agent_log.jsonl
+/query_log.jsonl
+
 # --- Gate B verification artifact (evolving owner/provisional verdicts) ---
 data/v4_gate_b_verdicts.json
 

@@ -31,7 +31,9 @@ from contextlib import closing
 from datetime import datetime, timezone
 from pathlib import Path
 
+from lib.catalog import require_catalog
 from lib.console import configure_utf8_stdio
+from prune_backups import DEFAULT_KEEP_DAYS, DEFAULT_KEEP_LATEST, prune
 
 POLARITY = {"affirmative", "negative", "none_exist", "not_applicable"}
 CONFIDENCE = {"low", "med", "high"}
@@ -236,6 +238,11 @@ def main(argv=None) -> int:
     parser.add_argument("--allow-regress", action="store_true",
                         help="store even results that drop sub-domains the doc already has "
                         "(default: skip such docs to protect existing reps)")
+    parser.add_argument("--prune-backups", action="store_true",
+                        help="after a successful snapshot, apply the retention policy "
+                        "(prune_backups.py) so old snapshots stop accumulating")
+    parser.add_argument("--prune-keep-latest", type=int, default=DEFAULT_KEEP_LATEST)
+    parser.add_argument("--prune-keep-days", type=float, default=DEFAULT_KEEP_DAYS)
     args = parser.parse_args(argv)
 
     db = args.out / "catalog.sqlite"
@@ -248,13 +255,21 @@ def main(argv=None) -> int:
         return 0
 
     backup_name = None
+    pruned = None
     if not args.dry_run:
+        require_catalog(db)  # never snapshot (or write to) a catalog we just created
         stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
         backup = args.out / f".backups/catalog.pre_rw_reextract_{stamp}.sqlite"
         backup.parent.mkdir(parents=True, exist_ok=True)
         with closing(sqlite3.connect(db)) as s, closing(sqlite3.connect(backup)) as d:
             s.backup(d)
         backup_name = backup.name
+        if args.prune_backups:
+            # Only after the fresh snapshot exists, so it is always the newest kept one.
+            report = prune(out=args.out, keep_latest=args.prune_keep_latest,
+                           keep_days=args.prune_keep_days, delete=True)
+            pruned = {"removed": report["counts"]["prune"],
+                      "reclaimed": report["reclaimable_h"]}
 
     results = []
     with closing(sqlite3.connect(db)) as conn:
@@ -292,7 +307,8 @@ def main(argv=None) -> int:
         for r in results if r.get("regress_overridden")
     ]
     print(json.dumps(
-        {"dry_run": args.dry_run, "backup": backup_name, "files": len(files),
+        {"dry_run": args.dry_run, "backup": backup_name, "pruned": pruned,
+         "files": len(files),
          "by_status": dict(by_status), "integrity": integrity,
          "full_read_stored": full_read_stored,
          "regress_overridden_count": len(regress_overridden),

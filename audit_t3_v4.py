@@ -11,6 +11,7 @@ from typing import Dict, List, Mapping, Optional
 
 from audit_t3_v3 import _compact, _normalized_number_is_supported
 from finalize_v4_remaining_nine import source_needs_candidate
+from lib.catalog import catalog_path, connect_catalog
 from lib.console import configure_utf8_stdio
 from v4_schema import (
     V4SchemaError,
@@ -518,7 +519,7 @@ def audit_v4(manifest_path: Path, *, out: Path, input_dir: Path, result_dir: Pat
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     if not isinstance(manifest, dict) or not isinstance(manifest.get("items"), list):
         raise ValueError("manifest must contain an items array")
-    with sqlite3.connect(out / "catalog.sqlite") as conn:
+    with connect_catalog(catalog_path(out), read_only=True) as conn:
         known = taxonomy_ids(conn)
         parents = taxonomy_parents(conn)
         aliases = taxonomy_aliases(conn)
