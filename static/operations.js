@@ -29,6 +29,107 @@ async function loadDashboard() {
   } catch (error) {
     $("live").textContent = "운영 대시보드를 불러오지 못했습니다.";
   }
+  await loadBurndown();
+}
+
+// 번다운은 V4 색인이 없는 코퍼스에서는 실패할 수 있으므로 별도 요청으로 분리한다
+// (운영 대시보드 본체가 함께 죽지 않게).
+async function loadBurndown() {
+  try {
+    const data = await api("/api/ops/burndown");
+    $("burndown-error").textContent = "";
+    renderBurndown(data);
+  } catch (error) {
+    $("burndown-error").textContent =
+      "번다운 지표를 불러오지 못했습니다 (V4 색인이 없을 수 있습니다).";
+  }
+}
+
+function pct(value) {
+  return value == null ? "-" : `${value}%`;
+}
+
+function progressRow(label, block) {
+  const width = block.percent == null ? 0 : block.percent;
+  return (
+    `<div class="burndown-row"><span class="burndown-label">${esc(label)}</span>` +
+    `<span class="progress-track burndown-track">` +
+    `<span class="progress-fill" style="width:${esc(width)}%"></span></span>` +
+    `<strong class="burndown-num">${esc(block.evaluated)}/${esc(block.total)}` +
+    ` · ${esc(pct(block.percent))}</strong></div>`
+  );
+}
+
+function renderBurndown(data) {
+  const index = data.index || {};
+  $("burndown-meta").textContent =
+    `${data.generated_at} · taxonomy v${index.taxonomy_version}` +
+    ` · schema v${index.schema_version} rev ${index.schema_revision}`;
+
+  const progress = data.type_progress || {};
+  const rows = [
+    progressRow("전체", progress.overall),
+    progressRow("core 4유형", progress.core_planned),
+    progressRow("CB/BW/EB", progress.scope_added),
+  ];
+  (progress.by_type || []).forEach((row) => rows.push(progressRow(row.ctype, row)));
+  $("burndown-types").innerHTML = rows.join("");
+
+  const families = (data.family_coverage || {}).families || {};
+  const names = Object.keys(families);
+  const head =
+    "<tr><th>family</th><th>body<br>complete</th><th>body<br>partial</th>" +
+    "<th>body<br>미평가</th><th>annex<br>complete</th><th>annex<br>별지없음</th>" +
+    "<th>annex<br>partial</th><th>annex<br>미평가</th><th>coverage<br>행 없음</th></tr>";
+  const body = names.map((name) => {
+    const scope = families[name].target_scope || {};
+    const b = scope.body || {};
+    const a = scope.annex || {};
+    const cells = [
+      b.complete || 0, b.partial || 0, b.not_evaluated || 0,
+      a.complete || 0, a.no_annex || 0, a.partial || 0, a.not_evaluated || 0,
+      scope.no_coverage_row_not_evaluated || 0,
+    ];
+    return `<tr><th scope="row">${esc(name)}</th>` +
+      cells.map((value) => `<td>${esc(value)}</td>`).join("") + "</tr>";
+  }).join("");
+  $("burndown-families").innerHTML = head + body;
+
+  const absence = data.absence_eligibility || {};
+  $("burndown-absence-summary").textContent =
+    `(문서 × family) ${absence.pairs_total}쌍 중 부재 질의 가능 ${absence.absence_eligible}` +
+    ` · 차단 ${absence.absence_blocked}` +
+    ` · family 게이트: ${(absence.family_gated_families || []).join(", ") || "없음"}`;
+  const reasons = absence.blocking_reasons || {};
+  $("burndown-reasons").innerHTML = Object.keys(reasons).length
+    ? Object.keys(reasons).map((key) =>
+        `<div class="list-row"><span class="mono">${esc(key)}</span>` +
+        `<strong>${esc(reasons[key])}</strong></div>`).join("")
+    : `<p class="body-muted">차단 사유가 없습니다.</p>`;
+
+  const backlog = data.taxonomy_backlog || {};
+  const rw = data.rw_reextraction || {};
+  const statusCounts = backlog.status_counts || {};
+  const lines = Object.keys(statusCounts).map((key) =>
+    [`후보 ${key}`, statusCounts[key]]);
+  lines.push(["pending 중 부재 차단(blocking)", backlog.pending_blocking]);
+  lines.push(["pending 중 비차단(one-off)", backlog.pending_non_blocking]);
+  lines.push(["pending이 막는 문서 수", backlog.documents_blocked_by_pending]);
+  lines.push([
+    "RW 재추출 stored",
+    rw.target_documents == null
+      ? `미산출 — ${rw.target_documents_unavailable_reason || ""}`
+      : `${rw.stored_documents}/${rw.target_documents} · ${pct(rw.percent)} (잔여 ${rw.remaining_audit_pending})`,
+  ]);
+  lines.push([
+    "RW 재추출 결과 파일",
+    rw.result_files == null
+      ? `미산출 — ${rw.result_files_unavailable_reason || ""}`
+      : rw.result_files,
+  ]);
+  $("burndown-backlog").innerHTML = lines.map(([label, value]) =>
+    `<div class="list-row"><span>${esc(label)}</span><strong>${esc(value)}</strong></div>`
+  ).join("");
 }
 
 function renderStatus(data) {

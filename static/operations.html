@@ -28,6 +28,23 @@
     <p id="last-indexed" class="body-muted"></p>
   </section>
 
+  <section class="feature-card ops-card" id="burndown-card">
+    <div class="section-head">
+      <h2>번다운 (V4 진행/차단)</h2>
+      <span id="burndown-meta" class="mono-eyebrow"></span>
+    </div>
+    <p id="burndown-error" class="body-muted"></p>
+    <h3 class="burndown-sub">대상유형 진행률</h3>
+    <div id="burndown-types" class="compact-list"></div>
+    <h3 class="burndown-sub">family × coverage (대상 문서 기준)</h3>
+    <div class="table-scroll"><table id="burndown-families" class="burndown-table"></table></div>
+    <h3 class="burndown-sub">부재 질의 차단 사유</h3>
+    <p id="burndown-absence-summary" class="body-muted"></p>
+    <div id="burndown-reasons" class="compact-list"></div>
+    <h3 class="burndown-sub">후보 backlog · RW 재추출</h3>
+    <div id="burndown-backlog" class="compact-list"></div>
+  </section>
+
   <section class="feature-card ops-card">
     <div class="section-head">
       <h2>Batch 통계</h2>
