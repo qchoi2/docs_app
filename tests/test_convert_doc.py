@@ -88,23 +88,26 @@ def test_non_ole_doc_is_recorded_as_unsupported(tmp_path):
     assert result["failure_count"] == 1
     manifest = json.loads((out / "converted" / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["items"]["fake.doc"]["status"] == "unsupported"
-    assert manifest["items"]["fake.doc"]["error_reason"] == "not_ole2_unknown"
+    assert manifest["items"]["fake.doc"]["error_reason"] == "not_convertible_unknown"
 
 
-def test_rtf_and_zip_doc_extensions_are_recorded_with_specific_reasons(tmp_path):
+def test_rtf_doc_is_now_a_candidate_and_zip_stays_unsupported(tmp_path):
+    # RTF-in-.doc is convertible (Word opens RTF regardless of extension), so it must
+    # become a conversion candidate instead of being rejected. ZIP-in-.doc is still
+    # unsupported by this pipeline.
     root = tmp_path / "contracts"
     out = tmp_path / "cs_index"
     root.mkdir()
     (root / "fake_rtf.doc").write_bytes(b"{\\rtf1 text")
     (root / "fake_zip.doc").write_bytes(b"PK\x03\x04")
 
-    result = convert_doc.convert_docs(root, out)
+    candidates, rejected, _skipped = convert_doc.build_candidates(root, out)
 
-    assert result["converted_count"] == 0
-    assert result["failure_count"] == 2
-    manifest = json.loads((out / "converted" / "manifest.json").read_text(encoding="utf-8"))
-    assert manifest["items"]["fake_rtf.doc"]["error_reason"] == "not_ole2_rtf"
-    assert manifest["items"]["fake_zip.doc"]["error_reason"] == "not_ole2_zip"
+    cand_paths = {c.rel_path for c in candidates}
+    rejected_by = {r["path"]: r["reason"] for r in rejected}
+    assert "fake_rtf.doc" in cand_paths          # now converts
+    assert "fake_rtf.doc" not in rejected_by
+    assert rejected_by["fake_zip.doc"] == "not_convertible_zip"
 
 
 def test_chunk_failure_quarantines_one_file_and_continues(tmp_path, monkeypatch):

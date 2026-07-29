@@ -17,6 +17,10 @@ from lib.console import configure_utf8_stdio
 OLE2_MAGIC = bytes.fromhex("D0CF11E0")
 RTF_MAGIC = b"{\\rtf"
 ZIP_MAGIC = b"PK"
+# Kinds the Word/PowerShell converter can open and re-save as .docx regardless of the
+# .doc extension. RTF-in-.doc was previously rejected as not_ole2_rtf (5 files, all
+# ATA/BTA 국문 — a type with only ~5.6% coverage), yet Word opens RTF natively.
+CONVERTIBLE_KINDS = {"ole2", "rtf"}
 MANIFEST_SCHEMA_VERSION = 1
 DEFAULT_CHUNK_SIZE = 25
 DEFAULT_TIMEOUT = 300
@@ -113,12 +117,12 @@ def build_candidates(
     for path in iter_doc_paths(root, include_misc, rules):
         rel_path = path.relative_to(root).as_posix()
         kind = detect_doc_kind(path)
-        if kind != "ole2":
-            rejected.append({"path": rel_path, "reason": "not_ole2_%s" % kind})
+        if kind not in CONVERTIBLE_KINDS:
+            rejected.append({"path": rel_path, "reason": "not_convertible_%s" % kind})
             items[rel_path] = {
                 "source_path": rel_path,
                 "status": "unsupported",
-                "error_reason": "not_ole2_%s" % kind,
+                "error_reason": "not_convertible_%s" % kind,
                 "updated_at": datetime.now(timezone.utc).isoformat(),
             }
             continue
