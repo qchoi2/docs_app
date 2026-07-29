@@ -34,6 +34,7 @@ from pathlib import Path
 
 from lib.catalog import require_catalog
 from lib.console import configure_utf8_stdio
+from lib.extraction_gate import gate_items
 from prune_backups import DEFAULT_KEEP_DAYS, DEFAULT_KEEP_LATEST, prune
 
 POLARITY = {"affirmative", "negative", "none_exist", "not_applicable"}
@@ -120,6 +121,11 @@ def store_one(conn: sqlite3.Connection, out: Path, data: dict, known_pay: set,
             it["taxonomy_id"] = norm
         if it.get("statement_polarity") not in POLARITY:
             raise ValueError(f"{file_key}: bad statement_polarity: {it.get('statement_polarity')}")
+    # Over-extraction / hallucination gate — runs before any DELETE so a rejected doc
+    # leaves existing rows intact. May drop exact-duplicate items in place.
+    items, gate_flags, reject = gate_items(conn, out, file_key, items, "PAY")
+    if reject is not None:
+        return reject
     row = conn.execute(
         "SELECT COALESCE(content_hash,'') FROM files WHERE file_key=?", (file_key,)
     ).fetchone()
@@ -229,6 +235,8 @@ def store_one(conn: sqlite3.Connection, out: Path, data: dict, known_pay: set,
         lost = sorted(prev_domains - new_domains)  # substantive domains dropped
     res = {"file_key": file_key, "status": "stored", "mode": mode,
            "pay_items": n, "added": len(items)}
+    if gate_flags:
+        res["gate_flags"] = gate_flags  # deduped / dense_paragraphs / grounding
     if full_read:
         res["review_method"] = "full_read"
     if lost:
@@ -320,6 +328,10 @@ def main(argv=None) -> int:
         {"file_key": r["file_key"], "lost_domains": r["lost_domains"]}
         for r in results if r.get("regress_overridden")
     ]
+    gate_flagged = [
+        {"file_key": r["file_key"], "gate_flags": r["gate_flags"]}
+        for r in results if r.get("gate_flags")
+    ]
     print(json.dumps(
         {"dry_run": args.dry_run, "backup": backup_name, "pruned": pruned,
          "files": len(files),
@@ -328,6 +340,7 @@ def main(argv=None) -> int:
          "regress_overridden_count": len(regress_overridden),
          "regress_overridden": regress_overridden[:40],
          "regression_count": len(regressions), "regressions": regressions[:40],
+         "gate_flagged_count": len(gate_flagged), "gate_flagged": gate_flagged[:40],
          "errors": errors[:40]},
         ensure_ascii=False, indent=2,
     ))

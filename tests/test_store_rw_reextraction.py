@@ -156,6 +156,22 @@ def test_gate_flags_shotgun_density(tmp_path):
     assert result["gate_flags"]["shotgun_severe"] == 8
 
 
+def test_grounding_coverage_tolerates_markup_but_catches_hallucination():
+    from lib.extraction_gate import grounding_coverage, _norm
+    doc = _norm("The Sale Shares constitute the whole of the [deleted] allotted and "
+                "issued equity capital of the Company as of the date hereof.")
+    # a faithful quote whose contiguous match is broken by the redline "[deleted]"
+    grounded = grounding_coverage(
+        "The Sale Shares constitute the whole of the allotted and issued equity capital", doc)
+    assert grounded is not None and grounded >= 0.7
+    # invented text shares almost no shingles with the document
+    hallucinated = grounding_coverage(
+        "The Purchaser shall indemnify the escrow agent against nuclear liability claims", doc)
+    assert hallucinated < 0.7
+    # too short to judge
+    assert grounding_coverage("short", doc) is None
+
+
 def test_store_one_rejects_non_rw_taxonomy(tmp_path):
     out = make_index(tmp_path)
     data = {

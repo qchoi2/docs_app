@@ -31,10 +31,9 @@ from contextlib import closing
 from datetime import datetime, timezone
 from pathlib import Path
 
-from audit_t3_v4 import oversegmentation_issues
 from lib.catalog import require_catalog
 from lib.console import configure_utf8_stdio
-from open_text import read_paragraphs
+from lib.extraction_gate import gate_items
 from prune_backups import DEFAULT_KEEP_DAYS, DEFAULT_KEEP_LATEST, prune
 
 POLARITY = {"affirmative", "negative", "none_exist", "not_applicable"}
@@ -44,117 +43,6 @@ CONFIDENCE = {"low", "med", "high"}
 # RW family and is authoritative — it overrides the regression guard for that one
 # document. Auto-extraction results (no marker) keep the guard.
 _FULL_READ_MARKERS = {"full_read", "full-read", "fullread", "proofread", "정독"}
-
-# --- over/under-extraction gate (root fix ③) ------------------------------------
-# A proofread result is authoritative, but two failure modes can still slip in and
-# corrupt the golden set: OVER-extraction (one ¶ shotgunned into many pseudo-reps,
-# or the same text tagged twice) and HALLUCINATION (a verbatim not actually in the
-# source). The gate runs BEFORE any DELETE/INSERT so it never half-writes a doc.
-# It is deliberately NON-BLOCKING and NON-DESTRUCTIVE except for provably-identical
-# rows: whole-doc rejection is too coarse (one bad pair would drop 90 good items),
-# and taxonomy-shotgun density needs taxonomy judgment (a separate review lane), so
-# suspected over-extraction is surfaced as flags for owner review, not blocked.
-#   - exact-duplicate items (identical FULL tuple) -> auto-collapsed (safe, silent)
-#   - duplicate_verbatim (same text+tag, overlapping ¶ span) -> flagged
-#   - dense ¶ (>= DENSITY_SHOTGUN_SEVERE marked severe) / ungrounded verbatim -> flagged
-# The reject path (store_one returns a status dict) is retained but currently unused;
-# hard-blocking can be re-enabled per-signal once thresholds are calibrated.
-DENSITY_SHOTGUN_SEVERE = 8  # a ¶ with >= this many items is marked severe for review
-GROUNDING_MIN_LEN = 12      # only grounding-check verbatims with >= this many compact chars
-
-
-def _ws(s) -> str:
-    """Whitespace-insensitive form for duplicate keys and grounding substring match."""
-    return "".join(str(s or "").split())
-
-
-def _dup_tuple(it: dict) -> tuple:
-    return (
-        _ws(it.get("verbatim")), str(it.get("proposition") or ""),
-        it.get("statement_polarity"), it.get("subject_role"),
-        it.get("counterparty_role"), it.get("action"), it.get("object_type"),
-        it.get("effective_time"), it.get("taxonomy_id"),
-    )
-
-
-def _doc_text_compact(conn: sqlite3.Connection, out: Path, file_key: str):
-    """Whitespace-stripped full document text (markers removed) for grounding, or
-    None if the txt cache is unavailable. Reads the file directly; the txt_path
-    lookup reuses the caller's connection to avoid a nested DB connection."""
-    row = conn.execute("SELECT txt_path FROM files WHERE file_key=?", (file_key,)).fetchone()
-    rel = (row[0] if row and row[0] else f"txt/{file_key}.txt")
-    path = Path(rel)
-    if not path.is_absolute():
-        path = out / path
-    if not path.exists():
-        return None
-    return _ws(" ".join(text for _n, text in read_paragraphs(path)))
-
-
-def gate_items(conn: sqlite3.Connection, out: Path, file_key: str, items: list):
-    """Screen a proofread result for over-extraction / hallucination.
-
-    Returns (kept_items, flags, reject). ``reject`` is None to proceed, or a status
-    dict to return from store_one WITHOUT touching the DB. ``flags`` is advisory
-    metadata (deduped count, moderate-density paragraphs, ungrounded refs) that is
-    stored alongside the doc and surfaced in the run report.
-    """
-    flags: dict = {}
-
-    # (1) auto-collapse exact-duplicate items (identical full tuple) — provably safe,
-    #     prevents re-introducing the redundancy a prior bulk pass produced.
-    seen: set = set()
-    kept = []
-    for it in items:
-        k = _dup_tuple(it)
-        if k in seen:
-            continue
-        seen.add(k)
-        kept.append(it)
-    if len(kept) != len(items):
-        flags["deduped"] = len(items) - len(kept)
-
-    # (2) over-segmentation: reuse the audit's family-agnostic detector on the items
-    #     as they will be stored (family RW, loc_start present). These are ADVISORY
-    #     — a single dup pair or dense ¶ must not reject an otherwise-good document,
-    #     and taxonomy-shotgun density can only be fixed with taxonomy judgment (a
-    #     separate semantic-review lane), so everything here is FLAGGED, not blocked.
-    probe = [{**it, "family": "RW"} for it in kept]
-    findings = oversegmentation_issues({"items": probe})
-    dense, dup = [], []
-    for f in findings:
-        if f["code"] == "paragraph_oversegmented":
-            dense.append({"loc_start": f["detail"]["loc_start"],
-                          "item_count": f["detail"]["item_count"]})
-        elif f["code"] in ("duplicate_verbatim", "duplicate_verbatim_substring"):
-            dup.append({"code": f["code"],
-                        "loc_start": f["detail"].get("loc_start"),
-                        "item_refs": f["detail"].get("item_refs")})
-    if dense:
-        dense.sort(key=lambda d: -d["item_count"])
-        flags["dense_paragraphs"] = dense
-        if dense[0]["item_count"] >= DENSITY_SHOTGUN_SEVERE:
-            flags["shotgun_severe"] = dense[0]["item_count"]  # egregious ¶ for review
-    if dup:
-        flags["duplicate_verbatim"] = dup
-
-    # (3) grounding: every substantive verbatim should appear in the source text.
-    #     A miss is advisory (normalization can differ), not a hard block.
-    doc = _doc_text_compact(conn, out, file_key)
-    if doc is None:
-        flags["txt_unavailable"] = True
-    else:
-        ungrounded = [
-            (it.get("item_ref") or f"#{i}")
-            for i, it in enumerate(kept, 1)
-            if len(_ws(it.get("verbatim"))) >= GROUNDING_MIN_LEN
-            and _ws(it.get("verbatim")) not in doc
-        ]
-        if ungrounded:
-            flags["ungrounded"] = ungrounded
-
-    return kept, flags, None
-
 
 COLS = [
     "file_key", "item_ref", "family", "taxonomy_id", "proposition", "statement_polarity",
@@ -232,7 +120,7 @@ def store_one(conn: sqlite3.Connection, out: Path, data: dict, known_rw: set,
             raise ValueError(f"{file_key}: bad statement_polarity: {it.get('statement_polarity')}")
     # Over-extraction / hallucination gate — runs before any DELETE so a rejected
     # doc leaves existing rows intact. May drop exact-duplicate items in place.
-    items, gate_flags, reject = gate_items(conn, out, file_key, items)
+    items, gate_flags, reject = gate_items(conn, out, file_key, items, "RW")
     if reject is not None:
         return reject
     # downstream (regression check, insert) now uses the deduped `items`.
