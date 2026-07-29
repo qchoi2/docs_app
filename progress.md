@@ -1373,3 +1373,36 @@ GPT 병렬 산출 626건(items 619 / empty 7 / 파싱실패 0)을 검증·저장
 
 다음: (병행 계속) PAY 정밀 진단 / 버전검색 필터 구현(search_contracts --version 먼저) /
 GPT next40 완료분 store. 재추출 확장은 versioned tier1(체결본) 우선으로 전환.
+
+### 2026-07-29 — PAY/DEF 결함 진단 + 재추출 매니페스트 + Gate B 재측정 (Claude, opus)
+
+버전 2nd-markup 당사자 보정 반영·재적용 완료(46678b1): markup_unknown 중 라운드번호 있는 건을
+거래 초안작성자+라운드 패리티(홀수=상대방 1st, 짝수=작성자 2nd)로 buyer/seller_markup 해소.
+version_role 재부여 분포: execution 690·buyer_markup 158·seller_markup 114·bidding 19 등, integrity ok.
+
+- **★ 부재형 verdicts 재측정(sub-agent, eval_v4_gate --pooled --ungate)**: RW 재추출 효과 실증.
+  RW 부재 정밀도(조세+환경) **47.2%→86.7%**, false-abs **52.8%→13.3%**. 환경 50%→**100%**(오탐 9→0,
+  수렴), 조세 44%→**71%**(오탐 10→2, 개선하나 90%대 미달). 비-RW 4계열 baseline과 완전 동일=무회귀.
+  **게이트 판정: RW 게이트 유지.** 근거: (1)측정이 축소된 stale subset(조세 7·환경 8)뿐 — 재추출 후
+  새로 든 confirmed_absent 풀(조세 32·환경 79) 미검증 → **풀 재검증 필요**, (2)IP·보험·노무·소송엔
+  부재쿼리 자체가 없어 family 인증 불가, (3)RW 재추출 미완 ~139 + 마커대기 ~27, (4)조세 잔여 오탐 2.
+  → 환경만 sub-domain 게이팅 되면 선(先)해제 가능. 릴리스 시퀀스: RW잔여완결→조세2건 정정→풀 재검증→
+  IP/보험/노무/소송 부재쿼리 추가.
+- **★ PAY 과소추출 진단(sub-agent, 원문대조)**: **시스템적 결함**(RW와 동형 "complete인데 하위영역
+  누락"). 723 PAY-complete leaf 중앙값 2, 70% ≤2, **85건 complete인데 항목 0**(61 SPA). 558 SPA 중
+  66%가 ≤2 leaf. 대금요소(base price·정산/NWC·locked-box·earnout·escrow·withholding) 구조적 누락.
+  → **다음 전량 재추출 대상.** 매니페스트 `cs_index/pay_reextraction_manifest.json` **392 타깃**
+  (tier1 61 zero-item SPA 대형부터 / tier2 24 zero-item 비SPA / tier3 307 SPA ≤2-leaf). GPT 지시서
+  `.docs/PAY_REEXTRACTION_AGENT_BRIEF.md`(cc7300b) — RW 정독 워크플로를 PAY 택소노미로 이식.
+- **★ DEF 과소추출 진단(sub-agent, 원문대조)**: **집중 tail 결함**(PAY와 달리 비시스템적). 794
+  complete leaf 중앙값 5·items 중앙값 18(본체 건강). 결함신호는 **items=0**(leaf 아님 — DEF.CONTRACT_TERM
+  캐치올이 16077/20600 항목 흡수). ~110건이 대형(≥30k자)인데 정의조항 통째 미포착(zero 109 중 85 SPA;
+  검증 7/7 실제 정의조항 존재). 택소노미 한계 아님. → **값싼 표적 재실행**(broad pass 아님). 매니페스트
+  `cs_index/def_reextraction_manifest.json` **206 타깃**(items=0 100 + items1~3 106; ≥30k자·items<4 컷,
+  진단 ~110보다 넓게 경계포함). 시퀀싱: PAY 후행/병행.
+- **조율자 인프라(sub-agent 구축 중)**: store_rw는 RW 전용 → **store_pay_reextraction.py**(family
+  파라미터화, full_read override·PAYRX/PAYADD·후퇴가드 동형) 구축 중. 버전검색 필터(v4_search/
+  search_contracts --version + VERSION_LABELS) 구축 중. 커밋은 조율자 리뷰 후.
+
+다음: (병행) 버전필터·PAY store 완료 리뷰·커밋 → v4_search 해제 후 IP/보험/노무/소송 부재쿼리 추가 →
+GPT에 PAY tier1 배정 → PAY 결과 store→Gate 재측정. RW잔여 139·풀 재검증은 별도 트랙.
