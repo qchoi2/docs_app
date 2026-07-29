@@ -38,6 +38,8 @@ DENSITY_SHOTGUN_SEVERE = 8    # a ¶ with >= this many items is marked severe fo
 GROUNDING_MIN_LEN = 12        # only grounding-check verbatims with >= this many norm chars
 GROUNDING_MIN_COVERAGE = 0.7  # fraction of a verbatim's char-shingles that must appear in txt
 GROUNDING_SUSPECT_RATE = 0.5  # above this ungrounded fraction the txt cache itself is suspect
+ITEM_SURGE_FACTOR = 3.0       # new item count >= this * previous -> over-extraction WARN
+ITEM_SURGE_MIN_PREV = 3       # only WARN when the doc previously had at least this many items
 
 
 def _norm(s) -> str:
@@ -106,6 +108,19 @@ def gate_items(conn: sqlite3.Connection, out: Path, file_key: str, items: list, 
         kept.append(it)
     if len(kept) != len(items):
         flags["deduped"] = len(items) - len(kept)
+
+    # (1b) item-count surge vs the doc's existing family extraction — the symmetric
+    #      partner of the store's regression guard (which blocks item DROPS). A sudden
+    #      ~Nx jump is an over-extraction smell; WARN (flag), never block (§9.3-2).
+    try:
+        prev = conn.execute(
+            "SELECT COUNT(*) FROM v4_clause_item WHERE file_key=? AND family=?",
+            (file_key, family),
+        ).fetchone()[0]
+    except sqlite3.Error:
+        prev = 0
+    if prev >= ITEM_SURGE_MIN_PREV and len(kept) >= prev * ITEM_SURGE_FACTOR:
+        flags["item_surge"] = {"previous": prev, "new": len(kept)}
 
     # (2) over-segmentation: reuse the audit's family-agnostic detector on the items as
     #     they will be stored. Everything here is FLAGGED, not blocked.

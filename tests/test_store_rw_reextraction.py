@@ -156,6 +156,24 @@ def test_gate_flags_shotgun_density(tmp_path):
     assert result["gate_flags"]["shotgun_severe"] == 8
 
 
+def test_gate_flags_item_surge_on_replace(tmp_path):
+    # Symmetric to the regression guard: a ~3x jump in item count is an over-extraction
+    # smell, WARNed (flagged) not blocked. (V4_PLAN §9.3-2)
+    out = make_index(tmp_path)
+    small = [{"taxonomy_id": "RW.TAX", "proposition": f"p{i}", "verbatim": f"세무 문장 번호 {i}",
+              "loc_start": i + 1, "statement_polarity": "affirmative"} for i in range(4)]
+    big = [{"taxonomy_id": "RW.TAX", "proposition": f"q{i}", "verbatim": f"세무 진술 항목 {i}",
+            "loc_start": i + 1, "statement_polarity": "affirmative"} for i in range(12)]
+    with closing(sqlite3.connect(out / "catalog.sqlite")) as conn:
+        store_one(conn, out, {"file_key": "b" * 16, "items": small}, _known_rw(conn))
+        conn.commit()
+        result = store_one(conn, out, {"file_key": "b" * 16, "review_method": "full_read",
+                                       "items": big}, _known_rw(conn))
+        conn.commit()
+    assert result["status"] == "stored"
+    assert result["gate_flags"]["item_surge"] == {"previous": 4, "new": 12}
+
+
 def test_grounding_coverage_tolerates_markup_but_catches_hallucination():
     from lib.extraction_gate import grounding_coverage, _norm
     doc = _norm("The Sale Shares constitute the whole of the [deleted] allotted and "
