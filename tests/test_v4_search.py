@@ -176,6 +176,78 @@ def test_pending_family_candidate_blocks_absence(tmp_path):
     assert "pending_taxonomy_candidates:1" in result["needs_review"][0]["coverage"]["reasons"]
 
 
+def _insert_candidate(conn, *, proposed_ko, family, parent, file_key, document_count=1):
+    conn.execute(
+        """
+        INSERT INTO v4_taxonomy_candidate(
+          proposed_ko,family,recommended_parent_id,distinction_reason,
+          evidence_file_key,loc_start,loc_end,verbatim,document_count,status,
+          created_at,updated_at
+        ) VALUES (?,?,?,'검토 필요',?,1,1,?,?,'pending',?,?)
+        """,
+        (proposed_ko, family, parent, file_key, proposed_ko, document_count, NOW, NOW),
+    )
+
+
+def test_one_off_document_specific_candidate_does_not_block_absence(tmp_path):
+    # A pending document-specific one-off (single doc, bare family-root catch-all
+    # parent, no cross-doc cluster) must NOT demote confirmed_absent. Per
+    # V4_PLAN §9.2 T-D absence eligibility is decoupled from that backlog.
+    out = make_index(tmp_path)
+    with closing(sqlite3.connect(out / "catalog.sqlite")) as conn:
+        _insert_candidate(
+            conn,
+            proposed_ko="이 계약 고유 정의어",
+            family="CP",
+            parent="CP",  # bare family root => catch-all one-off
+            file_key="b" * 16,
+        )
+        conn.commit()
+    result = search_clause_absence(out, "CP.THIRD_PARTY_CONSENT")
+    assert [row["file_key"] for row in result["confirmed_absent"]] == ["b" * 16]
+    reasons = result["confirmed_absent"][0]["coverage"]["reasons"]
+    assert not any(r.startswith("pending_taxonomy_candidates") for r in reasons)
+
+
+def test_specific_subnode_candidate_still_blocks_absence(tmp_path):
+    # A pending candidate recommended under a specific sub-node (dotted parent)
+    # is a genuine taxonomy gap, not a one-off — it still demotes to needs_review.
+    out = make_index(tmp_path)
+    with closing(sqlite3.connect(out / "catalog.sqlite")) as conn:
+        _insert_candidate(
+            conn,
+            proposed_ko="새 종결 선행조건 명제",
+            family="CP",
+            parent="CP.THIRD_PARTY_CONSENT",  # dotted => specific sub-node
+            file_key="b" * 16,
+        )
+        conn.commit()
+    result = search_clause_absence(out, "CP.THIRD_PARTY_CONSENT")
+    assert result["confirmed_absent"] == []
+    by_key = {row["file_key"]: row for row in result["needs_review"]}
+    assert "pending_taxonomy_candidates:1" in by_key["b" * 16]["coverage"]["reasons"]
+
+
+def test_cross_document_candidate_still_blocks_absence(tmp_path):
+    # The same proposed name appearing across >1 document is a genuine cross-doc
+    # cluster (not a one-off) even with a bare catch-all parent — still blocks.
+    out = make_index(tmp_path)
+    with closing(sqlite3.connect(out / "catalog.sqlite")) as conn:
+        for fk in ("b" * 16, "c" * 16):
+            _insert_candidate(
+                conn,
+                proposed_ko="여러 계약 공통 명제",
+                family="CP",
+                parent="CP",  # bare, but recurs across docs
+                file_key=fk,
+            )
+        conn.commit()
+    result = search_clause_absence(out, "CP.THIRD_PARTY_CONSENT")
+    assert result["confirmed_absent"] == []
+    by_key = {row["file_key"]: row for row in result["needs_review"]}
+    assert "pending_taxonomy_candidates:1" in by_key["b" * 16]["coverage"]["reasons"]
+
+
 def test_compare_distinguishes_present_absent_and_review(tmp_path):
     out = make_index(tmp_path)
     result = compare_clause_items(

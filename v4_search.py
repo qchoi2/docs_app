@@ -211,6 +211,67 @@ def _dedupe_item_rows(rows: Iterable[dict], show_duplicates: bool) -> list[dict]
     return result
 
 
+def _blocking_pending_candidates(
+    conn: sqlite3.Connection,
+    family: str,
+    file_keys: Iterable[str] | None = None,
+) -> dict[str, int]:
+    """Count pending taxonomy candidates that genuinely block absence.
+
+    Per .docs/V4_PLAN.md §9.2 T-D (owner decision 2026-07-29), absence
+    eligibility is DECOUPLED from the document-specific taxonomy-candidate
+    backlog. A pending candidate that is a document-specific one-off — a single
+    defined term / catch-all clause snippet that the generator could not place
+    under any specific taxonomy sub-node — must NOT block a document from
+    confirmed_absent. Such a candidate is the generator's per-document noise,
+    not evidence that a whole family/sub-domain went unextracted.
+
+    A pending candidate still blocks (is counted here) when it looks like a
+    genuine, potentially systematic taxonomy gap rather than a one-off:
+      * it is recommended under a specific sub-node (dotted ``recommended_parent_id``
+        such as ``RW.TAX``), i.e. it was placed near a real sub-domain; OR
+      * the generator marked it multi-document (``document_count > 1``); OR
+      * its proposed name recurs across more than one evidence document
+        (a genuine cross-document cluster).
+
+    Document-specific one-offs — a bare family-root catch-all parent (no dot, or
+    NULL) AND ``document_count <= 1`` AND no cross-document cluster — are ignored.
+
+    This is a query-time decoupling only: the candidate rows are not modified.
+    Genuine per-family/per-sub-domain coverage gating is unaffected, and the RW
+    ABSENCE_UNVERIFIED_FAMILIES safety gate stays intact independently.
+    """
+    rows = conn.execute(
+        """
+        WITH crossdoc AS (
+            SELECT proposed_ko
+            FROM v4_taxonomy_candidate
+            WHERE family=? AND status='pending' AND proposed_ko IS NOT NULL
+            GROUP BY proposed_ko
+            HAVING COUNT(DISTINCT evidence_file_key) > 1
+        )
+        SELECT evidence_file_key, COUNT(*) AS n
+        FROM v4_taxonomy_candidate c
+        WHERE c.family=? AND c.status='pending'
+          AND (
+                c.recommended_parent_id LIKE '%.%'
+             OR COALESCE(c.document_count, 1) > 1
+             OR c.proposed_ko IN (SELECT proposed_ko FROM crossdoc)
+          )
+        GROUP BY evidence_file_key
+        """,
+        (family, family),
+    )
+    counts = {
+        str(row["evidence_file_key"]): int(row["n"])
+        for row in rows
+    }
+    if file_keys is not None:
+        wanted = {str(key) for key in file_keys}
+        counts = {key: n for key, n in counts.items() if key in wanted}
+    return counts
+
+
 def _coverage_state(
     conn: sqlite3.Connection,
     file_row: sqlite3.Row | dict,
@@ -278,15 +339,7 @@ def _coverage_state(
             stale_sources += 1
     if stale_sources:
         reasons.append(f"source_stale:{stale_sources}")
-    pending = int(
-        conn.execute(
-            """
-            SELECT COUNT(*) FROM v4_taxonomy_candidate
-            WHERE evidence_file_key=? AND family=? AND status='pending'
-            """,
-            (file_key, family),
-        ).fetchone()[0]
-    )
+    pending = _blocking_pending_candidates(conn, family, [file_key]).get(file_key, 0)
     if pending:
         reasons.append(f"pending_taxonomy_candidates:{pending}")
     return {
@@ -352,19 +405,7 @@ def _bulk_coverage_states(
     ):
         if str(row["file_key"]) in requested:
             complete_sources.setdefault(str(row["file_key"]), []).append(row)
-    pending = {
-        str(row["evidence_file_key"]): int(row["n"])
-        for row in conn.execute(
-            """
-            SELECT evidence_file_key,COUNT(*) AS n
-            FROM v4_taxonomy_candidate
-            WHERE family=? AND status='pending'
-            GROUP BY evidence_file_key
-            """,
-            (family,),
-        )
-        if str(row["evidence_file_key"]) in requested
-    }
+    pending = _blocking_pending_candidates(conn, family, requested.keys())
 
     states = {}
     for file_key, file_row in requested.items():
