@@ -1345,3 +1345,31 @@ GPT 병렬 산출 626건(items 619 / empty 7 / 파싱실패 0)을 검증·저장
 
 미완: keep12 중 4건(289475b·a4607ea·add0364·5853fe0) + 스킵 13 + tier3 잔여. 세션 리셋(1:50pm) 후.
 다음: 미완 4 완결 → under<도메인12 컷으로 확장 지속 여부 판단 → 표적 일단락 시 부재형 verdicts 재측정.
+
+### 2026-07-29 — 버전(체결본/초안/mark-up) 분류·dedup + 버전검색 설계 (Claude, opus)
+
+소유자 통찰: 계약서는 같은 거래(project)에 체결본·매수인/매도인 초안·mark-up 등 여러 버전으로
+존재. ① 체결본 우선 정독으로 중복 제거(효율), ② 검색을 버전별로 구분(예: "매수인 초안의 자산
+진술보장 문구"). **최종적으로는 전 버전 정독**이 목표(체결본 우선은 순서이지 초안 영구 제외 아님).
+
+- **버전 분류 도구 `classify_version.py`**: 파일명→`version_role` 10종
+  (execution/bidding/buyer_draft/seller_draft/buyer_markup/seller_markup/draft_unknown/
+  markup_unknown/buyer_ver/seller_ver/unknown). 소유자 정정 반영: **"1st/2nd/3rd"=mark-up 라운드**
+  (초안 작성측 상대방 수정, draft 아님), **bidding/제출본=매수인 입찰제출본 별도 분류**.
+  `--apply`로 전체 files에 부여(백업 pre_version_role_*, integrity ok). 분포: execution 690·
+  draft_unknown 281·markup_unknown 242·buyer_draft 153·buyer_markup 148·seller_draft 137·
+  seller_markup 106·bidding 19·unknown 311·buyer/seller_ver 19.
+- **체결본 우선 dedup**: `--priority`로 재추출 733을 project(거래)로 묶어 대표 1건(체결본>초안>
+  mark-up 순)만 tier1, 나머지 버전은 tier2. **733→거래 403(tier1 대표 403 / tier2 중복 330)
+  = 45% 절감**. 체결본 대표 215·초안대표(체결본없음) 188. 산출: `rw_reextract_priority_versioned.json`.
+  방침: tier1(체결본 우선) 먼저, **tier2(중복 버전)도 최종 전부 정독**.
+- **next40 점검**: 16 체결본 + 24 비체결본(15건은 같은 거래 체결본이 코퍼스에 존재). GPT 진행분은
+  방침상 유지(전부 정독), 향후 확장은 versioned tier1 우선 적용.
+- **[설계] 버전별 검색** (구현 대기): `files.version_role`를 기반으로 (a) `search_contracts.py`에
+  `--version`(체결본/매수인초안/…) 필터, (b) `v4_search` 구조화 검색에 version_role 조인해 버전별
+  RW 항목 검색, (c) 결과에 version_role 한글 라벨 표시(VERSION_LABELS). CLI/웹/MCP 전파.
+  예시 쿼리 "제조업 SPA 매수인 초안의 자산 진술보장" = ctype SPA + version_role=buyer_draft +
+  RW.ASSETS. **미비: 업종(제조업) 메타는 코퍼스에 없음** → 업종 분류는 별도 과제로 큐잉.
+
+다음: (병행 계속) PAY 정밀 진단 / 버전검색 필터 구현(search_contracts --version 먼저) /
+GPT next40 완료분 store. 재추출 확장은 versioned tier1(체결본) 우선으로 전환.
