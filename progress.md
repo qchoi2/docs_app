@@ -3,6 +3,8 @@
 > 상세 초기 이력(Phase 0~3, 2026-07-09~07-16)은 [.docs/PROGRESS_ARCHIVE.md](.docs/PROGRESS_ARCHIVE.md)로 이동했다.
 > 이 파일은 **현재 상태 요약 + V4 원자 항목 계층 이력**을 유지한다.
 
+> **다음 할 일은 [NOW.md](NOW.md)가 단일 원천이다.** 이 파일은 이력·현재 상태 기록이다.
+
 ## 현재 상태 요약 (Current Status) — 2026-07-27 기준
 
 **프로젝트**: M&A 계약서 샘플 코퍼스(약 2,245파일)를 자연어로 검색하는 개인용 프로그램.
@@ -55,8 +57,8 @@
   no-reliance·독자조사·권한 등). store replace는 이제 RW.BUYER도 전체 교체 대상이고, 후퇴 가드가
   RW.BUYER 도메인 손실도 스킵으로 보호(구버전 buyer-less 결과가 기존 buyer를 지우지 못함).
   → 매수인 진술 존재·부재 검색이 신뢰성 있게 열린다.
-- **다음**: 나머지 tax/env false-absence(~9) + 733 전량 재추출(매수인 진술 포함) → RW 게이팅 해제
-  → Gate B 재측정 → 확장 재개 판정. rep→covenant 오분류(COV.NON_COMPETE 31%)는 재추출 프롬프트로 시정.
+- **다음**: → **[NOW.md](NOW.md)** 참조. 앞으로 할 일 목록은 이 절에서 유지하지 않는다(단일 원천 이관).
+  위 항목들은 2026-07-28 시점의 **상태 기록**이며, 그 이후 진척·우선순위·담당은 NOW.md가 최신이다.
 - **다른 계열로 일반화 (2026-07-28 결정, RW 마무리 후)**: RW를 Gate B로 개선 확인한 뒤,
   `audit_rw_coverage.py`를 CP/COV/DEF/PAY/REM용으로 일반화해 "complete인데 하위영역 누락"을
   **먼저 측정**하고, 결함이 확인된 계열만 동일 파이프라인(plan→병렬 result JSON→store→eval)으로
@@ -1406,3 +1408,98 @@ version_role 재부여 분포: execution 690·buyer_markup 158·seller_markup 11
 
 다음: (병행) 버전필터·PAY store 완료 리뷰·커밋 → v4_search 해제 후 IP/보험/노무/소송 부재쿼리 추가 →
 GPT에 PAY tier1 배정 → PAY 결과 store→Gate 재측정. RW잔여 139·풀 재검증은 별도 트랙.
+
+### 2026-07-29 — 계획 검토 지적 5건 반영: 단일 원천·번다운·저장소 위생 (Claude, opus 5 + 서브에이전트 5)
+
+소유자 리뷰 지적 5건을 서브에이전트 5개 병렬로 처리. 조율자는 DB 쓰기·삭제·git만 담당.
+**세부 상태·다음 할 일은 이제 [NOW.md](NOW.md)에 있다 — 이 항목은 경위 기록이다.**
+
+- **① §9.1 항목 수 불일치 정정**: "아래 **4개**를 모두 충족"인데 항목이 5개(#5 존재형 정밀도가
+  2026-07-29에 추가되며 본문 미수정). 5개로 정정하고, 같은 절의 두 번째 stale 카운트
+  ("1·2·3·4 모두 미완"→"1~5")도 발견·수정. §9.1이 스스로 "변경 시 날짜/사유 갱신"을 규정하므로
+  **개정 이력 블록**을 추가해 #5 추가(2026-07-29 소유자 승인, 게이트 강화 방향)를 감사 가능하게 했다.
+- **② "다음 할 일" 단일 원천 = `NOW.md` 신설**: 그간 progress.md Resume·각 세션 "다음:"·
+  V4_PLAN §9.2·PLAN_REVIEW 권고 6개·NEXT_STEPS.md에 산재(§9.2 T-A의 "한 줄로만 스쳐 실행에서
+  누락됨"이 그 비용의 자백). NOW.md = 진행 중 / 다음(우선순위 15행) / 차단·보류 / 갱신 규칙.
+  각 행은 상태·담당·근거문서 링크만 갖고 이유는 원 문서에 둔다. 담당 미정은 `미배정`으로 명시.
+  상태는 가정하지 않고 코드·DB로 확인(T-A 미착수 = `v4_search.py:628` 여전히 family 플래그,
+  T-B 골든쿼리 V4A09~A12는 **작성 완료·`pool_verified` 비어 있음**).
+  포인터 재배선: progress.md 최상단 선언 + Resume `다음:` 불릿 → 포인터, V4_PLAN §9.2·PLAN_REVIEW
+  권고 시퀀스에 추적 위치 명시. `NEXT_STEPS.md` → `.docs/NEXT_STEPS_ARCHIVE_20260724.md`로 이동
+  (이름 자체가 권위 문서로 오독되던 원인. 내용 보존, 인바운드 참조는 전부 아카이브 산문의 평문).
+- **③ 번다운 지표 상설화(PLAN_REVIEW 권고 5, 미구현이던 것)**: `burndown.py` + UI-2 대시보드
+  번다운 패널(`/api/ops/burndown`). **drift 방지가 설계 핵심** — 부재 적격 판정을 재구현하지 않고
+  `v4_search`의 `_bulk_coverage_states`·`_blocking_pending_candidates`·`ABSENCE_UNVERIFIED_FAMILIES`를
+  import해 `search_clause_absence`의 분기를 그대로 재생하고, 두 결과의 일치를 테스트가 단언한다.
+  산출 불가 지표는 날조 대신 `null`+사유. PLAN_REVIEW의 분모 정의(부수문서 필터 미적용)를 그대로
+  재현하고 primary-only 소계를 병기해 과거 수치와 비교 가능성을 유지.
+- **④ 루트 0바이트 `catalog.sqlite` — 원인 특정 후 가드**: 추측이 아니라 로그로 확정.
+  2026-07-29T15:51:24 서브에이전트가 저장소 루트에서 `sqlite3.connect('catalog.sqlite')`를 상대
+  경로로 호출 → `SQLITE_OPEN_CREATE`로 빈 파일 생성(`--out .`이 아니라 ad-hoc 한 줄 질의였다).
+  루트 `agent_log.jsonl`도 동일 증상. 원인은 CLAUDE.md가 cwd를 `cs_index/`로 가정해 쓰여 있는데
+  에이전트는 루트에서 실행한다는 것.
+  → `lib/catalog.py`에 `require_catalog()`/`connect_catalog(create=False)`: 없음·디렉터리·**0바이트**
+  거부, 아무것도 만들지 않음. `CatalogNotFoundError`를 `FileNotFoundError`로도 상속시켜 기존 예외
+  처리 무변경. 무방비였던 곳은 `taxonomy_admin.connect_admin`(쓰기)·`audit_t3_v4.audit_v4`.
+  CLAUDE.md의 `--out .` 6곳·`sqlite3 catalog.sqlite`·로그 경로를 `cs_index/` 기준으로 고치고
+  상단에 사고 경위 포함 경로 규칙 고정. 루트 로그 4건은 `cs_index/agent_log.jsonl`에 병합 후 삭제.
+- **⑤ 백업 보존 정책(소유자 결정: 최근 2개 + 30일, 손상본 보존)**: `prune_backups.py`
+  (dry-run 기본, `--delete` 명시 필요, incident 클래스 분리 → `--include-incident` 없이는 불가침).
+  store_rw/pay에 `--prune-backups`, backup_index에 `--prune` 옵션 연결로 재적재 차단.
+  실행: **삭제 14건/224 KB**(본체 없는 고아 `-wal`/`-shm`만). 07-24 스냅샷은 전부 30일 이내라 보존.
+  **실측 총량은 3.6 GB가 아니라 16.5 GB**(루트 `.backups/` 7.3 GB를 최초 집계에서 누락).
+  `cs_index/catalog.pre_*_20260724` 5개는 코드 경로가 아닌 수동 복사본으로 확인.
+
+측정(번다운 도구, 2026-07-29):
+- 대상유형 진행률 core **793/1,623 = 48.9%**(07-27 782 대비 +11). SPA 99.6%·SSA 28.3%·
+  ATA/BTA 5.7%·**SHA 2.1%** — 남은 core 833 중 830이 SHA/SSA/ATA·BTA. 쏠림 무변화.
+- 부재 질의 (문서×family) 10,800쌍 중 **가능 1,594 · 차단 9,206**(RW은 게이트로 0).
+- **차단 사유 히스토그램이 우선순위를 뒤집는다**: `family_not_evaluated` 4,998 → `annex_partial`
+  3,863 → `pending_taxonomy_candidates` 2,634 → … `body_partial` 67. **본문 추출은 사실상 문제가
+  아니고 미평가·별지가 진짜 병목.** annex partial이 6개 family에 318~399로 균일.
+- **T-D 재평가**: 질의시점 decouple(1ec2d6c)만으로는 부족함이 실측됨. pending 29,807 중
+  **17,818이 여전히 차단**(비차단 11,989), 실제 막힌 문서 **835건**. 즉 T-D ②(생성기 강화 +
+  기존 backlog 재분류)는 "신규 유입 차단"이 아니라 **지금 막힌 835문서를 여는 작업**이다.
+- coverage 기록 문서 968 vs item 보유 문서 960의 차이 8건은 평가했으나 해당 family item이 0인
+  문서다. **감소가 아니다**(문서 3곳이 950/968/960으로 달랐던 원인 = 지표 혼용, 권고 5로 해소).
+
+소유자 결정(2026-07-29): T-D ②는 **도구·dry-run 수치까지만** 이번 세션에 만들고,
+DB 쓰기(기존 backlog 재분류·`document_count` 백필)는 수치 검토 후 별도 승인.
+
+- **⑥ 버전 분류의 한계를 검색에 정직하게 노출**: `version_role`은 파일명 휴리스틱 단독인데
+  `--version`이 하드 필터였다 → unknown 311 + draft_unknown 281 + markup_unknown 224
+  (코퍼스 약 37%)와 라운드 패리티 추정분이 **조용히 누락**됐다(마커 없는 체결본이
+  `--version execution`에서 경고 없이 사라짐). is_draft 철학대로 "떨어뜨리지 말고 보여준다"로 전환:
+  - `version_basis`(JSON, 기존 `files.source_signals` 형태 차용) = 발동 규칙·매칭 토큰·충돌·
+    라운드 패리티 추론 객체. `version_confidence` = `doc_meta.confidence`와 같은 high/med/low 어휘.
+    **라운드 패리티 추론은 항상 low.** 역할 배정은 바이트 동일(dry-run이 현 분포 재현) —
+    1147 high / 598 med / 361 low.
+  - 매칭 결과는 하위호환 유지. low-confidence를 결과에 주입하거나 `confirmed_absent`↔
+    `needs_review` 사이로 옮기지 **않는다** — `coverage.reasons`는 "조항 커버리지 증명"을
+    뜻해야지 버전 귀속을 뜻하면 안 되기 때문. 대신 축을 분리해 `version_filter_notice`
+    (excluded_unknown / excluded_low_confidence / excluded_partial / 한글 warning /
+    review_candidates 표본)로 별도 고지. CLI·웹·MCP 전파.
+  - 백필 전에는 정직하게 degrade: confidence null, `version_review_required=true`,
+    `version_classification_not_backfilled` 경고.
+  - 실증: `--version 체결본` V4 질의에서 **그간 보이지 않던 unknown 52건 제외**를 보고.
+
+커밋: `6c34a38`(문서·단일원천·§9.1) · `4936e0d`(가드·보존정책) · `a28d9e0`(번다운) ·
+`d3319e4`(버전 정직화) · `5a579cc`(T-D 후보 승인규칙 도구).
+검증: `python -m pytest --basetemp=<쓰기가능경로>` → **388 passed, 1 skipped**(이전 253에서 증가).
+`python eval_search.py --out cs_index --json` → **fail 0**(회귀 없음).
+
+**소유자 승인 대기 중인 DB 쓰기 2건** (이번 세션에서 실행하지 않음):
+1. 버전 분류 백필 — `python classify_version.py --out cs_index --dry-run` 확인 후 `--apply`.
+   additive 컬럼 + 백업 + 멱등. 실행 전까지 버전 신뢰도 UI는 "미백필"로 표시된다.
+2. T-D backfill + 재분류 — 아래 순서 고정. 3번 리포트를 소유자가 검토한 뒤 4번 실행.
+   ```
+   python backfill_v4_candidate_recurrence.py --out cs_index            # dry-run
+   python backfill_v4_candidate_recurrence.py --out cs_index --apply
+   python reclassify_v4_candidate_backlog.py --out cs_index --report .docs/v4_backlog_reclassify_dryrun.json
+   python reclassify_v4_candidate_backlog.py --out cs_index --apply --report .docs/v4_backlog_reclassify_applied.json
+   ```
+   **백필 단독 실행 금지** — 두 단계는 함께 돌려야 한다(백필만 하면 22쌍 감소).
+
+⚠️ **동시 쓰기 주의**: 이 세션 종료 시점에 다른 세션이 `dedup_removed_20260729T164731.jsonl`
+(14MB)을 남기며 v4_clause_item 중복 제거를 수행한 흔적이 있다. 위 DB 쓰기는 **단일 writer
+원칙상 다른 세션이 조용할 때** 실행한다. 위 실측 수치도 그 dedup 이전 기준일 수 있다.
