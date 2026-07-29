@@ -72,6 +72,36 @@ python search_contracts.py --out C:\cs_index --type SPA --lang 국문 --kw earn-
 # T3 clause_map 필터
 python search_contracts.py --out C:\cs_index --clause 손해배상 --present --json
 python search_contracts.py --out C:\cs_index --clause 경업금지 --absent --json
+
+# 계약 버전 필터 (role key 또는 한글 라벨, 콤마로 다중)
+python search_contracts.py --out C:\cs_index --kw 손해배상 --version 체결본 --json
+python search_contracts.py --out C:\cs_index --kw 손해배상 --version "매수인 초안,매도인 초안" --json
+```
+
+### 4.1 `--version` 필터의 근거와 한계
+
+`--version`은 `files.version_role`(체결본/매수인 초안/…)에 대한 필터이고, 이 라벨은
+`classify_version.py`가 **파일명만 보고** 붙인 휴리스틱 결과입니다. 본문을 읽지 않으므로
+파일명에 표식이 없는 체결본은 `unknown`으로 남고, `draft_unknown`·`markup_unknown`처럼
+당사자나 단계가 비어 있는 라벨, `1st/2nd` 라운드 패리티로 **추론된** 당사자도 있습니다.
+따라서 `--version`은 "그 버전의 전수"가 아닙니다.
+
+- 각 분류는 근거 `files.version_basis`(JSON: 발화한 토큰·규칙·추론)와 신뢰도
+  `files.version_confidence`(high/med/low)를 함께 저장합니다. 두 컬럼이 아직 비어 있는
+  색인(백필 전)에서는 결과가 `version_confidence: null`로 나오고 전부 "확인 필요"로
+  표시됩니다 — 확신처럼 읽지 마세요.
+- `--version`을 쓴 응답에는 항상 `version_filter_notice`가 붙습니다:
+  `excluded_unknown`(버전 미상), `excluded_partial`(당사자·단계 부분 미상),
+  `excluded_low_confidence`(저신뢰), `excluded_unrated`(신뢰도 미기록),
+  `matched_low_confidence`(결과에 포함됐지만 확인 필요), `review_candidates`(제외된
+  문서 표본). `warnings`에도 같은 내용이 `version_filter_excluded_*` 토큰으로 들어갑니다.
+- 결과 행에는 `version_label`, `version_confidence`, `version_basis`,
+  `version_basis_summary`, `version_review_required`가 함께 실립니다.
+- 라벨 백필/갱신(단일 writer가 실행):
+
+```powershell
+python classify_version.py --out C:\cs_index --dry-run   # 쓰기 없이 분포 확인
+python classify_version.py --out C:\cs_index --apply     # 백업 후 role/basis/confidence 부여
 ```
 
 JSON 결과의 `why`, `score_breakdown`, `snippet_paras`로 선정 이유와 ¶위치를 확인하고,

@@ -3,7 +3,7 @@
 "use strict";
 
 const state = {
-  kw: [], type: "", lang: "", expand: "normal",
+  kw: [], type: "", lang: "", expand: "normal", version: "",
   excludeDrafts: false, showDuplicates: false,
   clause: "", clauseMode: "",
   limit: 20, offset: 0, total: 0,
@@ -100,16 +100,33 @@ async function loadFacets() {
     const facets = await (await api("/api/search/facets")).json();
     fillSelect($("filter-type"), facets.ctype);
     fillSelect($("filter-lang"), facets.lang);
+    fillSelect($("filter-version"), facets.version_role, (item) => item.label || item.value);
+    renderVersionFilterHelp(facets.version_meta);
   } catch (e) { announce("필터 옵션을 불러오지 못했습니다"); }
 }
 
-function fillSelect(select, items) {
+function fillSelect(select, items, labelOf) {
+  if (!select) return;
   for (const item of items || []) {
     const option = document.createElement("option");
     option.value = item.value;
-    option.textContent = `${item.value} (${item.count})`;
+    const label = labelOf ? labelOf(item) : item.value;
+    option.textContent = `${label} (${item.count})`;
     select.appendChild(option);
   }
+}
+
+/* 버전 필터는 파일명 휴리스틱이다 — 무엇이 빠질 수 있는지 필터 옆에 상시 표시한다
+   (is_draft=null을 "판별 불가"로 드러내는 것과 같은 원칙). */
+function renderVersionFilterHelp(meta) {
+  const help = $("version-filter-help");
+  if (!help || !meta) return;
+  const parts = ["버전은 파일명 휴리스틱 분류입니다 — 파일명에 표식이 없는 체결본은 “버전 미상”으로 남아 필터에서 빠집니다."];
+  if (meta.unattributed_docs) parts.push(`현재 버전 미상 ${meta.unattributed_docs}건.`);
+  if (meta.classification_recorded === false) {
+    parts.push("이 색인에는 분류 근거·신뢰도가 아직 기록되지 않았습니다 (classify_version.py --apply 필요).");
+  }
+  help.textContent = parts.join(" ");
 }
 
 /* ---------- events ---------- */
@@ -129,7 +146,8 @@ function bindEvents() {
     panel.hidden = !panel.hidden;
     $("toggle-filters").setAttribute("aria-expanded", String(!panel.hidden));
   });
-  for (const [id, key] of [["filter-type", "type"], ["filter-lang", "lang"], ["filter-expand", "expand"]]) {
+  for (const [id, key] of [["filter-type", "type"], ["filter-lang", "lang"],
+                           ["filter-expand", "expand"], ["filter-version", "version"]]) {
     $(id).addEventListener("change", (event) => { state[key] = event.target.value; submitSearch(); });
   }
   $("filter-drafts").addEventListener("change", (e) => { state.excludeDrafts = e.target.checked; submitSearch(); });
@@ -169,6 +187,7 @@ function updateUrl() {
   state.kw.forEach((term) => params.append("kw", term));
   if (state.type) params.set("type", state.type);
   if (state.lang) params.set("lang", state.lang);
+  if (state.version) params.set("version", state.version);
   if (state.expand !== "normal") params.set("expand", state.expand);
   if (state.excludeDrafts) params.set("exclude_drafts", "1");
   if (state.showDuplicates) params.set("show_duplicates", "1");
@@ -185,6 +204,7 @@ function restoreFromUrl() {
   state.kw = params.getAll("kw");
   state.type = params.get("type") || "";
   state.lang = params.get("lang") || "";
+  state.version = params.get("version") || "";
   state.expand = ["strict", "normal", "broad"].includes(params.get("expand")) ? params.get("expand") : "normal";
   state.excludeDrafts = params.get("exclude_drafts") === "1";
   state.showDuplicates = params.get("show_duplicates") === "1";
@@ -194,6 +214,7 @@ function restoreFromUrl() {
   $("search-input").value = state.kw.join(", ");
   $("filter-type").value = state.type;
   $("filter-lang").value = state.lang;
+  $("filter-version").value = state.version;
   $("filter-expand").value = state.expand;
   $("filter-drafts").checked = state.excludeDrafts;
   $("filter-dups").checked = state.showDuplicates;
@@ -205,6 +226,7 @@ function restoreFromUrl() {
 function searchBody() {
   return {
     kw: state.kw, type: state.type || null, lang: state.lang || null,
+    version: state.version || null,
     expand: state.expand, exclude_drafts: state.excludeDrafts,
     show_duplicates: state.showDuplicates, limit: state.limit, offset: state.offset,
     clause: state.clause && state.clauseMode ? state.clause : null,
@@ -242,6 +264,10 @@ function renderChips() {
     label: "확장: " + ({ strict: "정확하게", broad: "넓게" }[state.expand]),
     undo: () => { state.expand = "normal"; $("filter-expand").value = "normal"; },
   });
+  if (state.version) chips.push({
+    label: "버전: " + versionOptionLabel(state.version),
+    undo: () => { state.version = ""; $("filter-version").value = ""; },
+  });
   if (state.excludeDrafts) chips.push({ label: "Draft 제외", undo: () => { state.excludeDrafts = false; $("filter-drafts").checked = false; } });
   if (state.showDuplicates) chips.push({ label: "중복본 펼침", undo: () => { state.showDuplicates = false; $("filter-dups").checked = false; } });
   if (state.clause && state.clauseMode) chips.push({
@@ -268,7 +294,44 @@ const WARNING_LABELS = {
   short_term_fallback: (value) => `2글자 검색어 폴백: ${value}`,
   unsearchable_docs: (value) => `본문 검색 불가 문서 ${value}건`,
   term_dict_not_found: () => "동의어 사전 미발견",
+  version_filter_excluded_unknown: (value) => `버전 미상 제외 ${value}건`,
+  version_filter_excluded_partial: (value) => `버전 부분 미상 제외 ${value}건`,
+  version_filter_excluded_low_confidence: (value) => `저신뢰 분류 제외 ${value}건`,
+  version_low_confidence_results: (value) => `결과 중 버전 확인 필요 ${value}건`,
+  version_classification_not_backfilled: () => "버전 분류 근거 미기록",
 };
+
+function versionOptionLabel(role) {
+  const option = Array.from($("filter-version").options)
+    .find((item) => item.value === role);
+  return option ? option.textContent.replace(/\s*\(\d+\)$/, "") : role;
+}
+
+/* --version은 하드 필터라 조용히 누락시킬 수 있다. 무엇이 빠졌는지 결과 위에
+   항상 보여준다 (JSON에만 넣지 않는다). */
+function renderVersionNotice(data) {
+  const box = $("version-notice");
+  if (!box) return;
+  const notice = data.version_filter_notice;
+  if (!notice) { box.hidden = true; box.innerHTML = ""; return; }
+  const partial = Object.entries(notice.excluded_partial || {});
+  const partialText = partial.length
+    ? partial.map(([role, n]) => `${esc(role)} ${n}건`).join(", ")
+    : "없음";
+  const samples = (notice.review_candidates || []).slice(0, 5).map((row) =>
+    `<li><span class="code">${esc(row.file_key)}</span> ${esc(row.version_label || "버전 미상")} · ` +
+    `${esc(row.exclusion_reason)} · ${esc(row.version_basis_summary)}</li>`).join("");
+  box.innerHTML =
+    `<strong>버전 필터 고지</strong> — ${esc(notice.warning)}` +
+    `<ul class="version-notice-counts">` +
+    `<li>제외 합계 ${notice.excluded_total}건 (버전 미상 ${notice.excluded_unknown}건 · ` +
+    `부분 미상 ${partialText} · 저신뢰 ${notice.excluded_low_confidence}건 · ` +
+    `신뢰도 미기록 ${notice.excluded_unrated}건)</li>` +
+    `<li>결과 내 확인 필요 ${notice.matched_low_confidence}건</li>` +
+    `</ul>` +
+    (samples ? `<div class="body-muted">확인 필요 후보(표본)</div><ul class="version-notice-samples">${samples}</ul>` : "");
+  box.hidden = false;
+}
 
 function renderSummary(data) {
   $("summary-row").hidden = false;
@@ -285,6 +348,7 @@ function renderSummary(data) {
     badges.appendChild(badge);
   }
   $("export-md").disabled = $("export-csv").disabled = $("save-search").disabled = data.total === 0;
+  renderVersionNotice(data);
 }
 
 function renderResults(data, append) {
@@ -308,6 +372,14 @@ function resultCard(item) {
       (state.expand === "broad" ? "넓은 확장 매칭" : "동의어 매칭") + "</span>");
   if (item.is_draft === 1) badges.push('<span class="badge draft">Draft</span>');
   if (item.is_draft == null) badges.push('<span class="badge draft">Draft 판별불가</span>');
+  // 버전 라벨은 파일명 휴리스틱 — 신뢰도와 확인 필요 여부를 함께 보여준다.
+  if (item.version_label || item.version_role) {
+    badges.push(`<span class="badge" title="${esc(item.version_basis_summary || "")}">` +
+      `버전 ${esc(item.version_label || item.version_role)}` +
+      `${item.version_confidence ? " · " + esc(item.version_confidence) : ""}</span>`);
+  }
+  if (item.version_review_required)
+    badges.push('<span class="badge-warning">버전 확인 필요</span>');
   if (item.dup_count > 1) badges.push(`<span class="badge">중복 ${item.dup_count}건 중 대표본</span>`);
   if (item.clause && item.clause.status)
     badges.push(`<span class="badge exact">T3 조항 ${esc(item.clause.status === "present" ? "있음" : "없음")}</span>`);
@@ -511,6 +583,7 @@ function describeHistoryItem(item) {
   if (filters.lang) parts.push(filters.lang);
   if (item.expand_mode && item.expand_mode !== "normal")
     parts.push({ strict: "정확하게", broad: "넓게" }[item.expand_mode] || item.expand_mode);
+  if (filters.version) parts.push(`버전 ${filters.version}`);
   if (filters.exclude_drafts) parts.push("Draft 제외");
   if (filters.clause) parts.push(`T3 ${filters.clause}`);
   return parts.join(" · ") || "(빈 검색)";
@@ -521,6 +594,7 @@ function applyHistoryItem(item) {
   state.kw = Array.isArray(filters.kw) ? filters.kw.slice() : [];
   state.type = filters.type || "";
   state.lang = filters.lang || "";
+  state.version = filters.version || "";
   state.expand = ["strict", "normal", "broad"].includes(item.expand_mode) ? item.expand_mode : "normal";
   state.excludeDrafts = Boolean(filters.exclude_drafts);
   state.showDuplicates = Boolean(filters.show_duplicates);
@@ -530,6 +604,7 @@ function applyHistoryItem(item) {
   $("search-input").value = state.kw.join(", ");
   $("filter-type").value = state.type;
   $("filter-lang").value = state.lang;
+  $("filter-version").value = state.version;
   $("filter-expand").value = state.expand;
   $("filter-drafts").checked = state.excludeDrafts;
   $("filter-dups").checked = state.showDuplicates;

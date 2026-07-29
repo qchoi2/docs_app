@@ -31,7 +31,11 @@ class V4McpService:
         limit: int = 50,
         offset: int = 0,
     ) -> dict[str, Any]:
-        """Search atomic propositions or safely classified absence."""
+        """Search atomic propositions or safely classified absence.
+
+        A version filter never silently omits: the result carries
+        ``version_filter_notice`` with the unknown / partially-unknown /
+        low-confidence population that did not match."""
         if item_absent:
             return search_clause_absence(
                 self.out,
@@ -100,7 +104,7 @@ def register_v4_tools(mcp: Any, out: Path, annotations: Any = None) -> V4McpServ
         limit: int = 50,
         offset: int = 0,
     ) -> dict[str, Any]:
-        """Search approved V4 atomic items. If item_absent is true, only complete current body/annex coverage can produce confirmed_absent; all other non-matches are needs_review. version filters by contract version-role (execution/buyer_draft/... or Korean labels, comma-separated)."""
+        """Search approved V4 atomic items. If item_absent is true, only complete current body/annex coverage can produce confirmed_absent; all other non-matches are needs_review. version filters by contract version-role (execution/buyer_draft/... or Korean labels, comma-separated). That role is a FILENAME HEURISTIC, so a version-filtered call also returns version_filter_notice (excluded_unknown / excluded_partial / excluded_low_confidence / review_candidates): report those counts and never present the result as the complete population of that version. Rows carry version_confidence (high/med/low; null = not backfilled), version_basis and version_review_required — treat true as 확인 필요."""
         return service.search_clause_items(
             taxonomy_id,
             polarity=polarity,

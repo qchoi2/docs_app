@@ -45,6 +45,10 @@
           <option value="broad">넓게</option>
         </select>
       </label>
+      <label>계약 버전
+        <select id="filter-version" class="text-input"><option value="">전체</option></select>
+      </label>
+      <p class="filter-help" id="version-filter-help">버전은 파일명 휴리스틱 분류입니다. 파일명에 표식이 없는 체결본은 “버전 미상”으로 남아 필터에서 빠지므로, 결과 위의 고지에서 제외 건수를 확인하세요.</p>
       <label class="check"><input id="filter-drafts" type="checkbox"> Draft 제외</label>
       <label class="check"><input id="filter-dups" type="checkbox"> 중복본 펼치기</label>
       <label>조항 이름 (T3)
@@ -79,6 +83,7 @@
       <button id="export-csv" class="button-ghost-sm" type="button" disabled>CSV</button>
       <button id="save-search" class="button-ghost-sm" type="button" disabled>검색 저장</button>
     </div>
+    <div id="version-notice" class="version-notice" role="status" hidden></div>
     <div id="results"></div>
     <div class="more-row">
       <button id="more-button" class="button-ghost-sm" type="button" hidden>더 보기</button>

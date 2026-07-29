@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import collections
 import json
 import sqlite3
 import sys
@@ -12,7 +13,18 @@ from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 import yaml
 
-from classify_version import resolve_version_filter, version_label
+from classify_version import (
+    UNATTRIBUTED_ROLES,
+    VERSION_PARTIAL_MATCHES,
+    annotate_version_row,
+    build_version_filter_notice,
+    has_version_meta,
+    normalize_confidence,
+    resolve_version_filter,
+    row_value,
+    version_label,
+)
+from lib.catalog import catalog_path, connect_catalog, require_catalog
 from lib.console import configure_utf8_stdio
 from lib.normalize import normalize
 
@@ -20,6 +32,47 @@ from lib.normalize import normalize
 TERM_DICT_PATHS = (Path("data/term_dict.yaml"), Path(".docs/term_dict.yaml"))
 SCRIPT_DIR = Path(__file__).resolve().parent
 RRF_K = 60
+# --version 고지에 함께 싣는 "확인 필요" 문서 표본 수 (전체 카운트는 notice에 있다)
+VERSION_REVIEW_SAMPLE = 20
+
+
+def _is_version_review_candidate(row, version_roles) -> bool:
+    """버전 필터에서 빠졌지만 실제로는 요청한 버전일 수 있는 문서인가.
+
+    (a) 버전 미상, (b) 요청 role의 당사자·단계 부분 미상 대응 라벨,
+    (c) 저신뢰(또는 근거 미기록) 분류 — is_draft=null을 숨기지 않는 것과 같은 이유로
+    드러낸다."""
+    role = row_value(row, "version_role")
+    if role in UNATTRIBUTED_ROLES:
+        return True
+    partial = set()
+    for wanted in version_roles:
+        partial.update(VERSION_PARTIAL_MATCHES.get(wanted, ()))
+    if role in partial:
+        return True
+    return normalize_confidence(row_value(row, "version_confidence")) == "low"
+
+
+def _version_review_candidate(row, version_roles) -> Dict[str, object]:
+    item = annotate_version_row({
+        "file_key": row_value(row, "file_key"),
+        "path": row_value(row, "path"),
+        "ctype": row_value(row, "ctype"),
+        "lang": row_value(row, "lang"),
+        "version_role": row_value(row, "version_role"),
+        "version_basis": row_value(row, "version_basis"),
+        "version_confidence": row_value(row, "version_confidence"),
+    })
+    role = item["version_role"]
+    partial = set()
+    for wanted in version_roles:
+        partial.update(VERSION_PARTIAL_MATCHES.get(wanted, ()))
+    item["exclusion_reason"] = (
+        "version_unknown" if role in UNATTRIBUTED_ROLES
+        else "partial_version" if role in partial
+        else "low_confidence"
+    )
+    return item
 
 
 @dataclass
@@ -165,11 +218,11 @@ def reciprocal_rank(rank: int, weight: float = 1.0) -> float:
 
 def connect_search_db(db_path: Path, read_only: bool = False) -> sqlite3.Connection:
     """Open the catalog. read_only=True uses a short-lived mode=ro connection
-    (BACKEND_REVIEW_PC §2.4: searches must not take a writer slot)."""
-    if read_only:
-        conn = sqlite3.connect(f"file:{db_path.as_posix()}?mode=ro", uri=True)
-    else:
-        conn = sqlite3.connect(db_path)
+    (BACKEND_REVIEW_PC §2.4: searches must not take a writer slot).
+
+    Never creates the file: a wrong --out must fail loudly, not mint an empty
+    second catalog (lib.catalog.require_catalog)."""
+    conn = connect_catalog(db_path, read_only=read_only)
     conn.execute("PRAGMA busy_timeout=5000")
     return conn
 
@@ -204,9 +257,7 @@ def search_contracts(
 ) -> Tuple[Dict[str, object], int]:
     keywords = keywords or []
     version_roles = resolve_version_filter(version)
-    db_path = out / "catalog.sqlite"
-    if not db_path.exists():
-        raise FileNotFoundError(f"catalog.sqlite not found: {db_path}")
+    db_path = require_catalog(catalog_path(out))
 
     entries = load_term_dict()
     warnings: List[str] = []
@@ -309,6 +360,19 @@ def search_contracts(
             unsearchable = count_unsearchable(conn, ctype, lang, exclude_drafts)
             if unsearchable:
                 warnings.append(f"unsearchable_docs:{unsearchable}")
+            # 버전 필터가 걸린 응답은 결과가 0건이어도 고지 필드를 비우지 않는다
+            # (필드 유무가 흔들리면 소비자가 조용한 누락을 다시 못 본다).
+            empty_notice = (
+                build_version_filter_notice(
+                    version_roles, [], meta_available=has_version_meta(conn)
+                )
+                if version_roles else None
+            )
+            if empty_notice:
+                warnings.extend(
+                    warning for warning in empty_notice["warnings"]
+                    if warning not in warnings
+                )
             result = build_result(
                 ctype,
                 lang,
@@ -320,6 +384,7 @@ def search_contracts(
                 0,
                 0,
                 warnings,
+                version_notice=empty_notice,
             )
             log_query(out, result, expand, warnings)
             return result, 0
@@ -335,13 +400,38 @@ def search_contracts(
             params.append(lang)
         if exclude_drafts:
             filters.append("(is_draft IS NULL OR is_draft != 1)")
-        if version_roles:
-            filters.append(
-                "version_role IN (%s)" % ",".join("?" for _ in version_roles)
-            )
-            params.extend(version_roles)
+        # 버전 필터는 SQL이 아니라 파이썬에서 건다. 무엇이 걸러졌는지(미상·저신뢰)
+        # 세어서 고지해야 하기 때문이다 — 조용한 누락 금지.
         sql = f"SELECT * FROM files WHERE {' AND '.join(filters)}"
         file_rows = conn.execute(sql, params).fetchall()
+
+        version_notice = None
+        if version_roles:
+            meta_available = has_version_meta(conn)
+            buckets = collections.Counter(
+                (row["version_role"],
+                 normalize_confidence(row_value(row, "version_confidence")))
+                for row in file_rows
+            )
+            candidates = [
+                _version_review_candidate(row, version_roles)
+                for row in file_rows
+                if row["version_role"] not in version_roles
+                and _is_version_review_candidate(row, version_roles)
+            ]
+            version_notice = build_version_filter_notice(
+                version_roles,
+                [(role, confidence, count)
+                 for (role, confidence), count in buckets.items()],
+                meta_available=meta_available,
+                review_candidates=candidates[:VERSION_REVIEW_SAMPLE],
+            )
+            warnings.extend(
+                warning for warning in version_notice["warnings"]
+                if warning not in warnings
+            )
+            file_rows = [row for row in file_rows
+                         if row["version_role"] in version_roles]
 
         scored_rows = []
         for row in file_rows:
@@ -381,7 +471,7 @@ def search_contracts(
             if structured_filters:
                 why.append("T3 v3 구조화 조건 일치")
 
-            result_item = {
+            result_item = annotate_version_row({
                 "file_key": row["file_key"],
                 "path": row["path"],
                 "ctype": row["ctype"],
@@ -389,7 +479,8 @@ def search_contracts(
                 "is_draft": row["is_draft"],
                 "version_hint": row["version_hint"],
                 "version_role": row["version_role"],
-                "version_label": version_label(row["version_role"]),
+                "version_basis": row_value(row, "version_basis"),
+                "version_confidence": row_value(row, "version_confidence"),
                 "dup_group": row["dup_group"],
                 "dup_count": dup_counts.get(row["dup_group"], 1),
                 "dup_representative_reason": representative_reason(row),
@@ -403,7 +494,9 @@ def search_contracts(
                 "why": why,
                 "snippet": snippet,
                 "snippet_paras": snippet_paras,
-            }
+            })
+            if result_item["version_review_required"]:
+                why.append("버전 분류 확인 필요 — " + result_item["version_basis_summary"])
             if clause_tag:
                 result_item["clause"] = clause_evidence.get(row["file_key"], {})
             if structured_filters:
@@ -425,6 +518,7 @@ def search_contracts(
         total,
         total_files,
         warnings,
+        version_notice=version_notice,
     )
     log_query(out, result, expand, warnings)
     return result, len(results)
@@ -872,6 +966,7 @@ def build_result(
     total: int,
     total_files: int,
     warnings: List[str],
+    version_notice: Optional[Dict[str, object]] = None,
 ) -> Dict[str, object]:
     public_structured = None
     if structured_filter is not None:
@@ -880,7 +975,7 @@ def build_result(
             for key, value in structured_filter.items()
             if key != "evidence" and key != "matched_file_keys"
         }
-    return {
+    result = {
         "query": {
             "type": ctype,
             "lang": lang,
@@ -894,6 +989,11 @@ def build_result(
         "results": results,
         "warnings": warnings,
     }
+    if version_notice is not None:
+        # 버전 필터 응답에는 제외 모집단 고지를 반드시 싣는다 (가산 필드).
+        result["query"]["version"] = version_notice["requested"]
+        result["version_filter_notice"] = version_notice
+    return result
 
 
 def log_query(out: Path, result: Dict[str, object], expand_mode: str, warnings: List[str]) -> None:
@@ -925,7 +1025,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--show-duplicates", action="store_true")
     parser.add_argument("--version",
                         help="버전 필터: role key(execution/buyer_draft/...) 또는 "
-                             "한글 라벨(체결본/매수인 초안/...). 콤마로 다중 지정.")
+                             "한글 라벨(체결본/매수인 초안/...). 콤마로 다중 지정. "
+                             "분류는 파일명 휴리스틱이므로 미상·저신뢰 문서가 "
+                             "제외될 수 있고, 제외 규모는 version_filter_notice로 고지한다.")
     parser.add_argument("--clause")
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--present", action="store_true")
@@ -1036,9 +1138,15 @@ def main(argv: Optional[List[str]] = None) -> int:
     else:
         for item in result["results"]:
             version = item.get("version_label") or item.get("version_role") or "-"
-            print(f"{item['file_key']} [{version}] {item['path']} {item['snippet']}")
+            mark = "?" if item.get("version_review_required") else ""
+            confidence = item.get("version_confidence") or "미기록"
+            print(f"{item['file_key']} [{version}{mark}/{confidence}] "
+                  f"{item['path']} {item['snippet']}")
         if not result["results"]:
             print("No results")
+    notice = result.get("version_filter_notice") if isinstance(result, dict) else None
+    if notice and not args.json:
+        print("[버전 필터 고지] " + notice["warning"], file=sys.stderr)
     return 0
 
 

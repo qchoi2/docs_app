@@ -145,6 +145,21 @@ mark { background: var(--color-warning-soft); color: inherit; border-radius: 2px
 .inline-form { display: flex; gap: var(--sp-xs); margin-bottom: var(--sp-sm); }
 .inline-form .text-input { flex: 1; min-width: 0; }
 
+/* ---- burndown panel (PLAN_REVIEW 권고 5) ---- */
+.burndown-sub { margin: var(--sp-md) 0 var(--sp-xs); font-size: 13px;
+  color: var(--color-mute); font-weight: 600; }
+.burndown-row { display: flex; align-items: center; gap: var(--sp-sm); font-size: 13px; }
+.burndown-label { min-width: 96px; color: var(--color-body); }
+.burndown-track { flex: 1; margin: 0; min-width: 60px; }
+.burndown-num { font-family: var(--font-mono); font-size: 12px; min-width: 132px;
+  text-align: right; white-space: nowrap; }
+.table-scroll { overflow-x: auto; }
+.burndown-table { border-collapse: collapse; font-size: 12px; width: 100%; }
+.burndown-table th, .burndown-table td { border-top: 1px solid var(--color-hairline);
+  padding: var(--sp-xxs) var(--sp-xs); text-align: right; white-space: nowrap; }
+.burndown-table thead th, .burndown-table tr:first-child th { color: var(--color-mute); font-weight: 500; }
+.burndown-table th[scope="row"] { text-align: left; font-family: var(--font-mono); }
+
 /* ---- beginner guide ---- */
 .button-link { display: inline-block; text-decoration: none; }
 .guide-layout { max-width: 1080px; }
@@ -189,3 +204,14 @@ mark { background: var(--color-warning-soft); color: inherit; border-radius: 2px
   .three-grid, .tier-grid { grid-template-columns: 1fr; }
   .card-actions { flex-wrap: wrap; }
 }
+
+/* 버전 필터 고지 — --version은 하드 필터라 조용히 누락시킬 수 있다.
+   제외 모집단(미상·부분 미상·저신뢰)을 결과 위에 항상 드러낸다. */
+.version-notice { background: var(--color-warning-soft); color: var(--color-warning-deep);
+  border: 1px solid var(--color-hairline); border-radius: var(--rounded-md);
+  padding: var(--sp-sm) var(--sp-lg); margin-bottom: var(--sp-sm); font-size: 13px; }
+.version-notice ul { margin: var(--sp-xxs) 0 0; padding-left: 1.2em; }
+.version-notice li { margin: 0; }
+.version-notice .code { font-family: var(--font-mono); }
+.result-meta .badge-warning { background: var(--color-warning-soft); color: var(--color-warning-deep);
+  border-radius: 64px; padding: 2px var(--sp-sm); font-size: 12px; }

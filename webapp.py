@@ -32,7 +32,14 @@ from typing import Dict, List, Optional, Tuple
 from urllib.parse import parse_qs
 from wsgiref.simple_server import make_server
 
-from classify_version import resolve_version_filter
+from burndown import build_burndown
+from classify_version import (
+    UNATTRIBUTED_ROLES,
+    VERSION_CLASSIFICATION_BASIS,
+    has_version_meta,
+    resolve_version_filter,
+    version_label,
+)
 from index_contracts import IndexOptions, index_contracts
 from lib.console import configure_utf8_stdio
 from lib.jobs import JobError, JobQueue
@@ -54,6 +61,7 @@ from taxonomy_admin import (
     handle_taxonomy_resolve,
     handle_taxonomy_summary,
 )
+from v4_search import V4SearchError
 from v4_search_web import (
     handle_v4_item_compare,
     handle_v4_item_search,
@@ -627,6 +635,7 @@ def handle_search(app, match, query, body):
                     "clause": params["clause"],
                     "clause_present": params["clause_present"],
                     "clause_absent": params["clause_absent"],
+                    "version": params["version"],
                     **{name: params[name] for name in structured_names},
                 },
                 expand_mode=params["expand"],
@@ -701,6 +710,19 @@ def handle_ops_dashboard(app, match, query, body):
         "saved_search_count": len(saved_searches(app.out, 200)),
         "feedback": feedback_summary(app.out),
     }
+
+
+def handle_ops_burndown(app, match, query, body):
+    """V4 번다운 지표 (PLAN_REVIEW 권고 5).
+
+    계산은 전부 burndown.py에 있다 — SQL을 여기서 복제하지 않는다. 그래야
+    대시보드 숫자와 CLI(`python burndown.py --out cs_index --json`)가 갈라지지
+    않는다. 읽기 전용(mode=ro) 연결만 사용한다.
+    """
+    try:
+        return 200, build_burndown(app.out)
+    except V4SearchError as exc:
+        raise ApiError(500, exc.code, str(exc))
 
 
 def handle_ops_failures(app, match, query, body):
@@ -993,8 +1015,30 @@ def handle_facets(app, match, query, body):
                 f"GROUP BY {column} ORDER BY COUNT(*) DESC, {column}"
             ).fetchall()
             return [{"value": row[0], "count": row[1]} for row in rows if row[0]]
+
+        # 버전 facet은 한글 라벨과 미분류 건수를 함께 준다. UI가 "이 필터는
+        # 파일명 휴리스틱이고 미상 n건이 빠진다"를 스스로 말할 수 있어야 한다.
+        version_rows = conn.execute(
+            "SELECT version_role, COUNT(*) FROM files WHERE status != 'missing' "
+            "GROUP BY version_role ORDER BY COUNT(*) DESC, version_role"
+        ).fetchall()
+        version_facet = [
+            {"value": row[0], "label": version_label(row[0]) or row[0],
+             "count": row[1]}
+            for row in version_rows if row[0]
+        ]
+        # UNATTRIBUTED_ROLES는 NULL/''/'unknown'을 모두 포함한다 (중복 합산 금지).
+        unattributed = sum(
+            row[1] for row in version_rows if row[0] in UNATTRIBUTED_ROLES
+        )
         return 200, {"ctype": facet("ctype"), "lang": facet("lang"),
-                     "batch_label": facet("batch_label")}
+                     "batch_label": facet("batch_label"),
+                     "version_role": version_facet,
+                     "version_meta": {
+                         "classification_basis": VERSION_CLASSIFICATION_BASIS,
+                         "unattributed_docs": unattributed,
+                         "classification_recorded": has_version_meta(conn),
+                     }}
 
 
 def _export_filters_text(params: Dict[str, object]) -> str:
@@ -1003,6 +1047,8 @@ def _export_filters_text(params: Dict[str, object]) -> str:
         parts.append(f"type={params['ctype']}")
     if params["lang"]:
         parts.append(f"lang={params['lang']}")
+    if params.get("version"):
+        parts.append(f"version={params['version']}")
     parts.append(f"expand={params['expand']}")
     if params["exclude_drafts"]:
         parts.append("exclude_drafts")
@@ -1030,6 +1076,11 @@ def _export_rows(result: Dict[str, object], params: Dict[str, object]) -> List[D
             "lang": item["lang"],
             "is_draft": item["is_draft"],
             "version_hint": item["version_hint"] or "",
+            # 버전 라벨만 내보내면 휴리스틱 결과가 확정 사실처럼 보인다 —
+            # 신뢰도·근거를 같은 행에 싣는다.
+            "version_label": item.get("version_label") or "",
+            "version_confidence": item.get("version_confidence") or "미기록",
+            "version_basis": item.get("version_basis_summary") or "",
             "dup_count": item["dup_count"],
             "para": " ".join(str(p) for p in item["snippet_paras"]),
             "snippet": item["snippet"].replace("\n", " / "),
@@ -1047,11 +1098,21 @@ def handle_export_markdown(app, match, query, body):
     lines.append(f"- total: {result['total']} (files: {result['total_files']})")
     if result["warnings"]:
         lines.append(f"- warnings: {', '.join(result['warnings'])}")
+    notice = result.get("version_filter_notice")
+    if notice:
+        # 버전 필터로 무엇이 빠졌는지 내보내기 본문에도 남긴다.
+        lines.append(f"- 버전 필터 고지: {notice['warning']}")
     lines.append("")
     for item in result["results"]:
         paras = ",".join(str(p) for p in item["snippet_paras"])
+        version = item.get("version_label") or item.get("version_role") or "-"
         lines.append(f"## [{item['file_key']}] {item['path']}")
         lines.append(f"- ctype: {item['ctype']} / lang: {item['lang']} / draft: {item['is_draft']} / 중복 {item['dup_count']}건 / ¶{paras}")
+        lines.append(
+            f"- 버전: {version} (신뢰도 {item.get('version_confidence') or '미기록'}"
+            f"{', 확인 필요' if item.get('version_review_required') else ''}) — "
+            f"{item.get('version_basis_summary') or '근거 미기록'}"
+        )
         for reason in item.get("why") or []:
             lines.append(f"- 검색 사유: {reason}")
         lines.append("")
@@ -1070,7 +1131,8 @@ def handle_export_csv(app, match, query, body):
     rows = _export_rows(result, params)
     buffer = io.StringIO()
     fieldnames = ["query", "filters", "export_created_at", "file_key", "filename", "path",
-                  "ctype", "lang", "is_draft", "version_hint", "dup_count", "para",
+                  "ctype", "lang", "is_draft", "version_hint", "version_label",
+                  "version_confidence", "version_basis", "dup_count", "para",
                   "snippet", "why"]
     writer = csv.DictWriter(buffer, fieldnames=fieldnames, lineterminator="\r\n")
     writer.writeheader()
@@ -1147,6 +1209,7 @@ ROUTES = [
     ("POST", re.compile(r"^/api/search$"), handle_search),
     ("GET", re.compile(r"^/api/history/recent$"), handle_recent_searches),
     ("GET", re.compile(r"^/api/ops/dashboard$"), handle_ops_dashboard),
+    ("GET", re.compile(r"^/api/ops/burndown$"), handle_ops_burndown),
     ("GET", re.compile(r"^/api/ops/failures$"), handle_ops_failures),
     ("GET", re.compile(r"^/api/ops/manual-overrides/export$"), handle_manual_overrides_export),
     ("GET", re.compile(r"^/api/saved-searches$"), handle_saved_searches),

@@ -17,7 +17,11 @@ from contextlib import closing
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from classify_version import resolve_version_filter
+from classify_version import (
+    annotate_version_row,
+    resolve_version_filter,
+    version_meta_select,
+)
 from inspect_file import inspect_file
 from lib.console import configure_utf8_stdio
 from open_text import open_text
@@ -43,6 +47,9 @@ SERVER_INSTRUCTIONS = """
 6. 후보가 30건을 넘으면 조건을 더 좁힌다. 한 답변에서 조항 정독은 5건 이내가 기본이다.
 7. status=empty/error 문서는 본문 검색 불가 문서로 고지한다.
 8. 웹앱이 색인·설정·저장 작업을 담당한다. 이 MCP 서버는 코퍼스를 변경하지 않는다.
+9. version(버전) 필터는 파일명 휴리스틱 라벨 기준이다. version_filter_notice의
+   제외 건수(미상·부분 미상·저신뢰)를 반드시 고지하고, 버전 전수를 단정하지 마라.
+   version_confidence=low/미기록 문서는 "확인 필요"로 분리한다.
 """.strip()
 
 
@@ -179,6 +186,20 @@ class ContractMcpService:
             "narrow_before_reading": int(result.get("total", 0)) > MAX_RESULTS,
             "absence_rule": "키워드 미검출은 부재 증명이 아님",
         }
+        # 버전 필터는 파일명 휴리스틱 라벨에 대한 필터다. 무엇이 빠졌는지
+        # (version_filter_notice) 함께 읽지 않으면 조용한 누락을 그대로 답한다.
+        notice = result.get("version_filter_notice")
+        if notice:
+            result["mcp_guidance"]["version_rule"] = (
+                "version_role은 파일명 휴리스틱 분류다. version_filter_notice의 "
+                "excluded_unknown/excluded_partial/excluded_low_confidence를 답변에 "
+                "고지하고, 이 결과로 '해당 버전 전수'를 단정하지 마라. "
+                "결과 행의 version_confidence=low 또는 version_review_required=true는 "
+                "'확인 필요'로 표시하라."
+            )
+            result["mcp_guidance"]["version_excluded_documents"] = int(
+                notice.get("excluded_total", 0)
+            )
         return _public_result(result)
 
     def read_clause(self, file_key: str, section: str, context: int = 0) -> Dict[str, Any]:
@@ -229,8 +250,9 @@ class ContractMcpService:
             ).fetchone()
             dup_group = row["dup_group"] or key
             members = conn.execute(
-                """
-                SELECT file_key, path, status, is_draft, version_hint
+                f"""
+                SELECT file_key, path, status, is_draft, version_hint, version_role,
+                       {version_meta_select(conn, "")}
                 FROM files WHERE dup_group=? ORDER BY path, file_key
                 """,
                 (dup_group,),
@@ -239,7 +261,8 @@ class ContractMcpService:
             "file_key": key,
             "dup_group": dup_group,
             "count": len(members),
-            "members": [dict(member) for member in members],
+            # 버전 라벨은 파일명 휴리스틱이므로 근거·신뢰도를 함께 노출한다.
+            "members": [annotate_version_row(dict(member)) for member in members],
         }
 
     def corpus_status(self) -> Dict[str, Any]:
@@ -336,7 +359,7 @@ def build_mcp(service: ContractMcpService):
         forum: Optional[str] = None,
         version: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Search indexed contracts. Keywords use AND semantics; term_dict expansion is on by default. A clause means evaluated-present unless clause_absent is true. T3 v3 filters cover parties, consideration, indemnity cap, survival, governing law, and forum; older metadata is reported as unevaluated. version filters by contract version role: accepts role keys (execution, buyer_draft, seller_draft, buyer_markup, seller_markup, draft_unknown, markup_unknown, buyer_ver, seller_ver, bidding, unknown) or their Korean labels (체결본, 매수인 초안, 매도인 초안, 매수인 mark-up, 매도인 mark-up, ...); comma-separated values are OR-combined. Preserve file_key and evidence in the answer."""
+        """Search indexed contracts. Keywords use AND semantics; term_dict expansion is on by default. A clause means evaluated-present unless clause_absent is true. T3 v3 filters cover parties, consideration, indemnity cap, survival, governing law, and forum; older metadata is reported as unevaluated. version filters by contract version role: accepts role keys (execution, buyer_draft, seller_draft, buyer_markup, seller_markup, draft_unknown, markup_unknown, buyer_ver, seller_ver, bidding, unknown) or their Korean labels (체결본, 매수인 초안, 매도인 초안, 매수인 mark-up, 매도인 mark-up, ...); comma-separated values are OR-combined. version_role is a FILENAME HEURISTIC, not a read of the contract: an execution copy whose filename lacks a marker is labelled unknown and will not match. Every version-filtered response carries version_filter_notice (excluded_unknown / excluded_partial / excluded_low_confidence / review_candidates) — report those counts and never claim the result is the complete population of that version. Each row carries version_confidence (high/med/low, null = not yet backfilled) and version_basis/version_basis_summary; treat version_review_required=true as 확인 필요. Preserve file_key and evidence in the answer."""
         return service.search(
             keywords=keywords,
             ctype=ctype,

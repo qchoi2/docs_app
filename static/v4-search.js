@@ -27,6 +27,32 @@ function fillNodes() {
   if (visible.some((node) => node.taxonomy_id === selected)) $("#taxonomy").value = selected;
 }
 
+/* 버전 라벨은 파일명 휴리스틱이므로 신뢰도·확인 필요를 함께 표시한다. */
+function versionBadge(item) {
+  const label = item.version_label || item.version_role;
+  if (!label) return "";
+  const confidence = item.version_confidence || "신뢰도 미기록";
+  const review = item.version_review_required ? " · 확인 필요" : "";
+  return `<span class="badge" title="${escapeHtml(item.version_basis_summary || "")}">` +
+    `${escapeHtml(label)} · ${escapeHtml(confidence)}${review}</span>`;
+}
+
+/* --version 하드 필터가 무엇을 제외했는지 결과 위에 고지한다. */
+function renderVersionNotice(data) {
+  const box = $("#version-notice");
+  const notice = data.version_filter_notice;
+  if (!box) return;
+  if (!notice) { box.hidden = true; box.innerHTML = ""; return; }
+  const partial = Object.entries(notice.excluded_partial || {})
+    .map(([role, n]) => `${escapeHtml(role)} ${n}건`).join(", ") || "없음";
+  box.innerHTML =
+    `<strong>버전 필터 고지</strong> — ${escapeHtml(notice.warning)}` +
+    `<div>제외 합계 ${notice.excluded_total}건 · 버전 미상 ${notice.excluded_unknown}건 · ` +
+    `부분 미상 ${partial} · 저신뢰 ${notice.excluded_low_confidence}건 · ` +
+    `신뢰도 미기록 ${notice.excluded_unrated}건 · 결과 내 확인 필요 ${notice.matched_low_confidence}건</div>`;
+  box.hidden = false;
+}
+
 function cardForItem(item) {
   const review = item.freshness !== "current" || item.coverage?.state !== "complete";
   return `<article class="${review ? "review" : ""}">
@@ -34,6 +60,7 @@ function cardForItem(item) {
       <span class="badge">${review ? "재확인 필요" : "현재 원문"}</span>
       <span class="code">[${escapeHtml(item.file_key)}]</span>
       <span>${escapeHtml(item.ctype)} · ${escapeHtml(item.lang)}</span>
+      ${versionBadge(item)}
       <span class="code">${escapeHtml(item.taxonomy_id)}</span>
       <span>¶${item.loc_start}–${item.loc_end}</span>
       <span>${escapeHtml(item.source_kind)}${item.source_name ? ` · ${escapeHtml(item.source_name)}` : ""}</span>
@@ -51,6 +78,7 @@ function cardForCoverage(item) {
       <span class="badge">${review ? "미평가/확인 필요" : "부재 확인"}</span>
       <span class="code">[${escapeHtml(item.file_key)}]</span>
       <span>${escapeHtml(item.ctype)} · ${escapeHtml(item.lang)}</span>
+      ${versionBadge(item)}
       <span>${escapeHtml(item.path)}</span>
     </div>
     <div class="proposition">${escapeHtml(item.state)}</div>
@@ -69,6 +97,7 @@ async function runSearch(event) {
     polarity: $("#polarity").value || null,
     lang: $("#lang").value || null,
     ctype: $("#ctype").value.trim() || null,
+    version: $("#version").value.trim() || null,
     subject: $("#subject").value.trim() || null,
     effective_time: $("#effective-time").value.trim() || null,
     text: $("#text").value.trim() || null,
@@ -79,6 +108,7 @@ async function runSearch(event) {
     const data = await request("/api/v4/items/search", {
       method: "POST", body: JSON.stringify(body)
     });
+    renderVersionNotice(data);
     if (mode === "present") {
       $("#summary").textContent = `${data.query.taxonomy_id} · ${data.total_documents}개 문서 · ${data.total_items}개 원자 항목`;
       $("#results").innerHTML = data.results.map(cardForItem).join("") || "<article>확인된 항목이 없습니다.</article>";

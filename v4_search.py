@@ -10,11 +10,24 @@ from __future__ import annotations
 import argparse
 import json
 import sqlite3
+import sys
 from contextlib import closing
 from pathlib import Path
 from typing import Iterable, Sequence
 
-from classify_version import resolve_version_filter, version_label
+from classify_version import (
+    UNATTRIBUTED_ROLES,
+    VERSION_PARTIAL_MATCHES,
+    annotate_version_row,
+    build_version_filter_notice,
+    has_version_meta,
+    normalize_confidence,
+    resolve_version_filter,
+    row_value,
+    version_label,
+    version_meta_select,
+)
+from lib.catalog import CatalogNotFoundError, catalog_path, require_catalog
 from lib.console import configure_utf8_stdio
 
 
@@ -31,9 +44,13 @@ class V4SearchError(ValueError):
 
 
 def connect_v4_ro(out: Path) -> sqlite3.Connection:
-    db_path = (Path(out) / "catalog.sqlite").resolve()
-    if not db_path.is_file():
-        raise V4SearchError("catalog.sqlite not found.", code="CATALOG_NOT_FOUND")
+    db_path = catalog_path(out).resolve()
+    # require_catalog never creates the file: a wrong --out must fail loudly
+    # rather than leave an empty second catalog behind.
+    try:
+        require_catalog(db_path)
+    except CatalogNotFoundError as exc:
+        raise V4SearchError(str(exc), code="CATALOG_NOT_FOUND") from exc
     conn = sqlite3.connect(f"{db_path.as_uri()}?mode=ro", uri=True, timeout=10)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA query_only=ON")
@@ -171,16 +188,89 @@ def _file_filters(
         clauses.append("f.lang=?")
         params.append(lang)
     if version_roles:
-        clauses.append(
-            "f.version_role IN (%s)" % ",".join("?" for _ in version_roles)
-        )
-        params.extend(version_roles)
+        clause, version_params = _version_clause(version_roles)
+        clauses.append(clause)
+        params.extend(version_params)
     if file_keys is not None:
         if not file_keys:
             return clauses + ["0"], params
         clauses.append("f.file_key IN (%s)" % ",".join("?" for _ in file_keys))
         params.extend(file_keys)
     return clauses, params
+
+
+def _version_clause(version_roles: Sequence[str]) -> tuple[str, list[object]]:
+    return (
+        "f.version_role IN (%s)" % ",".join("?" for _ in version_roles),
+        list(version_roles),
+    )
+
+
+def _version_exclusion_reason(role, version_roles: Sequence[str]) -> str:
+    partial: set[str] = set()
+    for wanted in version_roles:
+        partial.update(VERSION_PARTIAL_MATCHES.get(wanted, ()))
+    if role in UNATTRIBUTED_ROLES:
+        return "version_unknown"
+    return "partial_version" if role in partial else "low_confidence"
+
+
+def _version_review_row(row, version_roles: Sequence[str]) -> dict:
+    item = annotate_version_row({
+        "file_key": row_value(row, "file_key"),
+        "path": row_value(row, "path"),
+        "ctype": row_value(row, "ctype"),
+        "lang": row_value(row, "lang"),
+        "version_role": row_value(row, "version_role"),
+        "version_basis": row_value(row, "version_basis"),
+        "version_confidence": row_value(row, "version_confidence"),
+    })
+    item["exclusion_reason"] = _version_exclusion_reason(
+        item["version_role"], version_roles
+    )
+    return item
+
+
+def _is_version_review_row(row, version_roles: Sequence[str]) -> bool:
+    role = row_value(row, "version_role")
+    if role in UNATTRIBUTED_ROLES:
+        return True
+    partial: set[str] = set()
+    for wanted in version_roles:
+        partial.update(VERSION_PARTIAL_MATCHES.get(wanted, ()))
+    if role in partial:
+        return True
+    return normalize_confidence(row_value(row, "version_confidence")) == "low"
+
+
+def _version_notice_from_rows(
+    conn: sqlite3.Connection,
+    rows: Iterable[dict],
+    version_roles: Sequence[str],
+    *,
+    sample: int = 20,
+) -> dict:
+    """버전 필터 적용 전 문서 행들로 고지 구조체를 만든다."""
+    rows = list(rows)
+    buckets: dict[tuple, int] = {}
+    for row in rows:
+        key = (
+            row_value(row, "version_role"),
+            normalize_confidence(row_value(row, "version_confidence")),
+        )
+        buckets[key] = buckets.get(key, 0) + 1
+    candidates = [
+        _version_review_row(row, version_roles)
+        for row in rows
+        if row_value(row, "version_role") not in version_roles
+        and _is_version_review_row(row, version_roles)
+    ]
+    return build_version_filter_notice(
+        version_roles,
+        [(role, confidence, count) for (role, confidence), count in buckets.items()],
+        meta_available=has_version_meta(conn),
+        review_candidates=candidates[:sample],
+    )
 
 
 def _dedupe_by_group(rows: Iterable[dict], show_duplicates: bool) -> list[dict]:
@@ -473,8 +563,7 @@ def _item_dict(row: sqlite3.Row) -> dict:
         if item["freshness"] == "current"
         else "v4_atomic_item_stale"
     )
-    item["version_label"] = version_label(item.get("version_role"))
-    return item
+    return annotate_version_row(item)
 
 
 def search_clause_items(
@@ -504,9 +593,9 @@ def search_clause_items(
         subtree = taxonomy_descendants(
             conn, str(node["taxonomy_id"]), include_descendants
         )
-        clauses, params = _file_filters(
-            ctype=ctype, lang=lang, version_roles=version_roles
-        )
+        # 버전 절은 마지막에 따로 붙인다 — 같은 조건에서 버전만 뺀 모집단을
+        # 세어 "무엇이 제외됐는지" 고지해야 하기 때문이다.
+        clauses, params = _file_filters(ctype=ctype, lang=lang)
         clauses.extend(
             [
                 "i.review_status='approved'",
@@ -529,6 +618,24 @@ def search_clause_items(
             )
             needle = f"%{text.strip()}%"
             params.extend([needle, needle])
+        version_notice = None
+        if version_roles:
+            scope_rows = conn.execute(
+                f"""
+                SELECT DISTINCT f.file_key,f.path,f.ctype,f.lang,f.version_role,
+                       {version_meta_select(conn)}
+                FROM v4_clause_item i
+                JOIN files f ON f.file_key=i.file_key
+                WHERE {' AND '.join(clauses)}
+                """,
+                params,
+            ).fetchall()
+            version_notice = _version_notice_from_rows(
+                conn, [dict(row) for row in scope_rows], version_roles
+            )
+            version_sql, version_params = _version_clause(version_roles)
+            clauses.append(version_sql)
+            params.extend(version_params)
         select_sql = f"""
             SELECT i.item_id,i.item_ref,i.file_key,i.family,i.taxonomy_id,
                    n.canonical_ko,n.canonical_en,i.proposition,
@@ -539,7 +646,8 @@ def search_clause_items(
                    i.loc_start,i.loc_end,i.confidence,i.txt_hash,
                    i.taxonomy_version,i.extractor_version,i.review_status,
                    f.path,f.filename,f.ctype,f.lang,f.status,f.content_hash,
-                   f.dup_group,f.is_draft,f.version_hint,f.version_role
+                   f.dup_group,f.is_draft,f.version_hint,f.version_role,
+                   {version_meta_select(conn)}
             FROM v4_clause_item i
             JOIN v4_taxonomy_node n ON n.taxonomy_id=i.taxonomy_id
             JOIN files f ON f.file_key=i.file_key
@@ -584,7 +692,10 @@ def search_clause_items(
         )
         for item in items:
             item["coverage"] = coverage_by_file[str(item["file_key"])]
-        return {
+        warnings = ["stale_items_require_source_recheck"] if stale else []
+        if version_notice:
+            warnings.extend(version_notice["warnings"])
+        result = {
             "query": {
                 "taxonomy_id": node["taxonomy_id"],
                 "resolved_label_ko": node["canonical_ko"],
@@ -613,10 +724,11 @@ def search_clause_items(
             ),
             "stale_items": stale,
             "results": items,
-            "warnings": (
-                ["stale_items_require_source_recheck"] if stale else []
-            ),
+            "warnings": warnings,
         }
+        if version_notice is not None:
+            result["version_filter_notice"] = version_notice
+        return result
 
 
 # Families whose coverage='complete' cannot currently be trusted to prove
@@ -655,21 +767,27 @@ def search_clause_absence(
         subtree = taxonomy_descendants(
             conn, str(node["taxonomy_id"]), include_descendants
         )
-        clauses, params = _file_filters(
-            ctype=ctype, lang=lang, version_roles=version_roles
-        )
+        # 버전 절 없이 모집단을 읽고 파이썬에서 나눈다 — 제외된 문서를 세어
+        # 고지하기 위해서다(부재 질의에서 조용한 누락은 특히 위험하다).
+        clauses, params = _file_filters(ctype=ctype, lang=lang)
         rows = conn.execute(
             f"""
             SELECT f.file_key,f.path,f.filename,f.ctype,f.lang,f.status,
                    f.content_hash,f.dup_group,f.is_draft,f.version_hint,
-                   f.version_role
+                   f.version_role,{version_meta_select(conn)}
             FROM files f
             WHERE {' AND '.join(clauses)}
             ORDER BY f.file_key
             """,
             params,
         ).fetchall()
-        files = _dedupe_by_group((dict(row) for row in rows), show_duplicates)
+        scope = [dict(row) for row in rows]
+        version_notice = None
+        if version_roles:
+            version_notice = _version_notice_from_rows(conn, scope, version_roles)
+            scope = [row for row in scope
+                     if row.get("version_role") in version_roles]
+        files = _dedupe_by_group(scope, show_duplicates)
         item_clauses = [
             "review_status='approved'",
             "taxonomy_id IN (%s)" % ",".join("?" for _ in subtree),
@@ -710,21 +828,30 @@ def search_clause_absence(
                     **coverage,
                     "reasons": [*coverage.get("reasons", []), "rw_coverage_unverified"],
                 }
-            result = {
+            result = annotate_version_row({
                 **file_row,
-                "version_label": version_label(file_row.get("version_role")),
                 "taxonomy_id": node["taxonomy_id"],
                 "family": node["family"],
                 "coverage": coverage,
                 "match_path": "v4_coverage",
-            }
+            })
             if coverage["state"] == "complete" and not family_gated:
                 result["state"] = "confirmed_absent"
                 absent.append(result)
             else:
                 result["state"] = "needs_review"
                 needs_review.append(result)
-        return {
+        warnings = (
+            (["unevaluated_or_incomplete_documents_are_not_absent"] if needs_review else [])
+            + (
+                ["rw_absence_unverified_demoted_to_needs_review"]
+                if family_gated
+                else []
+            )
+        )
+        if version_notice:
+            warnings.extend(version_notice["warnings"])
+        result = {
             "query": {
                 "taxonomy_id": node["taxonomy_id"],
                 "resolved_label_ko": node["canonical_ko"],
@@ -742,15 +869,11 @@ def search_clause_absence(
             "present_excluded_count": present_excluded,
             "confirmed_absent": absent[:limit],
             "needs_review": needs_review[:limit],
-            "warnings": (
-                (["unevaluated_or_incomplete_documents_are_not_absent"] if needs_review else [])
-                + (
-                    ["rw_absence_unverified_demoted_to_needs_review"]
-                    if family_gated
-                    else []
-                )
-            ),
+            "warnings": warnings,
         }
+        if version_notice is not None:
+            result["version_filter_notice"] = version_notice
+        return result
 
 
 def compare_clause_items(
@@ -775,7 +898,8 @@ def compare_clause_items(
         rows = conn.execute(
             f"""
             SELECT file_key,path,filename,ctype,lang,status,content_hash,
-                   dup_group,is_draft,version_hint,version_role
+                   dup_group,is_draft,version_hint,version_role,
+                   {version_meta_select(conn, "")}
             FROM files WHERE file_key IN ({placeholders}) AND status!='missing'
             """,
             keys,
@@ -826,8 +950,7 @@ def compare_clause_items(
                 state = "confirmed_absent"
             else:
                 state = "needs_review"
-            file_info = dict(file_row)
-            file_info["version_label"] = version_label(file_info.get("version_role"))
+            file_info = annotate_version_row(dict(file_row))
             comparison.append(
                 {
                     "file": file_info,
@@ -873,7 +996,9 @@ def build_parser() -> argparse.ArgumentParser:
     present.add_argument("--lang")
     present.add_argument("--version",
                          help="버전 필터: role key 또는 한글 라벨(콤마로 다중). "
-                              "예: buyer_draft / '매수인 초안,매도인 초안'")
+                              "예: buyer_draft / '매수인 초안,매도인 초안'. "
+                              "파일명 휴리스틱 분류이므로 제외 모집단은 "
+                              "version_filter_notice로 고지된다.")
     present.add_argument("--show-duplicates", action="store_true")
     present.add_argument("--limit", type=int, default=50)
     present.add_argument("--offset", type=int, default=0)
@@ -883,7 +1008,8 @@ def build_parser() -> argparse.ArgumentParser:
     absent.add_argument("--type", dest="ctype")
     absent.add_argument("--lang")
     absent.add_argument("--version",
-                        help="버전 필터: role key 또는 한글 라벨(콤마로 다중).")
+                        help="버전 필터: role key 또는 한글 라벨(콤마로 다중). "
+                             "제외 모집단은 version_filter_notice로 고지된다.")
     absent.add_argument("--show-duplicates", action="store_true")
     absent.add_argument("--limit", type=int, default=50)
     absent.add_argument("--json", action="store_true", default=argparse.SUPPRESS)
@@ -944,10 +1070,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         for item in result["results"]:
             version = item.get("version_label") or item.get("version_role") or "-"
+            mark = "?" if item.get("version_review_required") else ""
             print(
                 f"[{item['file_key']}] {item['item_ref']} "
                 f"{item['taxonomy_id']} ¶{item['loc_start']}-{item['loc_end']} "
-                f"({item['freshness']}) [{version}]"
+                f"({item['freshness']}) [{version}{mark}]"
             )
     elif args.command == "absent":
         print(
@@ -957,10 +1084,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         for item in result["confirmed_absent"]:
             version = item.get("version_label") or item.get("version_role") or "-"
-            print(f"[{item['file_key']}] confirmed_absent [{version}] {item['path']}")
+            mark = "?" if item.get("version_review_required") else ""
+            print(f"[{item['file_key']}] confirmed_absent [{version}{mark}] {item['path']}")
     else:
         for item in result["comparison"]:
             print(f"[{item['file']['file_key']}] {item['state']}")
+    notice = result.get("version_filter_notice") if isinstance(result, dict) else None
+    if notice and not args.json:
+        print("[버전 필터 고지] " + notice["warning"], file=sys.stderr)
     return 0
 
 

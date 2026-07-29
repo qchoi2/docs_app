@@ -50,6 +50,7 @@
           </select>
         </label>
         <label>계약 유형<input id="ctype" placeholder="SPA"></label>
+        <label>계약 버전<input id="version" placeholder="체결본 / buyer_draft (콤마로 다중)"></label>
         <label class="present-only">주체 역할<input id="subject" placeholder="대상회사"></label>
         <label class="present-only">기준 시점<input id="effective-time" placeholder="서명일 현재"></label>
         <label class="present-only wide">명제·원문 내 검색<input id="text" placeholder="미지급 보수"></label>
@@ -60,6 +61,7 @@
     </section>
 
     <section id="summary" class="summary"></section>
+    <section id="version-notice" class="version-notice" role="status" hidden></section>
     <section id="results" class="results"></section>
   </main>
   <script src="/static/v4-search.js"></script>
