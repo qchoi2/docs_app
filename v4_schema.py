@@ -14,7 +14,7 @@ from review_rw_leaf_gaps import LEAVES as RW_REFINEMENT_LEAVES
 
 V4_SCHEMA_VERSION = 4
 V4_SCHEMA_REVISION = "1R3"
-DEFAULT_TAXONOMY_VERSION = 14
+DEFAULT_TAXONOMY_VERSION = 20
 FAMILIES = ("RW", "CP", "COV", "DEF", "PAY", "REM")
 CONFIDENCE_VALUES = ("low", "med", "high")
 POLARITY_VALUES = ("affirmative", "negative", "none_exist", "not_applicable")
@@ -696,6 +696,44 @@ SEED_TAXONOMY += (
 # v14 leaf fallback for pre-existing broad solvency evidence after v13 refinement.
 SEED_TAXONOMY += (
     TaxonomySeed("RW.SOLVENCY.GENERAL", "RW.SOLVENCY", "RW", "일반 지급능력·도산 부재", "General solvency", "사해행위 위험 외의 일반적인 지급능력·채무초과·지급불능 또는 도산절차 부재 진술", 3, ("general solvency", "not insolvent", "지급능력", "지급불능 부재", "도산절차 부재")),
+)
+
+# v20 (2026-07-31): document-class coverage — investment (SSA/CBSA/BWSA) securities
+# issuance terms, security/collateral, SHA economic rights, and general-provision leaves
+# surfaced by the coordinator full_reads. Added UNDER existing families (the family CHECK
+# constraint blocks new top-level families without a full data migration); promoting these
+# to top-level ISS/SEC families is a later controlled migration if desired.
+SEED_TAXONOMY += (
+    # --- Securities issuance terms (investment docs; often in 별지) — under PAY (economic structure) ---
+    TaxonomySeed("PAY.ISSUANCE", "PAY", "PAY", "증권 발행조건", "Securities issuance terms", "신주·전환사채·신주인수권부사채 등 발행 증권의 조건(발행가·수량·이자·전환·상환·행사)", 1, ("발행조건", "issuance terms", "발행 개요")),
+    TaxonomySeed("PAY.ISSUANCE.SHARE_TERMS", "PAY.ISSUANCE", "PAY", "신주 발행조건", "New share issuance terms", "발행되는 신주의 종류·수량·발행가액·납입일·발행방식", 2, ("신주 발행", "발행가액", "new share terms", "subscription price")),
+    TaxonomySeed("PAY.ISSUANCE.PREFERRED_TERMS", "PAY.ISSUANCE", "PAY", "종류주식·우선주 조건", "Preferred share terms", "상환전환우선주 등 종류주식의 배당률·우선순위·의결권·존속기간 조건", 2, ("우선주 조건", "RCPS", "상환전환우선주", "preferred stock terms")),
+    TaxonomySeed("PAY.ISSUANCE.CB_TERMS", "PAY.ISSUANCE", "PAY", "전환사채 발행조건", "Convertible bond terms", "전환사채의 이자율·만기·전환가·전환비율·전환기간·조기상환 조건", 2, ("전환사채", "CB 발행조건", "convertible bond terms", "전환가")),
+    TaxonomySeed("PAY.ISSUANCE.BW_TERMS", "PAY.ISSUANCE", "PAY", "신주인수권부사채 발행조건", "Bond-with-warrant terms", "신주인수권부사채의 이자율·만기·신주인수권 행사가·행사비율·행사기간 조건", 2, ("신주인수권부사채", "BW 발행조건", "bond with warrant", "워런트 행사가")),
+    TaxonomySeed("PAY.ISSUANCE.CONVERSION_TERMS", "PAY.ISSUANCE", "PAY", "전환 조건", "Conversion terms", "전환가·전환비율·전환청구기간·전환제한 등 전환의 조건과 절차", 2, ("전환조건", "전환비율", "conversion ratio", "conversion terms")),
+    TaxonomySeed("PAY.ISSUANCE.REDEMPTION_TERMS", "PAY.ISSUANCE", "PAY", "상환 조건", "Redemption terms", "상환가액·상환청구기간·상환재원·상환우선순위 등 증권 상환의 조건", 2, ("상환조건", "상환가액", "redemption terms", "상환재원")),
+    TaxonomySeed("PAY.ISSUANCE.REFIXING", "PAY.ISSUANCE", "PAY", "전환가·행사가 조정(리픽싱)", "Conversion/exercise price adjustment", "주가 변동·희석사유 발생 시 전환가 또는 신주인수권 행사가를 조정하는 리픽싱 조항", 2, ("리픽싱", "전환가 조정", "refixing", "price adjustment")),
+    TaxonomySeed("PAY.ISSUANCE.SUBSCRIPTION_MECHANICS", "PAY.ISSUANCE", "PAY", "청약·납입 절차", "Subscription and payment mechanics", "청약·배정·납입일·납입방법 등 증권 발행의 절차적 사항", 2, ("청약 절차", "납입", "subscription mechanics", "payment of subscription")),
+    # --- Security / collateral — under COV (obligation to grant/maintain/release security) ---
+    TaxonomySeed("COV.SECURITY", "COV", "COV", "담보·보증 제공", "Security and collateral", "질권·저당·양도담보·보증 등 담보의 설정·유지·실행·해지에 관한 확약", 1, ("담보 제공", "collateral", "security interest", "담보권 설정")),
+    TaxonomySeed("COV.SECURITY.PLEDGE", "COV.SECURITY", "COV", "질권 설정", "Pledge", "주식·채권·예금 등에 대한 질권의 설정 및 대항요건 구비 의무", 2, ("주식질권", "질권설정계약", "share pledge", "pledge agreement")),
+    TaxonomySeed("COV.SECURITY.MORTGAGE", "COV.SECURITY", "COV", "저당·양도담보", "Mortgage and security assignment", "부동산 저당권 또는 동산·채권 양도담보의 설정 의무", 2, ("저당권", "양도담보", "mortgage", "security by assignment")),
+    TaxonomySeed("COV.SECURITY.GUARANTEE", "COV.SECURITY", "COV", "보증·연대보증 제공", "Guarantee provision", "당사자 또는 제3자가 의무 이행을 보증하거나 연대보증을 제공하는 확약", 2, ("연대보증", "지급보증", "guarantee", "surety")),
+    TaxonomySeed("COV.SECURITY.MAINTENANCE", "COV.SECURITY", "COV", "담보 유지·추가담보", "Collateral maintenance", "담보가치 유지·추가담보 제공·담보비율 유지 의무", 2, ("추가담보", "담보 유지", "additional collateral", "top-up")),
+    TaxonomySeed("COV.SECURITY.ENFORCEMENT", "COV.SECURITY", "COV", "담보권 실행", "Enforcement of security", "채무불이행 시 질권·저당권 등 담보권의 실행 절차와 방법", 2, ("담보 실행", "질권 실행", "enforcement", "foreclosure")),
+    TaxonomySeed("COV.SECURITY.RELEASE", "COV.SECURITY", "COV", "담보 해지·말소", "Release of security", "피담보채무 소멸 시 담보권의 해지·말소·반환 의무", 2, ("담보 말소", "질권 해지", "release of pledge", "discharge of security")),
+    # --- Financial-maintenance covenant + other covenant gaps ---
+    TaxonomySeed("COV.FINANCIAL_MAINTENANCE", "COV", "COV", "재무유지약정", "Financial-maintenance covenant", "부채비율·이자보상배율·순차입금/EBITDA 등 재무비율을 유지할 확약", 1, ("재무비율 유지", "leverage ratio", "financial covenant", "재무유지 약정")),
+    TaxonomySeed("COV.IP_TRANSFER", "COV", "COV", "지식재산권 이전 확약", "IP transfer covenant", "특허·상표·영업비밀 등 지식재산권을 대상회사 또는 당사자에게 이전·귀속시키는 확약", 1, ("지재권 이전", "IP assignment", "지식재산 양도", "assign intellectual property")),
+    TaxonomySeed("COV.CORPORATE_ACTION", "COV", "COV", "주주총회·이사회 소집·결의 확약", "Corporate-action covenant", "임시주주총회·이사회의 소집 및 정관변경·임원선임 등 회사 행위를 하도록 하는 확약", 1, ("주주총회 소집", "이사회 결의", "convene shareholders meeting", "EGM")),
+    # --- SHA economic rights (leaves under the existing COV.SHA subtree) ---
+    TaxonomySeed("COV.SHA.LIQUIDATION_PREFERENCE", "COV.SHA", "COV", "청산우선권", "Liquidation preference", "청산·매각·합병 시 투자자가 우선하여 분배받을 권리와 그 배수·참가 조건", 2, ("청산우선권", "liquidation preference", "우선분배권")),
+    TaxonomySeed("COV.SHA.REDEMPTION_RIGHT", "COV.SHA", "COV", "상환권(주주)", "Shareholder redemption right", "주주가 회사·대주주에게 주식의 상환·매수를 청구할 수 있는 권리와 그 트리거", 2, ("상환청구권", "redemption right", "주식매수청구")),
+    TaxonomySeed("COV.SHA.CONVERSION_RIGHT", "COV.SHA", "COV", "전환권(주주)", "Shareholder conversion right", "우선주·전환증권 보유 주주가 보통주 등으로 전환을 청구할 수 있는 권리", 2, ("전환청구권", "conversion right", "보통주 전환")),
+    # --- General-provision leaves (previously homeless boilerplate) ---
+    TaxonomySeed("REM.NOTICE_MECHANICS", "REM", "REM", "통지 방식", "Notice mechanics", "계약상 통지의 방법·주소·효력발생시기 등 통지 절차 조항", 1, ("통지방법", "notices", "통지 조항", "notice provision")),
+    TaxonomySeed("REM.COUNTERPARTS", "REM", "REM", "계약서 부본", "Counterparts", "계약서를 복수의 부본으로 작성하고 각 부본이 원본으로서 효력을 갖는다는 조항", 1, ("부본", "counterparts", "복본")),
+    TaxonomySeed("REM.LANGUAGE", "REM", "REM", "준거언어", "Governing language", "국·영문 등 복수 언어 계약에서 해석의 기준이 되는 언어를 정하는 조항", 1, ("준거언어", "governing language", "언어 우선")),
 )
 
 

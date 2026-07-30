@@ -1,4 +1,19 @@
-# Taxonomy 확장 권고 (2026-07-31, full_read 근거) — 소유자 결정 대기
+# Taxonomy 확장 권고 (2026-07-31, full_read 근거)
+
+> **✅ 승인·구현됨 (taxonomy v19→v20, 2026-07-31)**. 소유자가 전면 승인. **family CHECK 제약**
+> (`family IN ('RW','CP','COV','DEF','PAY','REM')`)이 신규 최상위 family를 막고, 마이그레이션은
+> 124k item export/재구축이 필요하므로, **기존 family 하위에 additive(+25 노드, INSERT OR IGNORE)로 신설**했다
+> (item 불변 137,429·integrity ok·FTS 동기). 최상위 `ISS`/`SEC` family 승격은 향후 controlled migration 옵션.
+> 신설 노드:
+> - **발행조건(투자문서 SSA/CBSA/BWSA)** → `PAY.ISSUANCE.*`: SHARE_TERMS·PREFERRED_TERMS(RCPS)·CB_TERMS·
+>   BW_TERMS·CONVERSION_TERMS·REDEMPTION_TERMS·REFIXING·SUBSCRIPTION_MECHANICS
+> - **담보·보증** → `COV.SECURITY.*`: PLEDGE·MORTGAGE·GUARANTEE·MAINTENANCE·ENFORCEMENT·RELEASE
+> - **SHA 경제권** → `COV.SHA.{LIQUIDATION_PREFERENCE, REDEMPTION_RIGHT, CONVERSION_RIGHT}`
+>   (ROFR/ROFO/CALL_OPTION/PUT_OPTION/TAG_ALONG/DRAG_ALONG는 **이미 COV.SHA에 존재** — 신설 불필요)
+> - `COV.FINANCIAL_MAINTENANCE`·`COV.IP_TRANSFER`·`COV.CORPORATE_ACTION`·`REM.{NOTICE_MECHANICS,COUNTERPARTS,LANGUAGE}`
+>
+> 다음: 재추출 시 이 노드들에 항목이 착지. SSA/CBSA/BWSA·SHA 정독은 이제 발행조건·담보·경제권을 제대로 담을 수 있다.
+> (아래는 원 권고 근거 — 이력용.)
 
 _근거: 조율자 소유 Sonnet-5 정독(T-C SHA 파일럿 98b037 + CP/COV/REM 측정 SPA 정독들).
 배경: [[spa-shaped-taxonomy-sha-mismatch]], [NOW.md](../NOW.md) 문서-클래스 구분._
