@@ -32,11 +32,28 @@ _이 수치를 손으로 베끼지 말 것 — `python burndown.py --out cs_inde
 단일 writer 규율 유지(정독 병렬·store만 직렬). **운영 원칙**: "키워드 미검출≠부재"의 쌍둥이
 **"키워드 검출≠존재"** — 센서스·스윕 전 과정에 적용(2026-07-30 실증: RWI 790·TERMINATION_FEE 92 정확구문 히트가 정독 결과 거의 허수).
 
-- **Phase 0 (즉시·셋 병렬)**: ① RW 잔여~58 + PAY 잔여 재추출 **완결**(반쯤 끝난 상태가 최대 리스크; Next #2) ·
+> **소유권·정책 변경(2026-07-31 소유자 결정)**: **추출 파이프라인을 조율자(Claude Code)가 직접 소유**한다 —
+> 정독·추출·result JSON 작성·store·게이트를 조율자와 그 **서브에이전트**가 직접 수행하고, 외부 GPT/Codex 샤드에
+> 위임하지 않는다. **유료 API는 전면 미사용**(enrich 자동추출기·`answer_quick.py` 등 API 경로 도구 보류) —
+> 추출은 구독형 에이전트의 **직접 정독**으로만 한다. 이로써 RW/PAY 완결·T-C·스윕·부재검증이 모두 조율자
+> 실행 가능해진다(이전의 "샤드 배정 대기" 병목 해소). 단일 writer(store=조율자 1명)·과대추출 게이트는 그대로.
+> **모델 티어링(2026-07-31)**: **정독 작업은 Sonnet 5 서브에이전트**가 수행한다(`Agent model:sonnet`).
+> 조율자(Opus)는 오케스트레이션·store·게이트·측정만 맡고 대량 정독을 직접 하지 않는다.
+
+> **문서 클래스 구분(2026-07-31 소유자 지적)**: 현재 taxonomy 6-family(RW·CP·PAY·REM·COV·DEF)는 **매매/인수계약
+> 해부구조**다. **SHA는 독립 도메인이 아니라 `COV.SHA` 하위로 욱여넣어져 있고**(26노드·1,784 item), SHA엔
+> CP/PAY/REM이 SPA와 같은 의미로 거의 없다. 따라서: **(A) 매매/인수(SPA·ATA/BTA)** = taxonomy 적합, 병목은 추출
+> → CP·COV·REM 재검증(Phase 0-④)은 **이 클래스 한정**. **(B) 주주간(SHA)** = COV.SHA 미스핏 → **T-C의 SHA 정독은
+> 결함측정이 아니라 "도메인 적합성 평가"**(SHA를 1급 도메인으로 승격할지 taxonomy 권고 산출; 재설계는 소유자 결정).
+> **(C) 투자(SSA·CB/BW/EB)** = 하이브리드 추정, T-C에서 어느 클래스에 가까운지 확인.
+
+- **Phase 0 (즉시·병렬)**: ① RW 잔여~58 + PAY 잔여 재추출 **완결**(반쯤 끝난 상태가 최대 리스크; Next #2) ·
   ② **T-C 비-SPA 소표본 정독**(SHA·SSA·ATA/BTA·CB류 각 5~10건 full_read — RW/PAY 뒤 직렬 금지, **병렬**;
-  산출물은 결함'프로파일'이 아니라 스멜테스트+**유형별 절대-recall 정답지**(SPA 89% 편중 해소)+게이트 요건; Next #8) ·
-  ③ **죽은-노드 센서스 v2**(정확구문·distinct-doc; 노드당 4분류=추출누락/형제흡수/키워드오탐/소싱공백; **분류는 히트문서~10건 AI 정독 실재율로 확정**; 지금 진행 중 표 참조).
-- **Phase 1 (센서스 v2 결과 기반)**: ① **추출-누락 확정 노드만** 표적 재추출 스윕(모집단=정확구문 히트집합, v1 느슨키워드 모집단 금지; 프롬프트 극성 규율 필수—"있으면 추출·없으면 명시적 없음", "찾아라" 단독 금지; extraction_gate+store전 표본정밀도 통과조건; RW/PAY 인프라 재사용) ·
+  산출물은 결함'프로파일'이 아니라 스멜테스트+**유형별 절대-recall 정답지**(SPA 89% 편중 해소)+게이트 요건; Next #8.
+  **단 SHA 정독은 "도메인 적합성 평가"** — 위 문서-클래스 구분 참조, taxonomy 권고 산출) ·
+  ③ **죽은-노드 센서스 v2**(정확구문·distinct-doc; 노드당 4분류=추출누락/형제흡수/키워드오탐/소싱공백; **분류는 히트문서~10건 AI 정독 실재율로 확정**; 지금 진행 중 표 참조) ·
+  ④ **CP·COV·REM 정독 재검증 트랙 — 측정 우선**(2026-07-31 소유자 결정, **매매/인수 클래스=SPA·ATA/BTA 한정**; SHA엔 이 계열 구성이 없어 부적용). **CP·COV·REM·DEF는 전량 원본 자동추출(`codex-context-review-1`) 그대로**이고 RW/PAY만 정독 재추출됐다 → 같은 자동추출기의 "범위 미경계" 결함이 이들에도 있을 개연성이 큰데 미검증. **SPA 소표본(~24문서, `cs_index/cpcovrem_measure_manifest.json`) full_read로 CP·COV·REM 결함률(범위미경계·오분류·과대추출)을 먼저 정량화** → 수치로 전면 재추출 여부 결정. T-C(비-SPA)와 이 SPA-CP/COV/REM 표본은 같은 정독의 두 축. 이미 측정된 증상: COV.NON_COMPETE ≈51%·DEF 83% 캐치올·REM/CP 죽은노드. §9.1 #5·§9.4(Next #6·#16)와 연결.
+- **Phase 1 (센서스 v2 결과 기반)** — 스윕 매니페스트 준비 완료(`cs_index/deadnode_sweep_manifest.json`: ①스윕 6노드 339문서+SHA거버넌스 4·②흡수 alias제안 5·④소싱공백 27, 정밀구문 모집단·per-doc 극성검증 명시): ① **추출-누락 확정 노드만** 표적 재추출 스윕(모집단=정확구문 히트집합, v1 느슨키워드 모집단 금지; 프롬프트 극성 규율 필수—"있으면 추출·없으면 명시적 없음", "찾아라" 단독 금지; extraction_gate+store전 표본정밀도 통과조건; RW/PAY 인프라 재사용) ·
   ② **형제 흡수 노드는 재추출 안 함** — 기존 item 소급 재분류 또는 질의측 alias/인접노드 고지(DEF #20 계열); 형제흡수+coverage complete가 만드는 오(誤)confirmed_absent 경로 동시 점검 ·
   ④ **소싱 공백 노드**(FIRPTA·materiality scrape 등)는 소유자 이관·기대치 문서화; ③ 오탐은 제외.
 - **Phase 2 (측정·게이트)**: 존재·비교형 정밀도 측정(§9.1 #5, SPA 먼저→T-C 유형마다 표준절차화; Next #6·#16) · 하이브리드 합집합 실측(T4 선행; Next #17 완료).
@@ -69,8 +86,8 @@ _2026-07-29 추가 반영(조율자 단일 writer): (a) `v4_clause_item` **exact
 
 | 작업 | 담당 | 상태 | 근거문서 |
 |---|---|---|---|
-| RW 재추출 정독 → result JSON → store | GPT/Codex 샤드 + 서브에이전트 정독, **store는 조율자 1명(단일 writer)** | 진행 중 — 675/733 문서 반영(DB 실측). 잔여 ~58 + full_read 마커 소급 대기 ~27항목 | [RW_REEXTRACTION_AGENT_BRIEF](.docs/RW_REEXTRACTION_AGENT_BRIEF.md), [progress.md 2026-07-29 세션](progress.md) |
-| PAY 재추출(과소추출 시스템 결함 대응) | GPT/Codex(정독 배정), store는 조율자 | 착수 — 매니페스트 392 타깃(tier1 61/tier2 24/tier3 307) 중 **8문서 반영** | [PAY_REEXTRACTION_AGENT_BRIEF](.docs/PAY_REEXTRACTION_AGENT_BRIEF.md), `cs_index/pay_reextraction_manifest.json` |
+| RW 재추출 정독 → result JSON → store | **조율자(Claude Code)+서브에이전트 직접 정독**, store는 조율자 1명(단일 writer) | 진행 중 — 675/733 문서 반영(DB 실측). 잔여 ~58 + full_read 마커 소급 대기 ~27항목. 소유권 변경(2026-07-31)으로 외부 샤드 대신 조율자가 직접 완결 | [RW_REEXTRACTION_AGENT_BRIEF](.docs/RW_REEXTRACTION_AGENT_BRIEF.md), [progress.md 2026-07-29 세션](progress.md) |
+| PAY 재추출(과소추출 시스템 결함 대응) | **조율자+서브에이전트 직접 정독**, store는 조율자 | 착수 — 매니페스트 392 타깃(tier1 61/tier2 24/tier3 307) 중 **8문서 반영**. 이하 조율자 직접 정독 | [PAY_REEXTRACTION_AGENT_BRIEF](.docs/PAY_REEXTRACTION_AGENT_BRIEF.md), `cs_index/pay_reextraction_manifest.json` |
 | ~~번다운 지표 도구 + 웹 대시보드 패널~~ | — | **완료(2026-07-29)** — `burndown.py` + UI-2 대시보드 번다운 패널(`/api/ops/burndown`). 절대 drift하지 않도록 `v4_search`의 부재 판정 로직을 직접 import해 재사용 | [PLAN_REVIEW 권고 5](.docs/PLAN_REVIEW_20260727.md), `burndown.py` |
 | 존재형(과대추출) 축 방지장치 | 미배정(1번은 구현 완료) | 부분 — 감사기 과다분절·중복 탐지 구현(advisory, `audit_t3_v4.py`). 나머지 2~5는 미착수 | [V4_PLAN §9.3](.docs/V4_PLAN.md) |
 | ~~**죽은-노드 센서스 v2** (Phase 0-③)~~ | 조율자(읽기전용) | **완료(2026-07-31)** — 정확구문·`COUNT(DISTINCT file_key)`로 truly-dead subtree **42노드** 재산출 → mid-range 20노드 실재율 정독(6히트/노드) + loc-커버리지 흡수테스트로 4분류 확정. **핵심: 기계 카운트 상위는 전부 허수·흡수**(VOTING_PROXY 201=제한부담 정의·PERMITTED_LIEN 147=RW reps 흡수·ANTI_DILUTION 106=RW.CAPITALIZATION·TERMINATION_FEE 92=위약금 정의·RWI 790=부모구문). **Phase-1 스윕 대상(①추출누락) = 소수**: RWI.PROCUREMENT·LIEN_RELEASE·COV.PERSONNEL·COV.D_AND_O·SANDBAGGING·PRIVILEGE + SHA거버넌스 4(QUORUM·DIVIDEND_POLICY·DEADLOCK·BUSINESS_PLAN_BUDGET, 유형확장과 겹침). ②흡수 5·③오탐 5·④소싱공백 22. 상세 [[dead-node-census-v2]] | [V4_PLAN §9.2](.docs/V4_PLAN.md) 로드맵 Phase 0 |
@@ -87,9 +104,9 @@ _2026-07-29 추가 반영(조율자 단일 writer): (a) `v4_clause_item` **exact
 | 3 | **부재 풀 전량 재검증** — 현재 `confirmed_absent` 풀 전량(조세·환경 + 신설 IP/보험/노무/소송) | 조율자(AI 정독) / 소유자 | **환경 89건 완료(2026-07-30, correct 89/0)**. IP·보험·노무·소송은 **재추출 후**(그 재추출이 후순위라 함께 대기) | **§9.1 #2**. stale subset으로 90%를 주장하지 않고 현재 검색 적격 풀을 매번 재산출 | [환경 워크시트](cs_index/environment_absence_full_pool_20260730.md), [V4_PLAN §9.1](.docs/V4_PLAN.md) |
 | 4 | ~~**조세 잔여 false-absence 2건 정정**~~ | — | **완료(2026-07-30)** — `[1d5383…]` Tax Matters ¶411–415 추출 누락 6항목 표적 추가, `[1f0dc2…]` 결과 JSON의 조세 ¶55 DB 미착지 재저장. integrity ok | **§9.1 #4** 완료. 현재 조세 풀의 별도 소유자 전량 라벨링은 #3에 남음 | [V4_PLAN §9.1](.docs/V4_PLAN.md), `cs_index/rw_tax_false_absence_fixes/` |
 | 5 | **T-B 측정** — IP·보험·노무·소송 부재쿼리(V4A09~A12) `pool_verified` 채우기 | 소유자(검증) + 조율자(pool 생성) | **작성 완료·측정 대기**(`data/golden_queries_v4_independent.seed.yaml`에 4개 존재) | 작성은 끝났고 재추출 착지 후에만 유효한 신호. **작성≠측정** — 지금 낮은 정밀도를 해제 신호로 읽지 말 것 | [V4_PLAN §9.2 T-B](.docs/V4_PLAN.md) |
-| 6 | **존재형·비교형 정밀도 ≥90% 측정** — family별(RW·COV·PAY) 사람 원문대조 표본 + COV.NON_COMPETE 오분류 수정 재측정 | 미배정 (표본 검증은 소유자) | **COV 엄밀 실측·게이트 미달(2026-07-30)** — AI-정독 60표본: 정답 33%·공시진술 25%·타family 18%·헤딩 23%. **정밀도 ≈51%**(≥90% 크게 미달). 정리: 헤딩 60삭제 + 공시진술 151(138+13)→RW.CONTRACTS + 분류기 3차 확장(매수측·frame·중요계약rep·TOC). COV 425→**211**. **규칙 정리는 ~50%에서 정체 — 잔여(타family 오분류·다양표현 공시진술)는 재추출(§9.3-3)이 답**. RW·PAY 표본+소유자 검증 미착수 | [V4_PLAN §9.1 #5·§9.3](.docs/V4_PLAN.md), `lib/classification_audit.py` |
+| 6 | **존재형·비교형 정밀도 ≥90% 측정** — family별(RW·COV·PAY) 사람 원문대조 표본 + COV.NON_COMPETE 오분류 수정 재측정 | 미배정 (표본 검증은 소유자) | **COV 엄밀 실측·게이트 미달(2026-07-30)** — AI-정독 60표본: 정답 33%·공시진술 25%·타family 18%·헤딩 23%. **정밀도 ≈51%**(≥90% 크게 미달). 정리: 헤딩 60삭제 + 공시진술 151(138+13)→RW.CONTRACTS + 분류기 3차 확장(매수측·frame·중요계약rep·TOC). COV 425→**211**. **규칙 정리는 ~50%에서 정체 — 잔여(타family 오분류·다양표현 공시진술)는 재추출(§9.3-3)이 답**. RW·PAY 표본+소유자 검증 미착수. **CP·COV·REM 확장(2026-07-31)**: 이 세 계열이 전량 원본 자동추출이라, 정밀도 측정을 **SPA 소표본 full_read(로드맵 Phase 0-④, 측정 우선)로 CP·COV·REM 결함률 정량화**와 통합. 조율자 직접 정독(유료API 미사용) | [V4_PLAN §9.1 #5·§9.3·§9.4](.docs/V4_PLAN.md), `lib/classification_audit.py` |
 | 7 | **번다운 수치 정기 확인** — `python burndown.py --out cs_index` 또는 UI-2 대시보드 번다운 패널 | 각 세션 | 도구 완료, 운영 습관화 필요 | 상태 수치를 이 파일에 손으로 베껴두지 말고 매번 도구로 뽑아라. 문서마다 다른 수치(950/968/960)가 나오던 원인 | `burndown.py`, [PLAN_REVIEW 권고 5](.docs/PLAN_REVIEW_20260727.md) |
-| 8 | **T-C 비-SPA 소표본 진단** — SHA·CB류 등 각 5~10건에서 동일 결함/수정 적용가능성 확인 | 미배정 | 미착수 | **V4-6 재개의 필수 진입 게이트**([V4_PLAN §10](.docs/V4_PLAN.md) 표에 명시). "SPA만 검증하고 확장 시작" 방지 | [V4_PLAN §9.2 T-C](.docs/V4_PLAN.md) |
+| 8 | **T-C 비-SPA 소표본 진단** — SHA·CB류 등 각 5~10건에서 동일 결함/수정 적용가능성 확인 | **조율자+서브에이전트 직접 정독** | **브리프·표본 준비 완료·정독 착수(2026-07-31)** — 브리프 [TC_PILOT_BRIEF](.docs/TC_PILOT_BRIEF.md), 표본 `cs_index/tc_pilot_manifest.json`(SHA8·SSA5·ATA/BTA5·CB5=23건, 유형×언어×크기 분산, **SHA 8건 전부 기존item 0=greenfield**). 전 계열 full_read + `review_method:full_read` + `defect_notes` 스멜테스트. 소유권 변경으로 **조율자가 직접 정독**(유료API 미사용, 구독형 직접 정독); store·게이트·정답지 편입도 조율자 | [V4_PLAN §9.2 T-C](.docs/V4_PLAN.md) |
 | 9 | **T-D (2) 후보 생성기 조이기 + 기존 backlog 재분류** — 도구 완성(`lib/v4_candidate_policy.py`·`backfill_v4_candidate_recurrence.py`·`reclassify_v4_candidate_backlog.py`) | 조율자(DB 쓰기) | **재분류 moot 확인(2026-07-30)** — dry-run: pending **13,222**(29,807에서 감소) 전부 정당(재발≥2문서 11,255 + 구체 sub-node 1,967), **문서특정 일회성 = 0** → 적용해도 0건 변경. 옛 +159는 29,807 기준. 남은 13,222는 실제 taxonomy 제안이라 pending 유지가 맞고 그 부재차단은 결함 아님 | [V4_PLAN §9.2 T-D](.docs/V4_PLAN.md), [PLAN_REVIEW 권고 3·항목 2 심화 + 2026-07-29 정정](.docs/PLAN_REVIEW_20260727.md) |
 | 10 | **DEF 표적 재실행** — 매니페스트 206 타깃(items=0 100 + 1~3 106) | 미배정 | 미착수 | PAY와 달리 집중 tail 결함이라 **값싼 표적 재실행**으로 회수 가능. PAY 후행/병행 | [progress.md 2026-07-29 PAY/DEF 진단 세션](progress.md), `cs_index/def_reextraction_manifest.json` |
 | 11 | ~~**§9.3-2 후퇴가드 대칭화** — item 수 급증 시 store 전 표본확인 WARN~~ | — | **완료(2026-07-30)** — item-surge WARN + 과대추출 게이트 및 회귀 테스트 반영 | 과대추출 축의 방지장치 | [V4_PLAN §9.3](.docs/V4_PLAN.md), `lib/extraction_gate.py` |
