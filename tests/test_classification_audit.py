@@ -54,5 +54,24 @@ def test_disclosure_rep_with_no_obligation_still_reclassifies():
     assert classify_verbatim("COV.NON_COMPETE", v) == "reclassify"
 
 
+def test_material_contracts_disclosure_rep_reclassifies():
+    v = ("계약: 대상회사가 당사자인 중요 계약은 모두 적법하게 체결되어 유효하며 대상회사와 상대방 "
+         "당사자의 법률적으로 구속력 있는 의무를 구성하고, 관련 법률에 부합한다.")
+    assert classify_verbatim("COV.NON_COMPETE", v) == "reclassify"
+
+
+def test_toc_section_list_is_noise():
+    v = ("6.01 COOPERATION; FURTHER ASSURANCE. 6.02 GOVERNMENTAL APPROVALS. "
+         "6.03 CONDUCT OF BUSINESS PRIOR TO CLOSING. 6.04 ACCESS.")
+    assert classify_verbatim("COV.NON_COMPETE", v) == "noise"
+
+
+def test_seller_covenant_mentioning_contracts_still_kept():
+    # a covenant that happens to mention 중요계약 must not be pulled into reclassify —
+    # keep is checked first and the obligation mood is present
+    v = "매도인은 거래종결 후 5년간 대상회사의 중요계약과 경쟁하는 사업을 영위할 수 없다."
+    assert classify_verbatim("COV.NON_COMPETE", v) == "keep"
+
+
 def test_unknown_node_is_review():
     assert classify_verbatim("RW.TAX", "anything") == "review"

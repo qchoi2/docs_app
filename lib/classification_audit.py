@@ -49,10 +49,19 @@ _COV_FRAME = re.compile(
 _COV_KR = re.compile(r"경업금지기간|경쟁사업을\s*영위(하지|할\s*수\s*없)|경쟁을\s*하지")
 _REP = re.compile(
     r"포함하?(고\s*있)?는\s*계약|포함한\s*계약|조항을\s*포함|자유롭게\s*사업을\s*영위할\s*수\s*없도록|"
+    r"제약하는\s*계약|제한하는\s*내용의\s*계약|"
+    # material-contracts disclosure rep: "중요(한) 계약(은/는) ... 유효/적법하게 체결/제공/구속력"
+    # (a representation about the target's contracts, never a promise — the reclassify
+    # path already excludes anything with obligation mood).
+    r"중요\s*계약(은|는|의|,|\s)[^가-힣]{0,4}[가-힣].{0,90}(유효|적법하게\s*체결|제공되었|구속력\s*있는\s*의무)|"
     r"contracts?\s+(that\s+contain|containing|which\s+contain|that\s+limit|that\s+restrict)|"
-    r"any\s+contract[^.]{0,60}(contain|limit|restrict)|provision\s+restricting",
+    r"any\s+contract[^.]{0,60}(contain|limit|restrict)|provision\s+restricting|"
+    r"non[-\s]?competition\s+agreements?\s+or\s+other\s+contracts|"
+    r"contracts?\s+restricting\s+(all\s+or\s+a\s+part|the\s+business)",
     re.I | re.S,
 )
+# A table-of-contents fragment carries 3+ "N.NN Title" section markers — never a clause.
+_TOC = re.compile(r"\d+\.\d{2}\s+[A-Z]")
 # Any obligation mood anywhere => promissory, not a pure disclosure noun-phrase => never
 # auto-reclassify (protects buyer-side / oddly-phrased covenants the _COV subject list misses).
 _OBLIG = re.compile(
@@ -83,7 +92,7 @@ def classify_verbatim(node: str, verbatim: str) -> str:
     # ("6.2 매도인은 … 영위할 수 없다") is not mislabelled a heading.
     if _COV.search(v) or _COV_KR.search(v) or _COV_FRAME.search(v):
         return "keep"
-    if len(v) < _MIN_LEN or _NOISE.match(v):
+    if len(v) < _MIN_LEN or _NOISE.match(v) or len(_TOC.findall(v)) >= 3:
         return "noise"
     if _REP.search(v) and not _OBLIG.search(v):
         return "reclassify"
