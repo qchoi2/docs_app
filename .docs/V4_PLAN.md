@@ -525,10 +525,14 @@ arm에도 **동일한 재질의 루프를 허용**해 "어휘+루프 vs T4+루�
 `ROW_NUMBER() OVER (PARTITION BY COALESCE(dup_group,file_key))`로 대표 선정·COUNT를 DB로 내리는 작업은 **백로그로 남긴다**
 (FTS는 text 질의만 빠르게 했고, 개념-only 열거의 비용은 그대로다).
 
-**T4 선행 조건(보류 아님)으로 승격.** **#9(a) §4 하이브리드 합집합 실측**: V4-7 ablation의 비교 대상이 "현행 하이브리드"인데
-그 수치가 미측정이면 ablation을 시작할 수 없다 → **보류가 아니라 T4 선행 조건**(NOW #17 잔여, eval_absolute_recall 경로
-구현됨·실행만). MCP docstring에 "구조화 0~소수면 문단 경로도 호출해 needs_review로 구분 보고" 지침을 넣어 에이전트-측
-하이브리드를 우선 유도. **#8 text 동의어 확장**(term_dict/alias + canonical_en 교차언어 OR): paraphrase miss의 교차언어분
+**T4 선행 조건 = 하이브리드 합집합 실측 완료(2026-07-30).** V4-7 ablation의 비교 arm("현행 하이브리드")을 확정했다 —
+정답지 29,767 item(806 저장), 예산 max-depth 1000·doc-depth 30·1term: **structured within-depth 0.576 → 하이브리드
+(structured∪item_text) 0.673 → +paragraph 0.678**. **paragraph 경로는 거의 무기여**(0.673→0.678) — 이 예산에선 "3경로"의
+실질이 structured∪item_text다. 핵심은 **recall@10 = 4.6%**(within-depth는 68%인데 top-10엔 없음): §9.6의 개념-질의
+랭킹 병목과 동일선상이며(측정이 개념 구동이라 변별 신호 없음), **T4의 가치 제안은 within-depth가 아니라 recall@10
+상승**임을 이 수치가 못박는다. **V4-7은 이 0.678/@10 4.6%(및 §9.6-b의 paraphrase 0.633)를 이겨야 채택.** within-depth
+0.678은 예산상 **하한**(더 깊으면↑). MCP docstring에 "구조화 0~소수면 문단 경로도 호출해 needs_review로 구분 보고"
+지침을 넣어 에이전트-측 하이브리드를 우선 유도. **#8 text 동의어 확장**(term_dict/alias + canonical_en 교차언어 OR): paraphrase miss의 교차언어분
 (국문 키워드가 영문 verbatim 미스)을 임베딩 없이 닫는 몫이라 **T4 전에 분리**해야 ablation이 공정하다. **#9(b)** 현 프로브는
 `show_duplicates=True`(비관적 모집단) 기준 — dedup 기본값은 순위가 같거나 낫다.
 
