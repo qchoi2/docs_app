@@ -33,5 +33,26 @@ def test_uncertain_goes_to_review_not_reclassify():
     assert classify_verbatim("COV.NON_COMPETE", v) != "reclassify"
 
 
+def test_buyer_side_covenant_is_kept():
+    # a buyer/양수인 non-compete is still a covenant, not a disclosure rep
+    v = ("양수인은 본 계약 체결일로부터 10년간, 양도인 사업분야 내에서 에스테틱 의약성분을 함유한 "
+         "제품을 직접 또는 간접적으로 개발, 생산, 상업화할 수 없다.")
+    assert classify_verbatim("COV.NON_COMPETE", v) == "keep"
+
+
+def test_long_noncompete_frame_is_kept():
+    # subject + from-closing + N years frame => covenant even if the verb is far away
+    v = ("경업금지. 매도인들은 거래종결일로부터 10년 동안, 매도인들이 직접 또는 그 특수관계인을 통하여 "
+         "간접적으로, 매수인의 사전 서면 동의 없이는 대상회사가 영위하는 사업과 경쟁하는 행위를 한다.")
+    assert classify_verbatim("COV.NON_COMPETE", v) == "keep"
+
+
+def test_disclosure_rep_with_no_obligation_still_reclassifies():
+    # widening 'keep' must not steal a mood-less disclosure rep from 'reclassify'
+    v = ("대상회사가 당사자로서 경업금지, 비밀유지 조항을 포함하고 있는 계약의 완전한 목록은 "
+         "공개목록에 첨부되어 있으며 모두 유효하다.")
+    assert classify_verbatim("COV.NON_COMPETE", v) == "reclassify"
+
+
 def test_unknown_node_is_review():
     assert classify_verbatim("RW.TAX", "anything") == "review"

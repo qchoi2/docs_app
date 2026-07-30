@@ -28,10 +28,23 @@ from typing import Dict, List
 _NOISE = re.compile(
     r"^\s*((section|article)\b|제\s*[\d.]+\s*조?|\d+(\.\d+)*\.?)\s*\S[^\n]{0,45}$", re.I)
 _COV = re.compile(
-    r"(매도인|양도인|주주|seller|shareholder).{0,90}"
-    r"(하지\s*아니|하지\s*않|않기로|영위할\s*수\s*없|영위하지|경쟁하지|"
+    # promisor subject (now incl. buyer-side 양수인/매수인 — a buyer non-compete is still
+    # a covenant, not a disclosure rep) ... obligation mood. Gap widened 90->160 because
+    # real non-compete clauses carry a long scope ("... 대한민국 내에서 (i) ... 사업을") between
+    # the subject and the prohibition verb.
+    r"(매도인|양도인|양수인|매수인|주주|seller|purchaser|buyer|shareholder).{0,160}"
+    r"(하지\s*아니|하지\s*않|않기로|영위할\s*수\s*없|영위하지|경쟁하지|개발.{0,10}생산|"
     r"shall\s+not|covenants?\s+(that|not)|undertakes?\s+not|refrain)",
     re.I | re.S,
+)
+# The "party + from-closing + for N years" frame is unmistakably a non-compete covenant
+# (a disclosure rep never promises on behalf of a party over a term), so it is a covenant
+# even when the prohibition verb sits past the 160-char window.
+_COV_FRAME = re.compile(
+    r"(매도인|양도인|양수인|매수인|주주).{0,20}"
+    r"(체결일|거래\s*종결|종결일|클로징).{0,12}(로?부터|이후).{0,120}"
+    r"(년간|년\s*동안|개월간|개월\s*동안)",
+    re.S,
 )
 _COV_KR = re.compile(r"경업금지기간|경쟁사업을\s*영위(하지|할\s*수\s*없)|경쟁을\s*하지")
 _REP = re.compile(
@@ -68,7 +81,7 @@ def classify_verbatim(node: str, verbatim: str) -> str:
         return "review"
     # keep is checked before noise so a short/numbered line that is a real covenant
     # ("6.2 매도인은 … 영위할 수 없다") is not mislabelled a heading.
-    if _COV.search(v) or _COV_KR.search(v):
+    if _COV.search(v) or _COV_KR.search(v) or _COV_FRAME.search(v):
         return "keep"
     if len(v) < _MIN_LEN or _NOISE.match(v):
         return "noise"
