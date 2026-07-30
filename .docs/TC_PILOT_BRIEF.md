@@ -85,6 +85,15 @@ store가 그 문서 한정으로 가드를 해제하고 정독 세트를 그대�
   "meta_schema_version": "v4",
   "taxonomy_version": <현재 버전>,
   "defect_notes": ["<문서당 몇 줄>"],
+  "coverage": {                        // ★ store 필수. 6계열 전부 키가 있어야 한다
+    "RW":  {"body_status": "complete", "annex_status": "complete|partial|no_annex", "reason": "Sonnet-5 full_read"},
+    "CP":  {"body_status": "complete", "annex_status": "no_annex", "reason": "..."},
+    "COV": {"body_status": "complete", "annex_status": "no_annex", "reason": "..."},
+    "REM": {"body_status": "complete", "annex_status": "no_annex", "reason": "..."},
+    "PAY": {"body_status": "complete", "annex_status": "no_annex", "reason": "..."},
+    "DEF": {"body_status": "complete", "annex_status": "no_annex", "reason": "..."}
+  },
+  "source_coverage": [],               // ★ store 필수(빈 배열 허용)
   "items": [
     {
       "item_ref": "RW-0001",              // 계열 접두어-일련번호
@@ -108,3 +117,9 @@ store가 그 문서 한정으로 가드를 해제하고 정독 세트를 그대�
 ```
 `loc_start`/`loc_end`는 txt 캐시의 `[¶n]` 문단번호다(정답지 좌표로 쓰이므로 정확히). `verbatim`은 원문
 그대로(수치·조항 내용 보존), `proposition`은 그 조항의 규범적 요지 한 문장.
+
+**coverage 의미(중요)**: 처음부터 끝까지 정독했으면 그 문서에서 **평가된 계열은 `body_status:"complete"`**로 적어라.
+**item이 0건인 계열도 정독으로 확인했으면 "complete"** — 이는 "정독 결과 이 계열은 부재"라는 confirmed-absent
+신호가 되므로, **정말 원문 전체를 읽고 그 계열이 없음을 확인한 경우에만** complete로 적고, 애매하면
+`not_evaluated`로 남겨라(과신 금지). `annex_status`는 별지까지 읽었으면 complete, 별지가 없으면 no_annex,
+별지가 있으나 미확인이면 partial/not_evaluated. 이 블록이 없으면 store가 거부된다.

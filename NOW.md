@@ -47,6 +47,14 @@ _이 수치를 손으로 베끼지 말 것 — `python burndown.py --out cs_inde
 > 결함측정이 아니라 "도메인 적합성 평가"**(SHA를 1급 도메인으로 승격할지 taxonomy 권고 산출; 재설계는 소유자 결정).
 > **(C) 투자(SSA·CB/BW/EB)** = 하이브리드 추정, T-C에서 어느 클래스에 가까운지 확인.
 
+> **taxonomy v20 적용(2026-07-31, 소유자 승인)**: family CHECK 제약이 신규 최상위 family를 막아, 기존 family 하위에
+> **additive +25 노드**(item 불변·integrity ok). 신설: `PAY.ISSUANCE.*`(신주·전환사채·BW·우선주 발행조건·전환·상환·리픽싱,
+> SSA/CBSA/BWSA용) · `COV.SECURITY.*`(질권·저당·보증·유지·실행·해지) · `COV.SHA.{청산우선권·상환권·전환권}`(ROFR/ROFO/CALL/
+> PUT/TAG/DRAG는 기존) · `COV.FINANCIAL_MAINTENANCE`·`COV.IP_TRANSFER`·`COV.CORPORATE_ACTION`·`REM.{통지·부본·준거언어}`.
+> 최상위 `ISS`/`SEC` 승격은 향후 124k-item controlled migration 옵션. 상세 [TAXONOMY_EXTENSION_RECOMMENDATION](.docs/TAXONOMY_EXTENSION_RECOMMENDATION.md).
+> **재추출 store 확정(소유자)**: full-replace·정독 RW 신뢰. 단 `replace_v4_result`는 `coverage`+`source_coverage` 필수 →
+> 브리프 스키마 보강함(정독 6건은 store 전 coverage 백필 필요, 캠페인에서 처리).
+
 - **Phase 0 (즉시·병렬)**: ① RW 잔여~58 + PAY 잔여 재추출 **완결**(반쯤 끝난 상태가 최대 리스크; Next #2) ·
   ② **T-C 비-SPA 소표본 정독**(SHA·SSA·ATA/BTA·CB류 각 5~10건 full_read — RW/PAY 뒤 직렬 금지, **병렬**;
   산출물은 결함'프로파일'이 아니라 스멜테스트+**유형별 절대-recall 정답지**(SPA 89% 편중 해소)+게이트 요건; Next #8.
