@@ -24,11 +24,18 @@ This probe measures two honest counterparts, both read-only:
                      vs. the verbatim mode is the pre-registered T4-ablation baseline:
                      V4-7 must beat this lexical number to justify adoption.
 
-Measured 2026-07-30, 220 stored full_read answer-key items (seed 17):
+verbatim mode scores multi-answer: any item bearing the SAME full verbatim (an
+identical-clause sibling in any document) counts, not only the source file_key. The
+earlier single-item keying made @1 a needle-provenance metric — an identical-quote
+sibling ranked first read as a miss — which is what depressed verbatim @1 to ~0.48
+and was mis-attributed to sample variance in an earlier round (Fable §9.6 review).
+
+Measured 2026-07-30, 220 stored full_read answer-key items (seed 17), post
+noise-cleanup corpus (55 COV headings deleted, 3 reclassified):
   concept-label path (eval_absolute_recall):        recall@10 1.5%   median 462
-  verbatim mode, file_key order (pre-ordering):     recall@10 0.905  median 1
-  verbatim mode, relevance order + token AND:       (see current run)
-  paraphrase mode (lexical gap / T4 baseline):      (see current run)
+  verbatim, single-item keying (old):               @1 0.482  recall@10 0.859
+  verbatim, multi-answer (identical-sibling) keying: @1 0.700  recall@10 0.927
+  paraphrase mode (lexical gap / T4 baseline):      @1 0.396  recall@10 0.609
 
 Run from repo root:
   python eval_ranking_signal.py [n] [--mode verbatim|paraphrase] [--dump-misses N]
@@ -107,15 +114,38 @@ def _verbatim_token_coverage(item: dict, tokens) -> float:
     return sum(1 for t in toks if t in v) / len(toks)
 
 
-def rank_of(item: dict, query: str, depth: int = DEPTH) -> int | None:
-    """AND retrieval (the product's current text path): every token must co-occur."""
+def _same_verbatim(item: dict, row: dict) -> bool:
+    """Multi-answer verbatim match: does this row carry the SAME full verbatim as the
+    source item (an identical-clause sibling), in any document? The 2000-char store
+    truncation is why containment — not just equality — counts. This is match_item's
+    verbatim rule with the file_key gate removed: an identical clause pasted into a
+    second contract is a correct answer to 'find this quote', so crediting it keeps @1
+    a ranking-skill metric instead of a needle-provenance one (Fable §9.6 review).
+    It stays STRICTER than 'row contains the 40-char needle' — a different clause that
+    merely shares a boilerplate head is NOT credited, so @1 is not made tautological."""
+    a = normalize_text(item.get("verbatim"))
+    b = normalize_text(row.get("verbatim"))
+    if not a or not b:
+        return False
+    if a == b:
+        return True
+    return len(a) >= MIN_CONTAINMENT and len(b) >= MIN_CONTAINMENT and (a in b or b in a)
+
+
+def rank_of(item: dict, query: str, depth: int = DEPTH, *, multi_answer=False) -> int | None:
+    """AND retrieval (the product's current text path): every token must co-occur.
+    verbatim mode sets multi_answer=True to credit any identical-verbatim sibling;
+    paraphrase mode scores the specific answer item (file_key-scoped) via match_item."""
     try:
         page = search_clause_items(OUT, item["family"], text=query,
                                    show_duplicates=True, limit=depth)
     except Exception:
         return None
     for rank, row in enumerate(page["results"], start=1):
-        if match_item(item, row):
+        if multi_answer:
+            if _same_verbatim(item, row):
+                return rank
+        elif match_item(item, row):
             return rank
     return None
 
@@ -150,7 +180,7 @@ def evaluate(n_sample=300, seed=17, mode="verbatim", dump_misses=0) -> dict:
             cov = _verbatim_token_coverage(it, query)
         if len(records) >= n_sample:
             break
-        rank = rank_of(it, query)
+        rank = rank_of(it, query, multi_answer=(mode == "verbatim"))
         coverages.append(cov)
         records.append({"item": it, "query": query, "rank": rank})
     found = [r["rank"] for r in records if r["rank"] is not None]
