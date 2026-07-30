@@ -498,14 +498,32 @@ trigram, content-linked)가 있고 트리거 3개로 유지되며 **137,865=137,
 bm25는 term-frequency 우선이라 "연속 구문·위치" 신호를 버린다. **연속구문-우선 하이브리드**로 복원: verbatim recall@10
 **0.900**(median 1). paraphrase는 bm25 IDF로 **0.633**(AND-LIKE 0.60 대비↑).
 
+**verbatim @1이 pre-FTS(0.63)보다 낮은 이유 — 실측(Fable 후속 (1)).** "표본 차이"로 넘기지 않고 `--dump-misses`로 측정:
+top-10 밖 12건 **전부 rank>10, rank=None 0건** — 즉 FTS AND가 정답을 **항상 검색**하며(검색 회귀 없음) 저순위만 남는다.
+원인은 boilerplate 헤딩이 아니라 **정형 조항문구가 여러 계약에 동일 반복**되는 것: "No Proceedings. There are no
+Proceedings pending"이 덤프에 2회(rank 53·68), "매도인은 본 계약을 체결하고 … 이행하기"(rank 123) 등. 동일 문구 형제
+계약들 사이에서 bm25가 어느 사본인지 못 가르고, eval은 N개 동일 item 중 **1개만 정답으로 채점**하므로 동등하게 맞는
+형제를 오답 처리하는 **채점 아티팩트**다(검색·랭킹 결함 아님). pre-FTS의 length tiebreak이 우연히 짧은 사본을 올렸던
+것과 같은 층위의 문제이며, 실사용에선 사용자가 문서를 지정하거나 dedup 기본값(동일 사본 접힘)이 이를 완화한다.
+
 **공정 T4 게이트 베이스라인 확정.** 종전 "패러프레이즈 0.596"은 Fable 3차 지적대로 핸디캡(AND가 조사 1개로 0건화 +
 최장토큰=조사부착) 걸린 수치였다. `eval_ranking_signal.py`에 **조사 제거**(`strip_josa`) + FTS bm25 경로를 반영해 재측정한
 **paraphrase recall@10 0.633 (verbatim 토큰 커버리지 0.435)** 가 공정 베이스라인이다 — **V4-7은 이를 이겨야 채택**.
 (순수 OR+bm25 "천장"은 흔한 토큰이 거의 전 코퍼스를 매치·스코어링해 비현실적으로 느렸다 — 이 사실 자체가 제품이
 AND+bm25를 택한 근거다. 어휘 backoff 측정은 폐기.)
 
-**성능(#2)·정합성(#5) 부수 개선.** LIKE 전체 스캔은 프로브조차 timeout시켰다(58k×2000자 스캔) — FTS 인덱스 전환이 이
-O(node) 비용을 직접 해소. `_bulk_coverage_states`는 family 전체를 읽고 파이썬에서 거르던 것을 페이지 키 `IN(...)`으로 내렸다.
+**Ablation 공정성 — 단발 vs 재질의 루프(Fable 후속 (2)).** 0.633은 **단발(single-shot) AND** 질의 수치다. 그러나 에이전트는
+재질의 루프를 가진다(`low_query_signal`→키워드 추가, `zero_result_hint`→키워드 제거·교체). 따라서 V4-7 ablation은 어휘
+arm에도 **동일한 재질의 루프를 허용**해 "어휘+루프 vs T4+루프"로 비교해야 공정하다 — 단발 0.633을 T4 단발과 비교하면
+어휘가 이미 가진 회복 능력을 T4 기여로 오인한다. 게이트 프로토콜에 명시: **베이스라인 = 어휘+에이전트 루프**, 0.633은
+그 하한.
+
+**성능(#2 일부)·정합성(#5) 부수 개선.** LIKE 전체 스캔은 프로브조차 timeout시켰다(58k×2000자 스캔) — FTS 인덱스 전환이
+이 text 경로의 O(node) 비용을 직접 해소. `_bulk_coverage_states`는 family 전체를 읽고 파이썬에서 거르던 것을 페이지 키
+`IN(...)`으로 내렸다. **#2 잔여(백로그 유지, Fable 후속 (3)):** text 없는 **브라우징의 `show_duplicates=False` 전량 구체화**는
+이번에 안 다뤘다 — dedup을 파이썬에서 하려고 노드 전체를 LIMIT 없이 fetch·dict 변환·버전 주석하며, offset 페이징마다 반복.
+`ROW_NUMBER() OVER (PARTITION BY COALESCE(dup_group,file_key))`로 대표 선정·COUNT를 DB로 내리는 작업은 **백로그로 남긴다**
+(FTS는 text 질의만 빠르게 했고, 개념-only 열거의 비용은 그대로다).
 
 **T4 선행 조건(보류 아님)으로 승격.** **#9(a) §4 하이브리드 합집합 실측**: V4-7 ablation의 비교 대상이 "현행 하이브리드"인데
 그 수치가 미측정이면 ablation을 시작할 수 없다 → **보류가 아니라 T4 선행 조건**(NOW #17 잔여, eval_absolute_recall 경로
