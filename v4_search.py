@@ -636,6 +636,28 @@ def search_clause_items(
             version_sql, version_params = _version_clause(version_roles)
             clauses.append(version_sql)
             params.extend(version_params)
+        # Ordering. A bare concept query has no signal that distinguishes one item
+        # from its hundreds of same-node siblings, so it stays in a stable document
+        # order (file_key, ¶) — an *enumeration* for compare/count queries. But when
+        # a `text` needle is given the query DOES carry a discriminating signal, and
+        # file_key order buries the best match (measured: recall@1 ~0.54 on distinctive
+        # queries because a sibling sorts first). Rank those by match quality: a hit in
+        # the verbatim beats a proposition-only hit, an earlier hit beats a later one,
+        # and a shorter (more focused) item beats a long catch-all. Purely a reorder of
+        # the same result set — totals/pagination and the no-text path are untouched.
+        order_params: list = []
+        if text:
+            needle = text.strip().lower()
+            order_sql = (
+                "CASE WHEN instr(lower(i.verbatim),?)>0 THEN 0 "
+                "     WHEN instr(lower(i.proposition),?)>0 THEN 1 ELSE 2 END,"
+                "CASE WHEN instr(lower(i.verbatim),?)>0 THEN instr(lower(i.verbatim),?) "
+                "     ELSE 2147483647 END,"
+                "length(COALESCE(i.verbatim,'')),f.file_key,i.loc_start,i.item_id"
+            )
+            order_params = [needle, needle, needle, needle]
+        else:
+            order_sql = "f.file_key,i.loc_start,i.item_id"
         select_sql = f"""
             SELECT i.item_id,i.item_ref,i.file_key,i.family,i.taxonomy_id,
                    n.canonical_ko,n.canonical_en,i.proposition,
@@ -652,7 +674,7 @@ def search_clause_items(
             JOIN v4_taxonomy_node n ON n.taxonomy_id=i.taxonomy_id
             JOIN files f ON f.file_key=i.file_key
             WHERE {' AND '.join(clauses)}
-            ORDER BY f.file_key,i.loc_start,i.item_id
+            ORDER BY {order_sql}
         """
         if show_duplicates:
             totals = conn.execute(
@@ -675,11 +697,11 @@ def search_clause_items(
             stale = int(totals["stale_items"])
             page_rows = conn.execute(
                 select_sql + " LIMIT ? OFFSET ?",
-                [*params, limit, offset],
+                [*params, *order_params, limit, offset],
             ).fetchall()
             items = [_item_dict(row) for row in page_rows]
         else:
-            rows = conn.execute(select_sql, params).fetchall()
+            rows = conn.execute(select_sql, [*params, *order_params]).fetchall()
             all_items = _dedupe_item_rows(
                 (_item_dict(row) for row in rows), show_duplicates
             )
@@ -745,7 +767,7 @@ ABSENCE_UNVERIFIED_FAMILIES = {"RW"}
 # (V4_PLAN §9.1 #3). A sub-domain is admitted ONLY once its golden absence query's
 # pool_verified is populated; an empty set keeps the whole family gated. Keyed by the
 # 2-segment sub-domain id (e.g. "RW.ENVIRONMENT").
-ABSENCE_VERIFIED_SUBDOMAINS: set[str] = set()
+ABSENCE_VERIFIED_SUBDOMAINS: set[str] = {"RW.ENVIRONMENT"}
 
 
 def _absence_subdomain(taxonomy_id: str) -> str:

@@ -1,0 +1,1381 @@
+{
+  "generated_at": "2026-07-30T01:19:32.223281+00:00",
+  "full_read_results": 390,
+  "finding_count": 60,
+  "complete_rows_at_risk": 55,
+  "findings": [
+    {
+      "file_key": "00a50ea89d8e14d6",
+      "result_file": "cs_index\\rw_reextract_results\\00a50ea89d8e14d6.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.REAL_ESTATE": [
+          {
+            "para": 235,
+            "text": "Real Property and Other Assets."
+          }
+        ],
+        "RW.IP": [
+          {
+            "para": 240,
+            "text": "Intellectual Property."
+          }
+        ],
+        "RW.INSURANCE": [
+          {
+            "para": 290,
+            "text": "Insurance."
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "018616d362652278",
+      "result_file": "cs_index\\rw_reextract_results\\018616d362652278.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.COMPLIANCE": [
+          {
+            "para": 1331,
+            "text": "법률 준수"
+          }
+        ],
+        "RW.REAL_ESTATE": [
+          {
+            "para": 1609,
+            "text": "부동산 소재지"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "01ccec5cdb2f5128",
+      "result_file": "cs_index\\rw_reextract_results\\01ccec5cdb2f5128.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.IP": [
+          {
+            "para": 328,
+            "text": "지적재산권"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "08fa9db87c5acaad",
+      "result_file": "cs_index\\rw_reextract_results\\08fa9db87c5acaad.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.CONTRACTS": [
+          {
+            "para": 32,
+            "text": "Section 3.16. Contracts 18"
+          }
+        ],
+        "RW.INSURANCE": [
+          {
+            "para": 33,
+            "text": "Section 3.17. Insurance 19"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "0d99cc337f9f29ae",
+      "result_file": "cs_index\\rw_reextract_results\\0d99cc337f9f29ae.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.IP": [
+          {
+            "para": 285,
+            "text": "지적재산권"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "0df5e9d7e1e7c893",
+      "result_file": "cs_index\\rw_reextract_results\\0df5e9d7e1e7c893.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.FINANCIAL": [
+          {
+            "para": 443,
+            "text": "financial statements within forty-five (45) days after the end of"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "1228a92c0df7b751",
+      "result_file": "cs_index\\rw_reextract_results\\1228a92c0df7b751.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.INSURANCE": [
+          {
+            "para": 26,
+            "text": "3.3 Insurance 15"
+          },
+          {
+            "para": 178,
+            "text": "Insurance"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "1289f43bbd364dcd",
+      "result_file": "cs_index\\rw_reextract_results\\1289f43bbd364dcd.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.CONTRACTS": [
+          {
+            "para": 460,
+            "text": "Contracts for supply or provision of goods or services involving an amount in excess of KRW [●];"
+          },
+          {
+            "para": 461,
+            "text": "Contracts involving capital expenditure in excess of KRW [●];"
+          },
+          {
+            "para": 464,
+            "text": "Contracts pertaining to Indebtedness or derivative transactions, involving an amount in excess of KRW [●];"
+          },
+          {
+            "para": 465,
+            "text": "Contracts regarding the licensing of Intellectual Property rights involving annual royalty payments in excess of KRW [●];"
+          },
+          {
+            "para": 466,
+            "text": "Contracts relating to any joint venture, partnership, strategic alliance, or similar arrangement;"
+          },
+          {
+            "para": 468,
+            "text": "Contracts that contain any non-compete provision restricting the Company Group from conducting any business activities or from competing with any Person;"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "14f036205bb729eb",
+      "result_file": "cs_index\\rw_reextract_results\\14f036205bb729eb.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.INSURANCE": [
+          {
+            "para": 7,
+            "text": "1. Insurance agency business;"
+          }
+        ],
+        "RW.REAL_ESTATE": [
+          {
+            "para": 9,
+            "text": "3. Real estate lease and consulting service;"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "14f9e70a3cc2d65a",
+      "result_file": "cs_index\\rw_reextract_results\\14f9e70a3cc2d65a.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.IP": [
+          {
+            "para": 430,
+            "text": "Intellectual Property."
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "19cb2dd280ab0b15",
+      "result_file": "cs_index\\rw_reextract_results\\19cb2dd280ab0b15.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.TAX": [
+          {
+            "para": 98,
+            "text": "조세"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "1c055d93e8e1ef18",
+      "result_file": "cs_index\\rw_reextract_results\\1c055d93e8e1ef18.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.IP": [
+          {
+            "para": 237,
+            "text": "Intellectual Property."
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "257187201fd2a9e2",
+      "result_file": "cs_index\\rw_reextract_results\\257187201fd2a9e2.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.ASSETS": [
+          {
+            "para": 490,
+            "text": "자산"
+          },
+          {
+            "para": 510,
+            "text": "자산 총계 | 2,779,362 | 2,774,458 | 56,059"
+          },
+          {
+            "para": 603,
+            "text": "자산"
+          },
+          {
+            "para": 623,
+            "text": "자산 총계 | 2,779,362 | 2,774,458 | 56,059"
+          },
+          {
+            "para": 649,
+            "text": "자산"
+          },
+          {
+            "para": 656,
+            "text": "자산 총계 | 56,059"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "25bf6547224663d7",
+      "result_file": "cs_index\\rw_reextract_results\\25bf6547224663d7.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.TAX": [
+          {
+            "para": 143,
+            "text": "조세 및 비용"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "294e3cff037d9964",
+      "result_file": "cs_index\\rw_reextract_results\\294e3cff037d9964.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.CONTRACTS": [
+          {
+            "para": 91,
+            "text": "Contracts entered into with any Governmental Authority;"
+          },
+          {
+            "para": 95,
+            "text": "Contracts involving aggregate revenue for the Company in excess of KRW 3,000,000,000 in any twelve (12)-month period;"
+          }
+        ],
+        "RW.IP": [
+          {
+            "para": 207,
+            "text": "Intellectual Property."
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "2e2dcdacc56a1065",
+      "result_file": "cs_index\\rw_reextract_results\\2e2dcdacc56a1065.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.IP": [
+          {
+            "para": 413,
+            "text": "1. 지식재산권 관련 분쟁 현황은 다음과 같음."
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "3503642f8b33a18c",
+      "result_file": "cs_index\\rw_reextract_results\\3503642f8b33a18c.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.ASSETS": [
+          {
+            "para": 247,
+            "text": "자산"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "39316d2fcb4a0bbe",
+      "result_file": "cs_index\\rw_reextract_results\\39316d2fcb4a0bbe.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.REAL_ESTATE": [
+          {
+            "para": 192,
+            "text": "Real Property and Other Assets."
+          }
+        ],
+        "RW.IP": [
+          {
+            "para": 196,
+            "text": "Intellectual Property."
+          }
+        ],
+        "RW.INSURANCE": [
+          {
+            "para": 240,
+            "text": "Insurance."
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "3dcb3afde8eb88a8",
+      "result_file": "cs_index\\rw_reextract_results\\3dcb3afde8eb88a8.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.INSURANCE": [
+          {
+            "para": 345,
+            "text": "Insurance Business."
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "40ac5c51f0bc9b73",
+      "result_file": "cs_index\\rw_reextract_results\\40ac5c51f0bc9b73.json",
+      "body_status": "not_evaluated",
+      "omissions": {
+        "RW.LITIGATION": [
+          {
+            "para": 157,
+            "text": "2.08 Litigation."
+          },
+          {
+            "para": 2809,
+            "text": "Litigation"
+          }
+        ],
+        "RW.REAL_ESTATE": [
+          {
+            "para": 233,
+            "text": "2.12 Real Property."
+          }
+        ],
+        "RW.IP": [
+          {
+            "para": 246,
+            "text": "Intellectual Property."
+          }
+        ],
+        "RW.TAX": [
+          {
+            "para": 722,
+            "text": "4.19 Tax Matters."
+          },
+          {
+            "para": 793,
+            "text": "Tax Matters Coordination and Survival."
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "41b7c05f4d0163a1",
+      "result_file": "cs_index\\rw_reextract_results\\41b7c05f4d0163a1.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.CONTRACTS": [
+          {
+            "para": 36,
+            "text": "계약 해제 및 종료"
+          }
+        ],
+        "RW.LABOR": [
+          {
+            "para": 314,
+            "text": "임직원 | 임직원 | 6,820 | 183,601"
+          },
+          {
+            "para": 320,
+            "text": "임직원 | 임직원 | 6,820 | 10,320 | 183,601 | 412,501"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "45abf55e0a8eaa8d",
+      "result_file": "cs_index\\rw_reextract_results\\45abf55e0a8eaa8d.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.ASSETS": [
+          {
+            "para": 146,
+            "text": "자산."
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "46100f002b22e748",
+      "result_file": "cs_index\\rw_reextract_results\\46100f002b22e748.json",
+      "body_status": "not_evaluated",
+      "omissions": {
+        "RW.CONTRACTS": [
+          {
+            "para": 48,
+            "text": "계약 해제"
+          }
+        ],
+        "RW.TAX": [
+          {
+            "para": 54,
+            "text": "세금 및 비용부담"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "4a332e32794c1f4c",
+      "result_file": "cs_index\\rw_reextract_results\\4a332e32794c1f4c.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.INSURANCE": [
+          {
+            "para": 188,
+            "text": "Insurance Business."
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "4a763d303478f588",
+      "result_file": "cs_index\\rw_reextract_results\\4a763d303478f588.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.TAX": [
+          {
+            "para": 37,
+            "text": "8.6. Tax Matters 7"
+          },
+          {
+            "para": 47,
+            "text": "11.2. Taxes and Expenses 9"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "4dc11d699179df37",
+      "result_file": "cs_index\\rw_reextract_results\\4dc11d699179df37.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.ASSETS": [
+          {
+            "para": 94,
+            "text": "자산 또는 유가증권의 취득, 처분 또는 담보설정 행위;"
+          },
+          {
+            "para": 311,
+            "text": "자산"
+          }
+        ],
+        "RW.IP": [
+          {
+            "para": 317,
+            "text": "지적재산권"
+          }
+        ],
+        "RW.INSURANCE": [
+          {
+            "para": 338,
+            "text": "보험"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "53503385c86ef92b",
+      "result_file": "cs_index\\rw_reextract_results\\53503385c86ef92b.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.TAX": [
+          {
+            "para": 258,
+            "text": "Taxes on Distributions and Tax Withholding."
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "5853fe0540a72d6c",
+      "result_file": "cs_index\\rw_reextract_results\\5853fe0540a72d6c.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.REAL_ESTATE": [
+          {
+            "para": 716,
+            "text": "1. 부동산 임대업"
+          },
+          {
+            "para": 1155,
+            "text": "1. Real estate business;"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "5a5dc2c779ac2a11",
+      "result_file": "cs_index\\rw_reextract_results\\5a5dc2c779ac2a11.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.LABOR": [
+          {
+            "para": 47,
+            "text": "4.14 Employee Matters 27"
+          },
+          {
+            "para": 98,
+            "text": "Section 7 employee matters"
+          },
+          {
+            "para": 377,
+            "text": "Employee Matters"
+          },
+          {
+            "para": 589,
+            "text": "employee matters"
+          }
+        ],
+        "RW.LITIGATION": [
+          {
+            "para": 53,
+            "text": "4.20 Legal Proceedings 34"
+          },
+          {
+            "para": 64,
+            "text": "5.5 Legal Proceedings 38"
+          },
+          {
+            "para": 421,
+            "text": "Legal Proceedings"
+          },
+          {
+            "para": 465,
+            "text": "Legal Proceedings"
+          }
+        ],
+        "RW.INSURANCE": [
+          {
+            "para": 55,
+            "text": "4.22 Insurance 36"
+          },
+          {
+            "para": 80,
+            "text": "6.12 Insurance 50"
+          },
+          {
+            "para": 442,
+            "text": "Insurance"
+          },
+          {
+            "para": 543,
+            "text": "Insurance"
+          }
+        ],
+        "RW.IP": [
+          {
+            "para": 100,
+            "text": "Section 8 INTELLECTUAL PROPERTY MATTERS"
+          },
+          {
+            "para": 601,
+            "text": "INTELLECTUAL PROPERTY MATTERS"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "5acc3ac91d0f354b",
+      "result_file": "cs_index\\rw_reextract_results\\5acc3ac91d0f354b.json",
+      "body_status": "partial",
+      "omissions": {
+        "RW.COMPLIANCE": [
+          {
+            "para": 90,
+            "text": "Schedule 4.5 Compliance with Laws / Schedule 4.10 Labor Matters"
+          }
+        ],
+        "RW.PERMITS": [
+          {
+            "para": 99,
+            "text": "Schedule 4.6 Permits"
+          }
+        ],
+        "RW.LITIGATION": [
+          {
+            "para": 115,
+            "text": "Schedule 4.7 Litigation"
+          }
+        ],
+        "RW.IP": [
+          {
+            "para": 122,
+            "text": "Schedule 4.12 Intellectual Property"
+          }
+        ],
+        "RW.ENVIRONMENT": [
+          {
+            "para": 135,
+            "text": "Schedule 4.15 Environmental Matters"
+          }
+        ],
+        "RW.REAL_ESTATE": [
+          {
+            "para": 380,
+            "text": "Schedule 4.16(l) Real Property"
+          }
+        ],
+        "RW.INSURANCE": [
+          {
+            "para": 468,
+            "text": "Schedule 4.19 Insurance"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "5c2f809bbe842329",
+      "result_file": "cs_index\\rw_reextract_results\\5c2f809bbe842329.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.CONTRACTS": [
+          {
+            "para": 40,
+            "text": "제6조 계약 해제 및 종료"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "5ccd7e0d9c38a9f8",
+      "result_file": "cs_index\\rw_reextract_results\\5ccd7e0d9c38a9f8.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.CONTRACTS": [
+          {
+            "para": 459,
+            "text": "Contracts for purchase of goods or services involving an amount in excess of KRW 2,000,000,000;"
+          },
+          {
+            "para": 460,
+            "text": "Contracts for supply or provision of goods or services involving an amount in excess of KRW 1,000,000,000;"
+          },
+          {
+            "para": 461,
+            "text": "Contracts involving capital expenditure in excess of KRW 1,000,000,000;"
+          },
+          {
+            "para": 464,
+            "text": "Contracts pertaining to Indebtedness or derivative transactions, involving an amount in excess of KRW 500,000,000;"
+          },
+          {
+            "para": 465,
+            "text": "Contracts regarding the licensing of Intellectual Property rights involving annual royalty payments in excess of KRW 100,000,000;"
+          },
+          {
+            "para": 466,
+            "text": "Contracts relating to any joint venture, partnership, strategic alliance, or similar arrangement;"
+          },
+          {
+            "para": 468,
+            "text": "Contracts that contain any non-compete provision restricting the Company Group from conducting any business activities or from competing with any Person;"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "6056f50af3ee0a9f",
+      "result_file": "cs_index\\rw_reextract_results\\6056f50af3ee0a9f.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.INSURANCE": [
+          {
+            "para": 541,
+            "text": "Insurance"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "61eaa440c254daec",
+      "result_file": "cs_index\\rw_reextract_results\\61eaa440c254daec.json",
+      "body_status": "partial",
+      "omissions": {
+        "RW.CONTRACTS": [
+          {
+            "para": 247,
+            "text": "11 CONTRACTS (RIGHTS OF THIRD PARTIES) ACT 1999"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "66e5ced52c343f46",
+      "result_file": "cs_index\\rw_reextract_results\\66e5ced52c343f46.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.ASSETS": [
+          {
+            "para": 555,
+            "text": "자산"
+          }
+        ],
+        "RW.IP": [
+          {
+            "para": 557,
+            "text": "지식재산권"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "69f5e7b0be9164f4",
+      "result_file": "cs_index\\rw_reextract_results\\69f5e7b0be9164f4.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.ASSETS": [
+          {
+            "para": 406,
+            "text": "SCHEDULE OF ASSETS AND LIABILITIES"
+          },
+          {
+            "para": 408,
+            "text": "ASSETS | Korean Won"
+          },
+          {
+            "para": 645,
+            "text": "5. Assets"
+          }
+        ],
+        "RW.CONTRACTS": [
+          {
+            "para": 600,
+            "text": "Material Contracts"
+          },
+          {
+            "para": 687,
+            "text": "10. Contracts"
+          }
+        ],
+        "RW.TAX": [
+          {
+            "para": 641,
+            "text": "4. Tax Matters"
+          }
+        ],
+        "RW.IP": [
+          {
+            "para": 650,
+            "text": "6. Intellectual Property Rights and IT"
+          }
+        ],
+        "RW.INSURANCE": [
+          {
+            "para": 685,
+            "text": "9. Insurance"
+          }
+        ],
+        "RW.LITIGATION": [
+          {
+            "para": 694,
+            "text": "11. Litigation"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "70472ab5bb865f33",
+      "result_file": "cs_index\\rw_reextract_results\\70472ab5bb865f33.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.ENVIRONMENT": [
+          {
+            "para": 348,
+            "text": "환경 등"
+          }
+        ],
+        "RW.IP": [
+          {
+            "para": 350,
+            "text": "지식재산권"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "78f006faf2bf49ec",
+      "result_file": "cs_index\\rw_reextract_results\\78f006faf2bf49ec.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.CONTRACTS": [
+          {
+            "para": 189,
+            "text": "18 CONTRACTS (RIGHTS OF THIRD PARTIES) ACT 1999"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "85c42bba43aa4c66",
+      "result_file": "cs_index\\rw_reextract_results\\85c42bba43aa4c66.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.LITIGATION": [
+          {
+            "para": 42,
+            "text": "5.4 소송"
+          },
+          {
+            "para": 54,
+            "text": "소송"
+          }
+        ],
+        "RW.LABOR": [
+          {
+            "para": 88,
+            "text": "7.3 고용 보장"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "977fb166c6765dc0",
+      "result_file": "cs_index\\rw_reextract_results\\977fb166c6765dc0.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.TAX": [
+          {
+            "para": 305,
+            "text": "Tax Matters"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "9d94fd6abbcab760",
+      "result_file": "cs_index\\rw_reextract_results\\9d94fd6abbcab760.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.REAL_ESTATE": [
+          {
+            "para": 178,
+            "text": "Real Property and Other Assets."
+          }
+        ],
+        "RW.INSURANCE": [
+          {
+            "para": 188,
+            "text": "Insurance."
+          }
+        ],
+        "RW.ASSETS": [
+          {
+            "para": 1092,
+            "text": "Assets or liabilities relating to corporate income taxes | 23 | 8 | 36 | 67"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "ad413a52cacf317f",
+      "result_file": "cs_index\\rw_reextract_results\\ad413a52cacf317f.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.ASSETS": [
+          {
+            "para": 369,
+            "text": "자산"
+          },
+          {
+            "para": 628,
+            "text": "자산 관련 정부승인 위반"
+          }
+        ],
+        "RW.INSURANCE": [
+          {
+            "para": 651,
+            "text": "보험"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "ae2b6f66b8840fb8",
+      "result_file": "cs_index\\rw_reextract_results\\ae2b6f66b8840fb8.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.IP": [
+          {
+            "para": 48,
+            "text": "지적재산권"
+          }
+        ],
+        "RW.ENVIRONMENT": [
+          {
+            "para": 57,
+            "text": "환경"
+          }
+        ],
+        "RW.INSURANCE": [
+          {
+            "para": 59,
+            "text": "보험"
+          }
+        ],
+        "RW.LABOR": [
+          {
+            "para": 77,
+            "text": "임직원 관련 정보: 본 계약 체결일 현재 대상회사의 최신 조직도 및 인력 현황(성명, 입사일 및 급여 포함)"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "b2f9897ca0f767f2",
+      "result_file": "cs_index\\rw_reextract_results\\b2f9897ca0f767f2.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.ASSETS": [
+          {
+            "para": 281,
+            "text": "자산."
+          }
+        ],
+        "RW.IP": [
+          {
+            "para": 317,
+            "text": "지식재산권."
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "b324cb8bdf00015a",
+      "result_file": "cs_index\\rw_reextract_results\\b324cb8bdf00015a.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.REAL_ESTATE": [
+          {
+            "para": 1287,
+            "text": "1. 부동산 임대업"
+          },
+          {
+            "para": 1726,
+            "text": "1. Real estate business;"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "b37d325825edc075",
+      "result_file": "cs_index\\rw_reextract_results\\b37d325825edc075.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.COMPLIANCE": [
+          {
+            "para": 459,
+            "text": "법률 준수"
+          }
+        ],
+        "RW.IP": [
+          {
+            "para": 490,
+            "text": "지적재산권"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "b682f22d32f7df3b",
+      "result_file": "cs_index\\rw_reextract_results\\b682f22d32f7df3b.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.IP": [
+          {
+            "para": 400,
+            "text": "지적재산권"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "bdc3da64be3ac235",
+      "result_file": "cs_index\\rw_reextract_results\\bdc3da64be3ac235.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.TAX": [
+          {
+            "para": 150,
+            "text": "세금 및 비용"
+          }
+        ],
+        "RW.LABOR": [
+          {
+            "para": 204,
+            "text": "근로관계 관련 법규 위반 사항"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "c855896fbf20003c",
+      "result_file": "cs_index\\rw_reextract_results\\c855896fbf20003c.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.LABOR": [
+          {
+            "para": 268,
+            "text": "임직원 및 그 특수관계인과 체결한 계약"
+          }
+        ],
+        "RW.CONTRACTS": [
+          {
+            "para": 454,
+            "text": "중요계약 명칭/상대방 | 내용(사전동의, 해제권, 해지권 등 내용) | 비고"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "ca3c63a72e1377d2",
+      "result_file": "cs_index\\rw_reextract_results\\ca3c63a72e1377d2.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.CONTRACTS": [
+          {
+            "para": 101,
+            "text": "계약 당사자간에 이상과 같이 본 계약을 체결하고 이를 증명하기 위하여 계약서 2통을 작성하여 \"갑\"과 \"을\"이 각 1부씩 보관하기로 한다."
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "cae8ff1986f4f37e",
+      "result_file": "cs_index\\rw_reextract_results\\cae8ff1986f4f37e.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.IP": [
+          {
+            "para": 298,
+            "text": "지적재산권"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "cc463e44d78d518f",
+      "result_file": "cs_index\\rw_reextract_results\\cc463e44d78d518f.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.REAL_ESTATE": [
+          {
+            "para": 198,
+            "text": "Real Property and Other Assets."
+          }
+        ],
+        "RW.IP": [
+          {
+            "para": 202,
+            "text": "Intellectual Property."
+          }
+        ],
+        "RW.INSURANCE": [
+          {
+            "para": 244,
+            "text": "Insurance."
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "cd4001d0c8009f7e",
+      "result_file": "cs_index\\rw_reextract_results\\cd4001d0c8009f7e.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.TAX": [
+          {
+            "para": 229,
+            "text": "조세 및 비용"
+          },
+          {
+            "para": 346,
+            "text": "조세"
+          }
+        ],
+        "RW.IP": [
+          {
+            "para": 333,
+            "text": "지적재산권"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "d313b345e29510e8",
+      "result_file": "cs_index\\rw_reextract_results\\d313b345e29510e8.json",
+      "body_status": "not_evaluated",
+      "omissions": {
+        "RW.FINANCIAL": [
+          {
+            "para": 50,
+            "text": "Financial Statements ..................................................................................... 23"
+          }
+        ],
+        "RW.TAX": [
+          {
+            "para": 60,
+            "text": "Tax Matters ................................................................................................... 24"
+          },
+          {
+            "para": 153,
+            "text": "ARTICLE 10 TAX MATTERS .................................................................................................... 52"
+          },
+          {
+            "para": 682,
+            "text": "Section 4.12. Tax Matters."
+          },
+          {
+            "para": 1188,
+            "text": "TAX MATTERS"
+          },
+          {
+            "para": 2810,
+            "text": "Section 4.12 Tax Matters"
+          }
+        ],
+        "RW.CONTRACTS": [
+          {
+            "para": 61,
+            "text": "Section 4.13. Material Contracts ......................................................................................... 25"
+          },
+          {
+            "para": 713,
+            "text": "Section 4.13. Material Contracts."
+          },
+          {
+            "para": 744,
+            "text": "contracts pursuant to which an Acquired Company has agreed as"
+          },
+          {
+            "para": 2081,
+            "text": "1. Contracts by and between the Company and the Founder"
+          },
+          {
+            "para": 2815,
+            "text": "Section 4.13 Material Contracts (cid:71) 1. Agreements for the purchase of services, raw materials, supplies or finished products in excess of"
+          }
+        ],
+        "RW.IP": [
+          {
+            "para": 63,
+            "text": "Intellectual Property ...................................................................................... 27"
+          },
+          {
+            "para": 772,
+            "text": "Intellectual Property."
+          },
+          {
+            "para": 3030,
+            "text": "Intellectual Property"
+          }
+        ],
+        "RW.LITIGATION": [
+          {
+            "para": 65,
+            "text": "Litigation ....................................................................................................... 28"
+          },
+          {
+            "para": 99,
+            "text": "Litigation ....................................................................................................... 33"
+          },
+          {
+            "para": 3032,
+            "text": "Section 4.15 Litigation (cid:71) 1. Dispute with Arumtree"
+          }
+        ],
+        "RW.COMPLIANCE": [
+          {
+            "para": 67,
+            "text": "Compliance with Laws ................................................................................. 29"
+          },
+          {
+            "para": 803,
+            "text": "Section 4.16. Compliance with Laws."
+          }
+        ],
+        "RW.INSURANCE": [
+          {
+            "para": 72,
+            "text": "Insurance ....................................................................................................... 30"
+          }
+        ],
+        "RW.ENVIRONMENT": [
+          {
+            "para": 88,
+            "text": "Environmental Matters.................................................................................. 32"
+          },
+          {
+            "para": 857,
+            "text": "Section 4.26. Environmental Matters."
+          }
+        ],
+        "RW.REAL_ESTATE": [
+          {
+            "para": 2942,
+            "text": "Real Property Sublease Agreement (Play Square) Lease Agreement (Yongin Distribution) Maple Treelog Korea"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "e149017ff54d0d76",
+      "result_file": "cs_index\\rw_reextract_results\\e149017ff54d0d76.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.REAL_ESTATE": [
+          {
+            "para": 215,
+            "text": "부동산 기타 유형자산:"
+          }
+        ],
+        "RW.IP": [
+          {
+            "para": 220,
+            "text": "지적재산권:"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "ea9a8dd9ad7ef65f",
+      "result_file": "cs_index\\rw_reextract_results\\ea9a8dd9ad7ef65f.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.CONTRACTS": [
+          {
+            "para": 53,
+            "text": "계약 건당 금 10억원 이상의 발행회사 및/또는 자회사가 체결한 파생상품계약(환율 위험의 헤지(hedge) 목적으로 체결한 파생상품계약을 포함하되 그에 한정되지 않음)"
+          },
+          {
+            "para": 313,
+            "text": "계약."
+          }
+        ],
+        "RW.ASSETS": [
+          {
+            "para": 307,
+            "text": "자산."
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "ec7cee7b9c85c5a1",
+      "result_file": "cs_index\\rw_reextract_results\\ec7cee7b9c85c5a1.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.INSURANCE": [
+          {
+            "para": 479,
+            "text": "Insurance"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "f04eb60d42c82c95",
+      "result_file": "cs_index\\rw_reextract_results\\f04eb60d42c82c95.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.PERMITS": [
+          {
+            "para": 67,
+            "text": "7.5 Government Approvals 17"
+          },
+          {
+            "para": 270,
+            "text": "Government Approvals"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "ff2fdc3c9ea25307",
+      "result_file": "cs_index\\rw_reextract_results\\ff2fdc3c9ea25307.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.ASSETS": [
+          {
+            "para": 362,
+            "text": "자산"
+          }
+        ],
+        "RW.IP": [
+          {
+            "para": 365,
+            "text": "지적재산권"
+          }
+        ],
+        "RW.INSURANCE": [
+          {
+            "para": 387,
+            "text": "보험"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "ff84d4a5346ad764",
+      "result_file": "cs_index\\rw_reextract_results\\ff84d4a5346ad764.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.PERMITS": [
+          {
+            "para": 278,
+            "text": "인허가 등 제비용"
+          }
+        ],
+        "RW.ASSETS": [
+          {
+            "para": 462,
+            "text": "자산"
+          }
+        ],
+        "RW.IP": [
+          {
+            "para": 465,
+            "text": "지적재산권"
+          }
+        ],
+        "RW.INSURANCE": [
+          {
+            "para": 469,
+            "text": "보험"
+          }
+        ]
+      }
+    }
+  ],
+  "apply": {
+    "changed": 55,
+    "backup": "cs_index\\.backups\\catalog.pre_full_read_omission_20260730T011932.sqlite",
+    "integrity": "ok"
+  }
+}

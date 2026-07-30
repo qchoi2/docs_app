@@ -1,0 +1,10 @@
+{
+  "1228a92c0df7b751": {
+    "RW.INSURANCE": {
+      "verdict": "not_rw",
+      "reviewed_at": "2026-07-30",
+      "evidence_para": [178, 179],
+      "reason": "Section 3 is Covenants of the Company. Paragraph 179 is a prospective obligation to obtain and maintain D&O insurance, not a representation or warranty."
+    }
+  }
+}

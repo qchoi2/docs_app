@@ -273,6 +273,12 @@ def main(argv=None) -> int:
     c.add_argument("--pool-depth", type=int, default=25)
     c.add_argument("--query", help="only this query id (e.g. V4A07)")
     c.add_argument(
+        "--ungate",
+        action="store_true",
+        help="Measurement only: temporarily clear the RW absence family gate while "
+        "building cards. Does not change stored search behaviour.",
+    )
+    c.add_argument(
         "--auto",
         action="store_true",
         help="Pre-fill a conservative provisional verdict when the contract text "
@@ -331,6 +337,9 @@ def main(argv=None) -> int:
 
     args = parser.parse_args(argv)
     if args.cmd == "cards":
+        if args.ungate:
+            import v4_search
+            v4_search.ABSENCE_UNVERIFIED_FAMILIES = set()
         types = (
             {t.strip() for t in args.types.split(",") if t.strip()}
             if args.types

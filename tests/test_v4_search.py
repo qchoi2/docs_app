@@ -302,3 +302,57 @@ def test_search_pagination_reports_full_totals(tmp_path):
     assert first["total_items"] == 1
     assert first["returned_items"] == 1
     assert first["has_more"] is False
+
+
+def _seed_text_ranking_items(out):
+    """Three items in one node, one per document, all matching the needle
+    '인허가 취득' but with different match quality:
+      c(=verbatim prefix) beats a(=verbatim, later position) beats b(=proposition only).
+    Document/file_key order (a<b<c) is the OPPOSITE, so a correct relevance sort
+    must override the enumeration order."""
+    needle_docs = [
+        # (file_key, verbatim, proposition, loc_start)
+        ("a" * 16, "매도인은 계약상 인허가 취득 의무를 부담한다 추가 문구로 길게 늘림", "동의 관련", 21),
+        ("b" * 16, "제3자 동의가 필요하다", "인허가 취득 관련 동의 명제", 22),
+        ("c" * 16, "인허가 취득 특약의 세부", "특약 명제", 23),
+    ]
+    with closing(sqlite3.connect(out / "catalog.sqlite")) as conn:
+        for i, (fk, verbatim, prop, loc) in enumerate(needle_docs):
+            conn.execute(
+                """
+                INSERT INTO v4_clause_item(
+                  file_key,item_ref,family,taxonomy_id,proposition,statement_polarity,
+                  source_kind,verbatim,loc_start,loc_end,confidence,txt_hash,
+                  taxonomy_version,extractor_version,prompt_version,review_status,
+                  created_at,updated_at
+                ) VALUES (?,?,?,?,?,?,'body',?,?,?,'high',?,12,'test','test',
+                          'approved',?,?)
+                """,
+                (fk, f"CPX-{i}", "CP", "CP.THIRD_PARTY_CONSENT", prop, "affirmative",
+                 verbatim, loc, loc, fk, NOW, NOW),
+            )
+        conn.commit()
+
+
+def test_text_query_ranks_by_match_quality_over_file_key(tmp_path):
+    out = make_index(tmp_path)
+    _seed_text_ranking_items(out)
+    result = search_clause_items(
+        out, "CP.THIRD_PARTY_CONSENT", text="인허가 취득", show_duplicates=True, limit=10
+    )
+    order = [row["file_key"] for row in result["results"]]
+    # verbatim prefix(c) first, verbatim-later(a) next, proposition-only(b) last —
+    # the exact inverse of alphabetical file_key order, proving relevance wins.
+    assert order == ["c" * 16, "a" * 16, "b" * 16]
+
+
+def test_concept_query_keeps_stable_enumeration_order(tmp_path):
+    # No text signal -> the enumeration order (file_key, ¶) is preserved, so
+    # compare/count queries stay deterministic and unaffected by the change.
+    out = make_index(tmp_path)
+    _seed_text_ranking_items(out)
+    result = search_clause_items(
+        out, "CP.THIRD_PARTY_CONSENT", show_duplicates=True, limit=10
+    )
+    keys = [row["file_key"] for row in result["results"]]
+    assert keys == sorted(keys)

@@ -1,0 +1,803 @@
+{
+ "generated": "2026-07-30",
+ "batch": "cs_index/rw_reextract_todo_150.json (원본 150건 스냅샷 — 이 파일은 이후 다른 세션이 재생성함)",
+ "note": "full_read 결과가 기존 DB의 RW 하위영역을 떨어뜨려 가드가 해제된 문서. 대부분은 하위영역 없는 bare RW를 구체 노드로 교체한 개선이지만, DISCLOSURE·ENVIRONMENT 감소는 소유자 확인 대상.",
+ "regress_overridden_doc_count": 60,
+ "lost_domain_frequency": {
+  "RW": 48,
+  "RW.DISCLOSURE": 20,
+  "RW.ENVIRONMENT": 13,
+  "RW.SOLVENCY": 6,
+  "RW.CUSTOMERS_SUPPLIERS": 4,
+  "RW.ABSENCE_OF_CHANGES": 3,
+  "RW.CONTRACTS": 2,
+  "RW.PERMITS": 2,
+  "RW.CAPITALIZATION": 1,
+  "RW.FINANCIAL": 1,
+  "RW.ASSETS": 1,
+  "RW.COMPLIANCE": 1,
+  "RW.IP": 1,
+  "RW.LITIGATION": 1,
+  "RW.RELATED_PARTY": 1,
+  "RW.TAX": 1,
+  "RW.INSURANCE": 1,
+  "RW.REAL_ESTATE": 1,
+  "RW.BENEFITS": 1,
+  "RW.PRODUCTS": 1
+ },
+ "regress_overridden": {
+  "018616d362652278": {
+   "lost_domains": [
+    "RW"
+   ],
+   "source": "recovered_from_backup_diff"
+  },
+  "08fa9db87c5acaad": {
+   "lost_domains": [
+    "RW"
+   ],
+   "source": "recovered_from_backup_diff"
+  },
+  "14f9e70a3cc2d65a": {
+   "lost_domains": [
+    "RW"
+   ],
+   "source": "recovered_from_backup_diff"
+  },
+  "1b8c393f95eea771": {
+   "lost_domains": [
+    "RW.ABSENCE_OF_CHANGES",
+    "RW.CAPITALIZATION",
+    "RW.FINANCIAL"
+   ],
+   "source": "recovered_from_backup_diff"
+  },
+  "1c055d93e8e1ef18": {
+   "lost_domains": [
+    "RW",
+    "RW.DISCLOSURE",
+    "RW.SOLVENCY"
+   ],
+   "source": "recovered_from_backup_diff"
+  },
+  "1cee6630384dc792": {
+   "lost_domains": [
+    "RW",
+    "RW.ENVIRONMENT"
+   ],
+   "source": "recovered_from_backup_diff"
+  },
+  "1f9352be4b914100": {
+   "lost_domains": [
+    "RW"
+   ],
+   "source": "recovered_from_backup_diff"
+  },
+  "257187201fd2a9e2": {
+   "lost_domains": [
+    "RW"
+   ],
+   "source": "recovered_from_backup_diff"
+  },
+  "294e3cff037d9964": {
+   "lost_domains": [
+    "RW"
+   ],
+   "source": "recovered_from_backup_diff"
+  },
+  "2e2dcdacc56a1065": {
+   "lost_domains": [
+    "RW"
+   ],
+   "source": "recovered_from_backup_diff"
+  },
+  "39316d2fcb4a0bbe": {
+   "lost_domains": [
+    "RW"
+   ],
+   "source": "recovered_from_backup_diff"
+  },
+  "3dcb3afde8eb88a8": {
+   "lost_domains": [
+    "RW",
+    "RW.DISCLOSURE",
+    "RW.ENVIRONMENT"
+   ],
+   "source": "recovered_from_backup_diff"
+  },
+  "45abf55e0a8eaa8d": {
+   "lost_domains": [
+    "RW",
+    "RW.ENVIRONMENT"
+   ],
+   "source": "recovered_from_backup_diff"
+  },
+  "479269874a979ae6": {
+   "lost_domains": [
+    "RW",
+    "RW.DISCLOSURE"
+   ],
+   "source": "recovered_from_backup_diff"
+  },
+  "4a332e32794c1f4c": {
+   "lost_domains": [
+    "RW",
+    "RW.DISCLOSURE",
+    "RW.ENVIRONMENT",
+    "RW.SOLVENCY"
+   ],
+   "source": "recovered_from_backup_diff"
+  },
+  "4b2440d674ca067e": {
+   "lost_domains": [
+    "RW",
+    "RW.ENVIRONMENT"
+   ],
+   "source": "recovered_from_backup_diff"
+  },
+  "4dc11d699179df37": {
+   "lost_domains": [
+    "RW"
+   ],
+   "source": "recovered_from_backup_diff"
+  },
+  "5a5dc2c779ac2a11": {
+   "lost_domains": [
+    "RW",
+    "RW.DISCLOSURE",
+    "RW.SOLVENCY"
+   ],
+   "source": "recovered_from_backup_diff"
+  },
+  "70472ab5bb865f33": {
+   "lost_domains": [
+    "RW",
+    "RW.CUSTOMERS_SUPPLIERS"
+   ],
+   "source": "recovered_from_backup_diff"
+  },
+  "9252b34cc3a611be": {
+   "lost_domains": [
+    "RW",
+    "RW.ASSETS",
+    "RW.COMPLIANCE",
+    "RW.CONTRACTS",
+    "RW.DISCLOSURE",
+    "RW.IP",
+    "RW.LITIGATION",
+    "RW.PERMITS",
+    "RW.RELATED_PARTY",
+    "RW.TAX"
+   ],
+   "source": "recovered_from_backup_diff"
+  },
+  "93da7bcc1f35e83e": {
+   "lost_domains": [
+    "RW",
+    "RW.DISCLOSURE",
+    "RW.SOLVENCY"
+   ],
+   "source": "recovered_from_backup_diff"
+  },
+  "977fb166c6765dc0": {
+   "lost_domains": [
+    "RW",
+    "RW.CUSTOMERS_SUPPLIERS"
+   ],
+   "source": "recovered_from_backup_diff"
+  },
+  "9d94fd6abbcab760": {
+   "lost_domains": [
+    "RW"
+   ],
+   "source": "recovered_from_backup_diff"
+  },
+  "a52c452d42cf6f2b": {
+   "lost_domains": [
+    "RW",
+    "RW.ABSENCE_OF_CHANGES",
+    "RW.DISCLOSURE",
+    "RW.INSURANCE",
+    "RW.SOLVENCY"
+   ],
+   "source": "recovered_from_backup_diff"
+  },
+  "ad413a52cacf317f": {
+   "lost_domains": [
+    "RW",
+    "RW.DISCLOSURE"
+   ],
+   "source": "recovered_from_backup_diff"
+  },
+  "ae2b6f66b8840fb8": {
+   "lost_domains": [
+    "RW"
+   ],
+   "source": "recovered_from_backup_diff"
+  },
+  "b2f9897ca0f767f2": {
+   "lost_domains": [
+    "RW"
+   ],
+   "source": "recovered_from_backup_diff"
+  },
+  "b324cb8bdf00015a": {
+   "lost_domains": [
+    "RW.DISCLOSURE"
+   ],
+   "source": "recovered_from_backup_diff"
+  },
+  "b37d325825edc075": {
+   "lost_domains": [
+    "RW"
+   ],
+   "source": "recovered_from_backup_diff"
+  },
+  "bd040336187ee268": {
+   "lost_domains": [
+    "RW.DISCLOSURE"
+   ],
+   "source": "recovered_from_backup_diff"
+  },
+  "be234f56be671ebd": {
+   "lost_domains": [
+    "RW.ENVIRONMENT"
+   ],
+   "source": "recovered_from_backup_diff"
+  },
+  "bf378086666c2414": {
+   "lost_domains": [
+    "RW.DISCLOSURE"
+   ],
+   "source": "recovered_from_backup_diff"
+  },
+  "c855896fbf20003c": {
+   "lost_domains": [
+    "RW",
+    "RW.ENVIRONMENT"
+   ],
+   "source": "recovered_from_backup_diff"
+  },
+  "cc463e44d78d518f": {
+   "lost_domains": [
+    "RW"
+   ],
+   "source": "recovered_from_backup_diff"
+  },
+  "e64246348b726d2e": {
+   "lost_domains": [
+    "RW",
+    "RW.ENVIRONMENT",
+    "RW.PERMITS",
+    "RW.SOLVENCY"
+   ],
+   "source": "recovered_from_backup_diff"
+  },
+  "ea9a8dd9ad7ef65f": {
+   "lost_domains": [
+    "RW"
+   ],
+   "source": "recovered_from_backup_diff"
+  },
+  "ff2fdc3c9ea25307": {
+   "lost_domains": [
+    "RW"
+   ],
+   "source": "recovered_from_backup_diff"
+  },
+  "ff84d4a5346ad764": {
+   "lost_domains": [
+    "RW",
+    "RW.ENVIRONMENT"
+   ],
+   "source": "recovered_from_backup_diff"
+  },
+  "031e25006e963fda": {
+   "lost_domains": [
+    "RW"
+   ],
+   "source": "store_report"
+  },
+  "09d8679989c082c3": {
+   "lost_domains": [
+    "RW",
+    "RW.DISCLOSURE",
+    "RW.REAL_ESTATE"
+   ],
+   "source": "store_report"
+  },
+  "15db7965546a199c": {
+   "lost_domains": [
+    "RW.DISCLOSURE"
+   ],
+   "source": "store_report"
+  },
+  "1cb9bcbb013d0946": {
+   "lost_domains": [
+    "RW"
+   ],
+   "source": "store_report"
+  },
+  "27f2c28a06dd1221": {
+   "lost_domains": [
+    "RW",
+    "RW.CONTRACTS"
+   ],
+   "source": "store_report"
+  },
+  "289a831a4e869121": {
+   "lost_domains": [
+    "RW",
+    "RW.ENVIRONMENT"
+   ],
+   "source": "store_report"
+  },
+  "295cadc5a78da6fc": {
+   "lost_domains": [
+    "RW",
+    "RW.ENVIRONMENT"
+   ],
+   "source": "store_report"
+  },
+  "29630ba91389ce76": {
+   "lost_domains": [
+    "RW",
+    "RW.DISCLOSURE"
+   ],
+   "source": "store_report"
+  },
+  "559b224afe3fab2b": {
+   "lost_domains": [
+    "RW",
+    "RW.ENVIRONMENT"
+   ],
+   "source": "store_report"
+  },
+  "66846bacbe7156ae": {
+   "lost_domains": [
+    "RW",
+    "RW.DISCLOSURE"
+   ],
+   "source": "store_report"
+  },
+  "75d01740842662b3": {
+   "lost_domains": [
+    "RW.BENEFITS",
+    "RW.DISCLOSURE"
+   ],
+   "source": "store_report"
+  },
+  "7ea64578b32dc4d5": {
+   "lost_domains": [
+    "RW.DISCLOSURE"
+   ],
+   "source": "store_report"
+  },
+  "7f720f0fe25d96c5": {
+   "lost_domains": [
+    "RW.CUSTOMERS_SUPPLIERS"
+   ],
+   "source": "store_report"
+  },
+  "94d9205c6940495e": {
+   "lost_domains": [
+    "RW",
+    "RW.DISCLOSURE"
+   ],
+   "source": "store_report"
+  },
+  "95bba32779158ac9": {
+   "lost_domains": [
+    "RW",
+    "RW.DISCLOSURE"
+   ],
+   "source": "store_report"
+  },
+  "9a191041f15591eb": {
+   "lost_domains": [
+    "RW"
+   ],
+   "source": "store_report"
+  },
+  "a6409510e4147d1a": {
+   "lost_domains": [
+    "RW.ENVIRONMENT"
+   ],
+   "source": "store_report"
+  },
+  "b4961c65cce6bc5e": {
+   "lost_domains": [
+    "RW",
+    "RW.ABSENCE_OF_CHANGES"
+   ],
+   "source": "store_report"
+  },
+  "bcdb4adf14bdfa8c": {
+   "lost_domains": [
+    "RW"
+   ],
+   "source": "store_report"
+  },
+  "bf702aad980a6d43": {
+   "lost_domains": [
+    "RW.CUSTOMERS_SUPPLIERS"
+   ],
+   "source": "store_report"
+  },
+  "d69935a08c290e6c": {
+   "lost_domains": [
+    "RW"
+   ],
+   "source": "store_report"
+  },
+  "df52be3d3920de0d": {
+   "lost_domains": [
+    "RW.PRODUCTS"
+   ],
+   "source": "store_report"
+  }
+ },
+ "gate_followup_note": "advisory 플래그. ungrounded=verbatim이 txt 캐시에서 확인되지 않음(환각 또는 txt 품질), shotgun_severe=한 ¶에 8개 이상 item.",
+ "gate_flagged": {
+  "031e25006e963fda": {
+   "dense_paragraphs": [
+    {
+     "loc_start": 108,
+     "item_count": 5
+    },
+    {
+     "loc_start": 114,
+     "item_count": 5
+    },
+    {
+     "loc_start": 118,
+     "item_count": 5
+    }
+   ],
+   "ungrounded": [
+    "#23"
+   ]
+  },
+  "09d8679989c082c3": {
+   "dense_paragraphs": [
+    {
+     "loc_start": 181,
+     "item_count": 5
+    }
+   ],
+   "ungrounded": [
+    "#13",
+    "#34"
+   ]
+  },
+  "0f6713a894fcf1fa": {
+   "dense_paragraphs": [
+    {
+     "loc_start": 547,
+     "item_count": 7
+    },
+    {
+     "loc_start": 557,
+     "item_count": 6
+    },
+    {
+     "loc_start": 559,
+     "item_count": 5
+    }
+   ],
+   "duplicate_verbatim": [
+    {
+     "code": "duplicate_verbatim_substring",
+     "loc_start": null,
+     "item_refs": [
+      "#40",
+      "#41"
+     ]
+    }
+   ]
+  },
+  "1cb9bcbb013d0946": {
+   "dense_paragraphs": [
+    {
+     "loc_start": 223,
+     "item_count": 9
+    },
+    {
+     "loc_start": 224,
+     "item_count": 8
+    },
+    {
+     "loc_start": 226,
+     "item_count": 8
+    },
+    {
+     "loc_start": 219,
+     "item_count": 6
+    },
+    {
+     "loc_start": 217,
+     "item_count": 5
+    },
+    {
+     "loc_start": 225,
+     "item_count": 5
+    },
+    {
+     "loc_start": 228,
+     "item_count": 5
+    },
+    {
+     "loc_start": 230,
+     "item_count": 5
+    }
+   ],
+   "shotgun_severe": 9,
+   "duplicate_verbatim": [
+    {
+     "code": "duplicate_verbatim_substring",
+     "loc_start": null,
+     "item_refs": [
+      "#11",
+      "#13"
+     ]
+    },
+    {
+     "code": "duplicate_verbatim_substring",
+     "loc_start": null,
+     "item_refs": [
+      "#12",
+      "#13"
+     ]
+    },
+    {
+     "code": "duplicate_verbatim_substring",
+     "loc_start": null,
+     "item_refs": [
+      "#14",
+      "#15"
+     ]
+    },
+    {
+     "code": "duplicate_verbatim_substring",
+     "loc_start": null,
+     "item_refs": [
+      "#55",
+      "#56"
+     ]
+    }
+   ],
+   "ungrounded": [
+    "#2"
+   ]
+  },
+  "27f2c28a06dd1221": {
+   "dense_paragraphs": [
+    {
+     "loc_start": 122,
+     "item_count": 6
+    },
+    {
+     "loc_start": 135,
+     "item_count": 5
+    }
+   ],
+   "duplicate_verbatim": [
+    {
+     "code": "duplicate_verbatim_substring",
+     "loc_start": null,
+     "item_refs": [
+      "#34",
+      "#35"
+     ]
+    }
+   ]
+  },
+  "295cadc5a78da6fc": {
+   "dense_paragraphs": [
+    {
+     "loc_start": 68,
+     "item_count": 5
+    }
+   ]
+  },
+  "29630ba91389ce76": {
+   "ungrounded": [
+    "#3"
+   ]
+  },
+  "29d07c86ebc626df": {
+   "dense_paragraphs": [
+    {
+     "loc_start": 193,
+     "item_count": 8
+    },
+    {
+     "loc_start": 214,
+     "item_count": 8
+    },
+    {
+     "loc_start": 185,
+     "item_count": 7
+    },
+    {
+     "loc_start": 195,
+     "item_count": 6
+    },
+    {
+     "loc_start": 208,
+     "item_count": 5
+    }
+   ],
+   "shotgun_severe": 8
+  },
+  "4b0219f0ad1cd7aa": {
+   "dense_paragraphs": [
+    {
+     "loc_start": 279,
+     "item_count": 8
+    },
+    {
+     "loc_start": 282,
+     "item_count": 7
+    },
+    {
+     "loc_start": 280,
+     "item_count": 6
+    },
+    {
+     "loc_start": 273,
+     "item_count": 5
+    },
+    {
+     "loc_start": 274,
+     "item_count": 5
+    },
+    {
+     "loc_start": 284,
+     "item_count": 5
+    },
+    {
+     "loc_start": 286,
+     "item_count": 5
+    }
+   ],
+   "shotgun_severe": 8
+  },
+  "559b224afe3fab2b": {
+   "dense_paragraphs": [
+    {
+     "loc_start": 151,
+     "item_count": 8
+    },
+    {
+     "loc_start": 153,
+     "item_count": 7
+    },
+    {
+     "loc_start": 154,
+     "item_count": 6
+    },
+    {
+     "loc_start": 145,
+     "item_count": 5
+    },
+    {
+     "loc_start": 155,
+     "item_count": 5
+    }
+   ],
+   "shotgun_severe": 8
+  },
+  "66846bacbe7156ae": {
+   "dense_paragraphs": [
+    {
+     "loc_start": 278,
+     "item_count": 5
+    },
+    {
+     "loc_start": 280,
+     "item_count": 5
+    }
+   ],
+   "duplicate_verbatim": [
+    {
+     "code": "duplicate_verbatim_substring",
+     "loc_start": null,
+     "item_refs": [
+      "#23",
+      "#24"
+     ]
+    }
+   ],
+   "ungrounded": [
+    "#12"
+   ]
+  },
+  "75d01740842662b3": {
+   "dense_paragraphs": [
+    {
+     "loc_start": 325,
+     "item_count": 5
+    }
+   ]
+  },
+  "94d9205c6940495e": {
+   "dense_paragraphs": [
+    {
+     "loc_start": 163,
+     "item_count": 6
+    },
+    {
+     "loc_start": 158,
+     "item_count": 5
+    }
+   ],
+   "ungrounded": [
+    "#52"
+   ]
+  },
+  "9a191041f15591eb": {
+   "dense_paragraphs": [
+    {
+     "loc_start": 225,
+     "item_count": 5
+    }
+   ]
+  },
+  "a6409510e4147d1a": {
+   "dense_paragraphs": [
+    {
+     "loc_start": 210,
+     "item_count": 5
+    }
+   ]
+  },
+  "2a0cc39710728228": {
+   "ungrounded": [
+    "#10",
+    "#12"
+   ]
+  },
+  "46e075abf3706a97": {
+   "ungrounded": [
+    "#8",
+    "#10",
+    "#28",
+    "#36",
+    "#37"
+   ]
+  },
+  "7b676511f309d75a": {
+   "ungrounded": [
+    "#17"
+   ]
+  },
+  "91d89e03238fe8f5": {
+   "shotgun_severe": 8
+  },
+  "988f5e418c117070": {
+   "ungrounded": [
+    "#71"
+   ]
+  },
+  "b7185779a2789140": {
+   "shotgun_severe": 21
+  },
+  "c91bb6a90e2c6875": {
+   "ungrounded": [
+    "#7",
+    "#36",
+    "#43"
+   ],
+   "shotgun_severe": 9
+  },
+  "d028463ef1b67e86": {
+   "shotgun_severe": 9
+  }
+ },
+ "reconversion_candidates": {
+  "00c09fbabb422f6c": "txt 캐시 문장 중간 유실(¶392·¶402·¶405·¶406/407). 조율자가 full_read 마커 해제 — 재변환 후 재정독 필요",
+  "289475b069d75d1c": "Schedule 7.1(매도인 진술) 본문이 txt에 없음(헤더만). 원본 별지 미수집 추정 — NOW.md ⛳5 해당",
+  "27f2c28a06dd1221": "¶120·¶122 문장 유실. 조항 취지는 판독 가능해 confidence=med로 유지"
+ }
+}

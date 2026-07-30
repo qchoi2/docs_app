@@ -1,0 +1,372 @@
+{
+  "generated_at": "2026-07-30T03:53:16.182574+00:00",
+  "full_read_results": 410,
+  "finding_count": 18,
+  "complete_rows_at_risk": 5,
+  "findings": [
+    {
+      "file_key": "19cb2dd280ab0b15",
+      "result_file": "cs_index\\rw_reextract_results\\19cb2dd280ab0b15.json",
+      "body_status": "partial",
+      "omissions": {
+        "RW.TAX": [
+          {
+            "para": 98,
+            "text": "조세"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "29630ba91389ce76",
+      "result_file": "cs_index\\rw_reextract_results\\29630ba91389ce76.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.IP": [
+          {
+            "para": 102,
+            "text": "지적재산권."
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "4a763d303478f588",
+      "result_file": "cs_index\\rw_reextract_results\\4a763d303478f588.json",
+      "body_status": "partial",
+      "omissions": {
+        "RW.TAX": [
+          {
+            "para": 37,
+            "text": "8.6. Tax Matters 7"
+          },
+          {
+            "para": 47,
+            "text": "11.2. Taxes and Expenses 9"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "5acc3ac91d0f354b",
+      "result_file": "cs_index\\rw_reextract_results\\5acc3ac91d0f354b.json",
+      "body_status": "partial",
+      "omissions": {
+        "RW.COMPLIANCE": [
+          {
+            "para": 90,
+            "text": "Schedule 4.5 Compliance with Laws / Schedule 4.10 Labor Matters"
+          }
+        ],
+        "RW.PERMITS": [
+          {
+            "para": 99,
+            "text": "Schedule 4.6 Permits"
+          }
+        ],
+        "RW.LITIGATION": [
+          {
+            "para": 115,
+            "text": "Schedule 4.7 Litigation"
+          }
+        ],
+        "RW.IP": [
+          {
+            "para": 122,
+            "text": "Schedule 4.12 Intellectual Property"
+          }
+        ],
+        "RW.ENVIRONMENT": [
+          {
+            "para": 135,
+            "text": "Schedule 4.15 Environmental Matters"
+          }
+        ],
+        "RW.REAL_ESTATE": [
+          {
+            "para": 380,
+            "text": "Schedule 4.16(l) Real Property"
+          }
+        ],
+        "RW.INSURANCE": [
+          {
+            "para": 468,
+            "text": "Schedule 4.19 Insurance"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "6056f50af3ee0a9f",
+      "result_file": "cs_index\\rw_reextract_results\\6056f50af3ee0a9f.json",
+      "body_status": "partial",
+      "omissions": {
+        "RW.INSURANCE": [
+          {
+            "para": 541,
+            "text": "Insurance"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "61eaa440c254daec",
+      "result_file": "cs_index\\rw_reextract_results\\61eaa440c254daec.json",
+      "body_status": "partial",
+      "omissions": {
+        "RW.CONTRACTS": [
+          {
+            "para": 247,
+            "text": "11 CONTRACTS (RIGHTS OF THIRD PARTIES) ACT 1999"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "69f5e7b0be9164f4",
+      "result_file": "cs_index\\rw_reextract_results\\69f5e7b0be9164f4.json",
+      "body_status": "partial",
+      "omissions": {
+        "RW.ASSETS": [
+          {
+            "para": 406,
+            "text": "SCHEDULE OF ASSETS AND LIABILITIES"
+          },
+          {
+            "para": 645,
+            "text": "5. Assets"
+          }
+        ],
+        "RW.IP": [
+          {
+            "para": 650,
+            "text": "6. Intellectual Property Rights and IT"
+          }
+        ],
+        "RW.INSURANCE": [
+          {
+            "para": 685,
+            "text": "9. Insurance"
+          }
+        ],
+        "RW.CONTRACTS": [
+          {
+            "para": 687,
+            "text": "10. Contracts"
+          }
+        ],
+        "RW.LITIGATION": [
+          {
+            "para": 694,
+            "text": "11. Litigation"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "75d01740842662b3",
+      "result_file": "cs_index\\rw_reextract_results\\75d01740842662b3.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.INSURANCE": [
+          {
+            "para": 39,
+            "text": "5.10 Insurance 24"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "78f006faf2bf49ec",
+      "result_file": "cs_index\\rw_reextract_results\\78f006faf2bf49ec.json",
+      "body_status": "partial",
+      "omissions": {
+        "RW.CONTRACTS": [
+          {
+            "para": 189,
+            "text": "18 CONTRACTS (RIGHTS OF THIRD PARTIES) ACT 1999"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "7ea64578b32dc4d5",
+      "result_file": "cs_index\\rw_reextract_results\\7ea64578b32dc4d5.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.LABOR": [
+          {
+            "para": 47,
+            "text": "4.14 Employee Matters 27"
+          },
+          {
+            "para": 98,
+            "text": "Section 7 employee matters"
+          },
+          {
+            "para": 377,
+            "text": "Employee Matters"
+          }
+        ],
+        "RW.LITIGATION": [
+          {
+            "para": 53,
+            "text": "4.20 Legal Proceedings 34"
+          },
+          {
+            "para": 64,
+            "text": "5.5 Legal Proceedings 38"
+          },
+          {
+            "para": 465,
+            "text": "Legal Proceedings"
+          }
+        ],
+        "RW.INSURANCE": [
+          {
+            "para": 55,
+            "text": "4.22 Insurance 36"
+          },
+          {
+            "para": 80,
+            "text": "6.12 Insurance 50"
+          },
+          {
+            "para": 442,
+            "text": "Insurance"
+          },
+          {
+            "para": 543,
+            "text": "Insurance"
+          }
+        ],
+        "RW.IP": [
+          {
+            "para": 100,
+            "text": "Section 8 INTELLECTUAL PROPERTY MATTERS"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "85c42bba43aa4c66",
+      "result_file": "cs_index\\rw_reextract_results\\85c42bba43aa4c66.json",
+      "body_status": "partial",
+      "omissions": {
+        "RW.LITIGATION": [
+          {
+            "para": 42,
+            "text": "5.4 소송"
+          },
+          {
+            "para": 54,
+            "text": "소송"
+          }
+        ],
+        "RW.LABOR": [
+          {
+            "para": 88,
+            "text": "7.3 고용 보장"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "92b88a138b111f75",
+      "result_file": "cs_index\\rw_reextract_results\\92b88a138b111f75.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.IP": [
+          {
+            "para": 373,
+            "text": "지적재산권"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "95bba32779158ac9",
+      "result_file": "cs_index\\rw_reextract_results\\95bba32779158ac9.json",
+      "body_status": "complete",
+      "omissions": {
+        "RW.ASSETS": [
+          {
+            "para": 127,
+            "text": "Assets and Properties."
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "b682f22d32f7df3b",
+      "result_file": "cs_index\\rw_reextract_results\\b682f22d32f7df3b.json",
+      "body_status": "partial",
+      "omissions": {
+        "RW.IP": [
+          {
+            "para": 400,
+            "text": "지적재산권"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "cae8ff1986f4f37e",
+      "result_file": "cs_index\\rw_reextract_results\\cae8ff1986f4f37e.json",
+      "body_status": "partial",
+      "omissions": {
+        "RW.IP": [
+          {
+            "para": 298,
+            "text": "지적재산권"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "cd4001d0c8009f7e",
+      "result_file": "cs_index\\rw_reextract_results\\cd4001d0c8009f7e.json",
+      "body_status": "partial",
+      "omissions": {
+        "RW.IP": [
+          {
+            "para": 333,
+            "text": "지적재산권"
+          }
+        ],
+        "RW.TAX": [
+          {
+            "para": 346,
+            "text": "조세"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "ec7cee7b9c85c5a1",
+      "result_file": "cs_index\\rw_reextract_results\\ec7cee7b9c85c5a1.json",
+      "body_status": "partial",
+      "omissions": {
+        "RW.INSURANCE": [
+          {
+            "para": 479,
+            "text": "Insurance"
+          }
+        ]
+      }
+    },
+    {
+      "file_key": "f04eb60d42c82c95",
+      "result_file": "cs_index\\rw_reextract_results\\f04eb60d42c82c95.json",
+      "body_status": "partial",
+      "omissions": {
+        "RW.PERMITS": [
+          {
+            "para": 67,
+            "text": "7.5 Government Approvals 17"
+          }
+        ]
+      }
+    }
+  ]
+}

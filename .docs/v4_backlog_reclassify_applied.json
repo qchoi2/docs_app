@@ -1,0 +1,50 @@
+{
+  "pending_before": 29807,
+  "keep_as_candidate_generic": 13222,
+  "retire_document_specific_one_off": 16585,
+  "pending_after": 13222,
+  "admission_reasons": {
+    "document_specific_one_off": 16585,
+    "recurs_across_documents": 11255,
+    "specific_parent": 1967
+  },
+  "per_family": {
+    "COV": {
+      "generic": 2211,
+      "one_off": 3774
+    },
+    "CP": {
+      "generic": 1312,
+      "one_off": 1738
+    },
+    "DEF": {
+      "generic": 2634,
+      "one_off": 3401
+    },
+    "PAY": {
+      "generic": 969,
+      "one_off": 1216
+    },
+    "REM": {
+      "generic": 1436,
+      "one_off": 1511
+    },
+    "RW": {
+      "generic": 4660,
+      "one_off": 4945
+    }
+  },
+  "human_decisions_before": {
+    "approved": 31,
+    "merged": 1540,
+    "rejected": 16
+  },
+  "min_documents": 2,
+  "applied": true,
+  "absorbed_items_created": 16585,
+  "human_decisions_after": {
+    "approved": 31,
+    "merged": 1540,
+    "rejected": 16
+  }
+}

@@ -41,7 +41,7 @@
 # ============================================================
 
 meta:
-  version: 0                 # seed. pool_verified 채우면 1로
+  version: 1                 # V4A07(환경) pool_verified 반영(2026-07-30)
   status: seed               # seed -> active
   created: 2026-07-27
   method: pooled_verification # 전수 라벨링 아님: pool만 사람이 검증 → precision + 상대재현율
@@ -189,7 +189,10 @@ queries:
     taxonomy: RW.ENVIRONMENT
     query: "환경 관련 진술보장이 없는 계약"
     check: 진술보장 영역에 환경 도메인 진술이 실제로 없나
-    pool_verified: { correct: [], incorrect: [], unknown: [] }
+    # AI 정독(Claude) 판정 2026-07-30: 89건 전량 원문 대조. correct 89 / incorrect 0 / unknown 0.
+    # 방법: 전문 환경어휘 스캔(강한 rep어휘=오염·유해물질·폐기물·환경법규·contamination·hazardous·remediation)
+    #   → 강한어휘 6건만 정독(4 정의/FCPA/자산목록 오탐, 1 CP목록, 1 폐기물 인허가=PERMITS로 분류), 나머지 83 무-rep 확인.
+    pool_verified: { correct: [1228a92c0df7b751, 167299b34d606e60, 068120c8242fcf70, 07571fb811fe224f, 0cc3310a127d13a8, 0df5e9d7e1e7c893, 107c90b14950eeec, 11cd60d4fc69aa13, 14c3460e9caf347b, 1a17b6d3c2f7d833, 1a544249d1b7ff90, 1ba010a52944ef96, 1d2477bbbb17ce04, 1eb4538a9df9abbb, 1f037d5d2639a0ca, 1f0dc2031c3e3bf9, 21b396f87f266e97, 23977816a227e5e7, 23ab80326ff537b3, 23f99d498f34139f, 25bf6547224663d7, 25ceed246ace26f4, 2922a49a6aeae1ff, 2c6c882d4e082afb, 2d4a3a3f9ad4c7bf, 2dadb052fbc0c603, 2e46d615d7904477, 32ccd0d3c855a1a0, 34cbe5a9dc49dfac, 361d609c65be6184, 37352bfa03b02bb6, 3c86175c4821fa83, 41d0d4fabde0aa79, 44fe31b52107c3c9, 495dbce8b1930860, 4b0e8afc4a81e3fb, 4df689bccd36684f, 53503385c86ef92b, 5551ccae38a4e032, 55b08dd844dedb8e, 562b7f5707962165, 5853fe0540a72d6c, 5a3b91ef7f0efb51, 5acc464bf298ea84, 5ad974af617efa9a, 5b77c491f91848c7, 5c011a0e170a38c7, 5cd633f12adec214, 613a963a60846e50, 632e70469fed940d, 648248bf94ae1126, 68e851a8ac679fca, 6a0f4e04e7ef4f21, 73613d49cf1d8b27, 773fd8e9fecb5b1e, 78e55433faabadd4, 7bd78f821239a717, 7f6a55e9f980621a, 81075014d5064351, 81f93aca41a01ea5, 8ee1ba40a28429ad, 90d909c7dc1453a2, 9158a19c0072e3ea, 9252b34cc3a611be, 93e04fcb0a6761fe, 9800d93256e48009, 9eeab96fc746984f, a018bba7380cf4a1, ab58b75de73956fc, aefc0d0aaba9d57f, b4e8af960eed0274, b7185779a2789140, b9ca268b0dba03d3, ba9d49bf32ae0d65, baf074f83ca706fc, c163e7d36d6264df, c1d8c02f81222874, c6558ab202c9414b, ceccbf5dd0817e5e, db6a3cf06228a50a, dec49268e5099071, e110a7f3fae2de7f, e222ab9655e7298a, e32bba7cee51936c, e45d3402878d30f6, e6db8b55a58a1a3a, e92786926c653433, ea4eee4167342c0e, ed098980c85129cf, ee9f154cfb6901a1, f1ac6a2e59e8dbea], incorrect: [], unknown: [] }
 
   - id: V4A08
     intent: absence

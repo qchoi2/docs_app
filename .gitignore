@@ -32,3 +32,6 @@ tmp_doc_convert_probe/
 tmp_*/
 *.tmp
 .vscode/
+
+# session-local temp (probes, pytest basetemp, reversal logs)
+scratchpad/

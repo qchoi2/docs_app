@@ -1560,3 +1560,77 @@ DB 쓰기(기존 backlog 재분류·`document_count` 백필)는 수치 검토 �
 
 커밋: `8092446`(검증 축 3개·T4·런북) · `378af6a`(사각지대 실측) · `21d5f10`(절대 recall·거래 메타데이터).
 검증: `python -m pytest --basetemp=<쓰기가능경로>` → **460 passed, 1 skipped**.
+
+## 2026-07-30 — 조세·환경 false-absence 정정 및 full_read 누락 안전장치
+
+- **조세 false-absence 2건 정정**
+  - `[1d5383e7e95f97d0]`: Tax Matters ¶411–415 추출 누락을 확인해 `RW.TAX` 6항목을 추가 저장.
+  - `[1f0dc2031c3e3bf9]`: full_read 결과에는 있던 `RW.TAX` ¶55가 DB에 미착지한 저장 누락으로 확인되어 결과 전체를 재저장.
+- **환경 명백 누락 정정**
+  - `[4ce0986a974f2338]`, `[bd1b50cf224ba143]`, `[69f5e7b0be9164f4]`, `[ebd995e449b4959a]`의 명시 환경 진술보장을 추가 저장.
+  - `[69f5e7b0be9164f4]`는 `review_method=full_read`였는데도 환경 섹션 전체가 빠진 실제 full_read 추출 누락.
+  - `[332870c0c1886e5e]`는 TOC의 환경 섹션과 달리 추출 본문이 없어 `complete`를 신뢰할 수 없으므로 `partial`로 강등.
+- **full_read 누락-net 소급·상시화**
+  - 기존 full_read 결과 390건을 목차·명시 조항 제목과 저장 sub-domain으로 대조.
+  - 고정밀 재감사에서 불일치 39건을 확인했고, 기존 `complete` 위험 36건을 `partial`로 강등. 재감사 결과 `complete_rows_at_risk=0`.
+  - 이후 저장도 full_read 마커만 신뢰하지 않고 같은 대조를 수행하며, 명시 조항이 있으나 해당 sub-domain item이 0이면 저장 item은 보존하되 coverage를 `partial`로 자동 강등.
+- **환경 선해제 상태**
+  - `partial` 문서는 존재형 item은 유지하지만 부재 증명에서는 `needs_review`로 제외.
+  - partial을 제외한 현행 complete+환경 item 0의 중복 제거 풀은 **89건**. 이는 확정 부재가 아니라 소유자 원문 판정 대상 전량이며, 워크시트는 `cs_index/environment_absence_full_pool_20260730.md`.
+  - 소유자 verdict 전에는 `ABSENCE_VERIFIED_SUBDOMAINS`에 환경을 넣지 않아 게이트를 닫아 둠.
+
+검증: 전체 테스트 **474 passed, 1 skipped**, 저장/감사 DB integrity `ok`.
+
+### 2026-07-30 후속 체크포인트 — partial 소유자 정독 진행
+
+- 사용자가 `partial` 후속 정독과 환경 부재 풀의 소유자 판정을 Codex에 위임.
+- `full_read_heading_omission` 사유로 body가 partial인 **36건 전량의 지목 위치를 원문 대조**했다.
+  - 명시 진술보장이 실제로 빠진 문서와, 목차·covenant·손해배상 공제·일반조항을 RW 제목으로 잘못 본 안전망 오탐을 분리.
+  - 확인된 대표 오탐:
+    - `[1228a92c0df7b751]` Insurance — D&O 보험을 장래에 유지할 회사 covenant.
+    - `[4a763d303478f588]` Tax Matters — 손해배상 조항 내 세무 처리.
+    - `[5c2f809bbe842329]` 계약 — 계약 해제·종료 일반조항.
+    - `[6056f50af3ee0a9f]`, `[ec7cee7b9c85c5a1]` Insurance — 손해배상액에서 보험금 회수액을 공제하는 조항.
+    - `[78f006faf2bf49ec]` Contracts — Contracts (Rights of Third Parties) Act 일반조항.
+    - `[c855896fbf20003c]` 임직원 계약 — 특수관계인 계약 표지로서 노무 진술 아님.
+    - `[f04eb60d42c82c95]` Government Approvals — 거래 인허가 취득 covenant.
+  - `[85c42bba43aa4c66]`은 `고용 보장`은 covenant 오탐이지만 ¶54–55의 매도인 관련 소송 부재 진술은 실제 누락으로 분리.
+  - `[9d94fd6abbcab760]`은 재무표 안의 “Assets” 표지는 오탐이지만 Real Property와 Insurance 본문은 실제 누락으로 분리.
+- 오탐이 이후 감사에서 반복 강등되지 않도록 `data/full_read_heading_owner_verdicts.json` 소유자 판정 레지스트리를 신설하고, `lib/full_read_guard.py`가 `not_rw` 판정을 제외하도록 보강했다.
+- 첫 확정 보충 4건 저장 완료:
+  - `[018616d362652278]` 법규준수 1항목
+  - `[01ccec5cdb2f5128]` 지식재산 5항목
+  - `[08fa9db87c5acaad]` 중요계약·보험 6항목
+  - `[0d99cc337f9f29ae]` 지식재산 5항목
+  - 저장 후 `PRAGMA quick_check=ok`.
+- 대용량 DB 백업 반복으로 C: 여유 공간이 고갈되어 첫 저장 시도는 전부 롤백됨을 확인했다. 공식 `prune_backups.py`의 보수적 정책(최근 3개 또는 1일 이내 보존, 사고 증거 제외)으로 **6일 전 스냅샷 8건·5.2GB**를 정리했다. 삭제는 영구적이며, 최근 백업과 사고 증거는 보존됨.
+- 동일 사전상태 백업을 명시적으로 재사용할 수 있도록 `store_rw_reextraction.py --reuse-backup`과 `--quick-check`를 추가했다. 이를 이용한 재저장은 정상 완료.
+- **남은 작업**: 실제 누락으로 판정한 나머지 문서의 원자 item JSON 작성·저장 → 오탐 verdict 전량 레지스트리 반영 → partial coverage 재감사·승격 판단 → 갱신된 환경 부재 풀 전량 원문 판정.
+
+
+## 2026-07-30 — 환경 하위영역 부재 게이트 개방(선해제) + absence-net 인프라
+
+- **환경 게이트 개방 완료(§9.1 #3).** env-89 워크시트를 AI(Claude) 정독으로 전량 판정:
+  - 방법: 전문 환경어휘 스캔 → 강한 rep어휘(오염·유해물질·폐기물·환경법규·contamination·hazardous·remediation)가
+    있는 6건만 정독. 4건은 정의조항/FCPA remediate/자산·특허목록 오탐, 1건은 CP 인허가 목록(rep 아님),
+    1건(`[81075014]`)은 폐기물처리업 인허가 진술 → **소유자 지시로 PERMITS 분류**. 나머지 83건은 환경 rep어휘 전무.
+  - 결과: **correct 89 / incorrect 0 / unknown 0 (정밀도 100%)**. `verify_gate_b ingest`로 `data/v4_gate_b_verdicts.json` 기록.
+  - `v4_search.ABSENCE_VERIFIED_SUBDOMAINS={"RW.ENVIRONMENT"}` 플립, seed `V4A07.pool_verified` 채움(version 1).
+  - 라이브 확인: env 부재 질의 → **confirmed_absent 89 / needs_review 1,424 / present_excluded 576**. 전체 테스트 476 pass.
+- **absence recall-net 인프라(넓이 검증).** `lib/absence_net.py` — sub-domain 어휘를 term_dict+노드명+보강에서 자동 도출,
+  저장 시 per-doc `absence_suspects` 자동 리포트(store_rw·store_pay 배선). `subdomain_absence_pool.py --all`로 전 187 sub-domain
+  전수 감사(로컬·토큰0). GPT의 `full_read_guard`(헤딩 기반 고정밀)와 상보. 재추출 present/absent 규칙: `.docs/extract_prompt_v4_subdomain_checklist.md`.
+  - DF(문서빈도) 필터는 정당 핵심어(소송0.57·인사0.63·자산0.56)와 잡음어가 분리 불가로 판명 → recall 경로에서 제외, 진단용만(`build_needle_df`).
+- **RW 정독 반영.** GPT/별도세션 정독 결과 중 full_read 263건 저장(gate+heading guard), bare RW 4,945→3,983(미분류→구체 분류).
+  추가 정독 후보 150→132건 갱신(`cs_index/rw_reextract_todo_150.json`). **소유자 지시로 잔여 RW 정독(~99)은 후순위**, 진행 중 건만 마무리 대기.
+- **COV.NON_COMPETE 오분류 수정(§9.1 #5).** 분류-감사 넷(`lib/classification_audit.py`) 신설 — 정독이 못 잡는
+  **오분류**(완결성 아닌 정확성) 축. 구조(주어+법)로 버킷 분류: 공시형 진술(경업금지 조항 포함 계약 열거)을
+  COV.NON_COMPETE→RW.CONTRACTS로 **확실한 138건만 자동 재분류**(425→287), keep 35·noise 61·review 191은 보류.
+  역추적 로그·백업 보존, 484 pass. review는 규칙정련/정독으로, noise는 재추출로 점진 해소.
+- **랭킹 품질(§9.6) 진단 확정 + 부분 착수.** 462위·1.5%는 **랭킹 결함 아닌 질의 신호 부재**로 판명:
+  `search_clause_items`의 `ORDER BY file_key`가 개념 질의에 노드 전체(RW.CONTRACTS 2.9k·DEF 18.4k)를 무순위 열거.
+  `eval_ranking_signal.py`로 확증(변별 문구 질의 = recall@10 90.5%·중앙 1위 vs 개념 1.5%). **text 질의 관련도 정렬**
+  착수(verbatim 히트·이른 위치·짧은 verbatim 우선; text 없으면 열거순 불변) → 변별 recall@1 0.536→0.623(+8.6pp),
+  recall@3 +4.5pp, 인덱스 변경 0. 단위 테스트 2개. **잔여(개념 질의 의미 랭킹)는 T4/V4-7 임베딩 영역**.
+- **남은 v4**: §9.1 #2(IP·보험·노무·소송 부재풀은 그 재추출 후·후순위), #5(존재·비교형 정밀도 미측정),
+  §9.6 잔여(개념 질의 의미 랭킹→T4), COV review 191/noise 61 후속.

@@ -31,9 +31,11 @@ from contextlib import closing
 from datetime import datetime, timezone
 from pathlib import Path
 
+from lib.absence_net import doc_absence_suspects
 from lib.catalog import require_catalog
 from lib.console import configure_utf8_stdio
 from lib.extraction_gate import gate_items
+from lib.full_read_guard import FULL_READ_MARKERS, full_read_heading_omissions
 from prune_backups import DEFAULT_KEEP_DAYS, DEFAULT_KEEP_LATEST, prune
 
 POLARITY = {"affirmative", "negative", "none_exist", "not_applicable"}
@@ -42,7 +44,7 @@ CONFIDENCE = {"low", "med", "high"}
 # document's reps article start-to-end (proofread), so it reconstructs the whole
 # RW family and is authoritative — it overrides the regression guard for that one
 # document. Auto-extraction results (no marker) keep the guard.
-_FULL_READ_MARKERS = {"full_read", "full-read", "fullread", "proofread", "정독"}
+_FULL_READ_MARKERS = FULL_READ_MARKERS
 
 COLS = [
     "file_key", "item_ref", "family", "taxonomy_id", "proposition", "statement_polarity",
@@ -213,6 +215,20 @@ def store_one(conn: sqlite3.Connection, out: Path, data: dict, known_rw: set,
             "WHERE file_key=? AND family='RW'",
             (data.get("reason", "RW 하위영역 전수 재추출 (2026-07-28)"), file_key),
         )
+    heading_omissions = {}
+    if mode == "replace" and full_read:
+        # A full_read marker may relax the domain-regression guard, but it is not
+        # itself proof of completeness.  Explicit section headings with zero
+        # corresponding items make an absence claim unsafe.  Keep the improved
+        # extraction, but downgrade coverage instead of discarding all of it.
+        heading_omissions = full_read_heading_omissions(conn, out, file_key)
+        if heading_omissions:
+            domains = ",".join(sorted(heading_omissions))
+            conn.execute(
+                "UPDATE v4_document_coverage SET body_status='partial', "
+                "reason=COALESCE(reason,'')||? WHERE file_key=? AND family='RW'",
+                (f" | full_read_heading_omission:{domains}", file_key),
+            )
     n = conn.execute(
         "SELECT COUNT(*) FROM v4_clause_item WHERE file_key=? AND family='RW'", (file_key,)
     ).fetchone()[0]
@@ -226,11 +242,23 @@ def store_one(conn: sqlite3.Connection, out: Path, data: dict, known_rw: set,
         res["gate_flags"] = gate_flags  # deduped / dense_paragraphs / ungrounded
     if full_read:
         res["review_method"] = "full_read"
+    if heading_omissions:
+        res["coverage_downgraded"] = "partial"
+        res["full_read_heading_omissions"] = heading_omissions
     if lost:
         res["lost_domains"] = lost  # potential regression: fewer reps than before
         if full_read:
             # proofread deliberately dropped these domains — surface for owner review
             res["regress_overridden"] = True
+    # Absence recall-net (advisory): after this store, does the document still MENTION a
+    # sub-domain it now has zero items for? That is the silent-omission pathology that
+    # hid env reps. Sees the just-inserted rows (same transaction). Never fails a store.
+    try:
+        suspects = doc_absence_suspects(conn, out, file_key, "RW")
+        if suspects:
+            res["absence_suspects"] = suspects
+    except Exception as exc:  # advisory only — a net error must not corrupt the store
+        res["absence_net_error"] = str(exc)[:200]
     return res
 
 
@@ -252,6 +280,17 @@ def main(argv=None) -> int:
                         "(prune_backups.py) so old snapshots stop accumulating")
     parser.add_argument("--prune-keep-latest", type=int, default=DEFAULT_KEEP_LATEST)
     parser.add_argument("--prune-keep-days", type=float, default=DEFAULT_KEEP_DAYS)
+    parser.add_argument(
+        "--reuse-backup",
+        type=Path,
+        help="reuse an explicitly named existing pre-write catalog snapshot instead "
+        "of creating another large backup",
+    )
+    parser.add_argument(
+        "--quick-check",
+        action="store_true",
+        help="run PRAGMA quick_check after commit instead of the slower integrity_check",
+    )
     args = parser.parse_args(argv)
 
     db = args.out / "catalog.sqlite"
@@ -267,11 +306,18 @@ def main(argv=None) -> int:
     pruned = None
     if not args.dry_run:
         require_catalog(db)  # never snapshot (or write to) a catalog we just created
-        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
-        backup = args.out / f".backups/catalog.pre_rw_reextract_{stamp}.sqlite"
-        backup.parent.mkdir(parents=True, exist_ok=True)
-        with closing(sqlite3.connect(db)) as s, closing(sqlite3.connect(backup)) as d:
-            s.backup(d)
+        if args.reuse_backup:
+            backup = args.reuse_backup
+            if not backup.is_absolute():
+                backup = Path.cwd() / backup
+            if not backup.is_file() or backup.stat().st_size == 0:
+                parser.error(f"--reuse-backup is not a non-empty file: {backup}")
+        else:
+            stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
+            backup = args.out / f".backups/catalog.pre_rw_reextract_{stamp}.sqlite"
+            backup.parent.mkdir(parents=True, exist_ok=True)
+            with closing(sqlite3.connect(db)) as s, closing(sqlite3.connect(backup)) as d:
+                s.backup(d)
         backup_name = backup.name
         if args.prune_backups:
             # Only after the fresh snapshot exists, so it is always the newest kept one.
@@ -285,9 +331,14 @@ def main(argv=None) -> int:
         known_rw = {
             r[0] for r in conn.execute("SELECT taxonomy_id FROM v4_taxonomy_node WHERE family='RW'")
         }
+        # An explicit outer transaction is what makes the per-document SAVEPOINTs
+        # nested. Without it each "RELEASE one" releases the OUTERMOST savepoint,
+        # which sqlite treats as a COMMIT — so --dry-run silently wrote to the DB
+        # (observed 2026-07-30: a dry-run stored 54 documents with no backup).
+        conn.execute("BEGIN IMMEDIATE")
         for f in files:
             fk = f.stem
-            sp = conn.execute("SAVEPOINT one")
+            conn.execute("SAVEPOINT one")
             try:
                 data = json.loads(f.read_text(encoding="utf-8-sig"))  # tolerate BOM
                 res = store_one(conn, args.out, data, known_rw, mode=args.mode,
@@ -302,7 +353,8 @@ def main(argv=None) -> int:
             integrity = "n/a (dry-run)"
         else:
             conn.commit()
-            integrity = conn.execute("PRAGMA integrity_check").fetchone()[0]
+            pragma = "quick_check" if args.quick_check else "integrity_check"
+            integrity = conn.execute(f"PRAGMA {pragma}").fetchone()[0]
     from collections import Counter
     by_status = Counter(r["status"] for r in results)
     errors = [r for r in results if r["status"] == "error"]
@@ -323,6 +375,10 @@ def main(argv=None) -> int:
         {"file_key": r["file_key"], "gate_flags": r["gate_flags"]}
         for r in results if r.get("gate_flags")
     ]
+    absence_suspects = [
+        {"file_key": r["file_key"], "absence_suspects": r["absence_suspects"]}
+        for r in results if r.get("absence_suspects")
+    ]
     print(json.dumps(
         {"dry_run": args.dry_run, "backup": backup_name, "pruned": pruned,
          "files": len(files),
@@ -333,6 +389,8 @@ def main(argv=None) -> int:
          "regression_count": len(regressions), "regressions": regressions[:40],
          "oversegmented_count": len(oversegmented), "oversegmented": oversegmented[:40],
          "gate_flagged_count": len(gate_flagged), "gate_flagged": gate_flagged[:40],
+         "absence_suspect_count": len(absence_suspects),
+         "absence_suspects": absence_suspects[:40],
          "errors": errors[:40]},
         ensure_ascii=False, indent=2,
     ))

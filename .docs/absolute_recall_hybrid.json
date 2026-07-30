@@ -1,0 +1,4139 @@
+{
+  "benchmark": "V4 absolute item-level recall (full_read answer key)",
+  "hit_definition": {
+    "granularity": "answer-key item, not document",
+    "query_source": "taxonomy canonical label / aliases — the concept, never the row id",
+    "identity_rules": [
+      "verbatim_exact",
+      "verbatim_containment(>=8 normalized chars)",
+      "loc_overlap + same sub-domain"
+    ],
+    "paragraph_path": "document rank; 'localized' additionally requires a matched paragraph inside the item's ¶ range (floor: matched_terms is capped at 20 per document)",
+    "scope": "(file_key, family) — a full_read for one family scores that family only"
+  },
+  "limits": [
+    "ground truth is RW/PAY only and SPA-skewed — not a corpus-wide claim",
+    "answer keys were produced by an AI reading the article start-to-end, not by an independent human labeller",
+    "items beyond max_depth are reported as not retrieved, which is the practical truth for a user but not proof of absence from the index",
+    "re-extraction is in flight: answer keys not yet stored are broken out under by_answer_key_stored — that shortfall is pipeline backlog, not a search defect"
+  ],
+  "parameters": {
+    "max_depth": 2000,
+    "doc_depth": 50,
+    "paragraph_terms": 1,
+    "paths": [
+      "structured",
+      "item_text",
+      "paragraph"
+    ],
+    "item_k": [
+      10,
+      25,
+      50,
+      100,
+      250,
+      500,
+      1000
+    ],
+    "doc_k": [
+      5,
+      10,
+      25,
+      50,
+      100,
+      200
+    ]
+  },
+  "ground_truth": {
+    "documents": 606,
+    "items": 17389,
+    "documents_by_family": {
+      "RW": 214,
+      "PAY": 392
+    },
+    "items_by_family": {
+      "RW": 10013,
+      "PAY": 7376
+    },
+    "documents_by_family_ctype": {
+      "PAY/ATA/BTA": 1,
+      "PAY/BW인수": 1,
+      "PAY/CB인수": 9,
+      "PAY/EB인수": 2,
+      "PAY/SHA": 2,
+      "PAY/SPA": 368,
+      "PAY/SSA": 9,
+      "RW/ATA/BTA": 5,
+      "RW/BW인수": 3,
+      "RW/CB인수": 21,
+      "RW/EB인수": 2,
+      "RW/SHA": 5,
+      "RW/SPA": 164,
+      "RW/SSA": 14
+    },
+    "distinct_file_keys": 497,
+    "answer_keys_stored": 566,
+    "answer_keys_not_yet_stored": 40,
+    "items_in_unstored_answer_keys": 1786,
+    "note": "a document full-read for one family is an answer key for that family only"
+  },
+  "total_gt_items": 17389,
+  "by_path": {
+    "structured": {
+      "rank_unit": "item",
+      "retrieved": 12712,
+      "recall_within_max_depth": 0.731,
+      "recall_at": {
+        "@10": 0.0154,
+        "@25": 0.0322,
+        "@50": 0.0615,
+        "@100": 0.1138,
+        "@250": 0.2439,
+        "@500": 0.3844,
+        "@1000": 0.5586
+      },
+      "median_rank": 449.0
+    },
+    "item_text": {
+      "rank_unit": "item",
+      "retrieved": 3324,
+      "recall_within_max_depth": 0.1912,
+      "recall_at": {
+        "@10": 0.0106,
+        "@25": 0.0218,
+        "@50": 0.0365,
+        "@100": 0.0596,
+        "@250": 0.1028,
+        "@500": 0.1395,
+        "@1000": 0.1711
+      },
+      "median_rank": 219.0
+    },
+    "paragraph_document_level": {
+      "rank_unit": "document",
+      "retrieved": 742,
+      "recall_within_max_depth": 0.0427,
+      "recall_at": {
+        "@5": 0.0037,
+        "@10": 0.0064,
+        "@25": 0.0234,
+        "@50": 0.0427,
+        "@100": 0.0427,
+        "@200": 0.0427
+      },
+      "median_rank": 24.0
+    },
+    "paragraph_localized": {
+      "rank_unit": "document",
+      "retrieved": 516,
+      "recall_within_max_depth": 0.0297,
+      "recall_at": {
+        "@5": 0.0019,
+        "@10": 0.0032,
+        "@25": 0.0162,
+        "@50": 0.0297,
+        "@100": 0.0297,
+        "@200": 0.0297
+      },
+      "median_rank": 24.0
+    },
+    "hybrid_item_paths": {
+      "rank_unit": "item",
+      "retrieved": 13017,
+      "recall_within_max_depth": 0.7486,
+      "recall_at": {
+        "@10": 0.0227,
+        "@25": 0.046,
+        "@50": 0.0831,
+        "@100": 0.1424,
+        "@250": 0.2805,
+        "@500": 0.4131,
+        "@1000": 0.5884
+      },
+      "median_rank": 408
+    }
+  },
+  "by_family": {
+    "PAY": {
+      "gt_items": 7376,
+      "structured": {
+        "recall_within_max_depth": 1.0,
+        "recall_at": {
+          "@25": 0.0603,
+          "@100": 0.2044,
+          "@1000": 0.8746
+        }
+      },
+      "item_text": {
+        "recall_within_max_depth": 0.2183,
+        "recall_at": {
+          "@25": 0.0373,
+          "@100": 0.095,
+          "@1000": 0.2183
+        }
+      },
+      "paragraph_document_level": {
+        "recall_within_doc_depth": 0.0484
+      },
+      "hybrid_item_paths": {
+        "recall_within_max_depth": 1.0
+      }
+    },
+    "RW": {
+      "gt_items": 10013,
+      "structured": {
+        "recall_within_max_depth": 0.5329,
+        "recall_at": {
+          "@25": 0.0115,
+          "@100": 0.047,
+          "@1000": 0.3259
+        }
+      },
+      "item_text": {
+        "recall_within_max_depth": 0.1712,
+        "recall_at": {
+          "@25": 0.0104,
+          "@100": 0.0336,
+          "@1000": 0.1364
+        }
+      },
+      "paragraph_document_level": {
+        "recall_within_doc_depth": 0.0385
+      },
+      "hybrid_item_paths": {
+        "recall_within_max_depth": 0.5634
+      }
+    }
+  },
+  "by_ctype": {
+    "ATA/BTA": {
+      "gt_items": 277,
+      "structured": {
+        "recall_within_max_depth": 0.6751,
+        "recall_at": {
+          "@25": 0.0036,
+          "@100": 0.0108,
+          "@1000": 0.3249
+        }
+      },
+      "item_text": {
+        "recall_within_max_depth": 0.13,
+        "recall_at": {
+          "@25": 0.0036,
+          "@100": 0.0072,
+          "@1000": 0.0939
+        }
+      },
+      "paragraph_document_level": {
+        "recall_within_doc_depth": 0.1083
+      },
+      "hybrid_item_paths": {
+        "recall_within_max_depth": 0.6895
+      }
+    },
+    "BW인수": {
+      "gt_items": 76,
+      "structured": {
+        "recall_within_max_depth": 0.3816,
+        "recall_at": {
+          "@25": 0.0,
+          "@100": 0.0132,
+          "@1000": 0.2105
+        }
+      },
+      "item_text": {
+        "recall_within_max_depth": 0.0526,
+        "recall_at": {
+          "@25": 0.0,
+          "@100": 0.0,
+          "@1000": 0.0263
+        }
+      },
+      "paragraph_document_level": {
+        "recall_within_doc_depth": 0.0
+      },
+      "hybrid_item_paths": {
+        "recall_within_max_depth": 0.4079
+      }
+    },
+    "CB인수": {
+      "gt_items": 1002,
+      "structured": {
+        "recall_within_max_depth": 0.4531,
+        "recall_at": {
+          "@25": 0.016,
+          "@100": 0.0649,
+          "@1000": 0.2914
+        }
+      },
+      "item_text": {
+        "recall_within_max_depth": 0.1058,
+        "recall_at": {
+          "@25": 0.007,
+          "@100": 0.0389,
+          "@1000": 0.0868
+        }
+      },
+      "paragraph_document_level": {
+        "recall_within_doc_depth": 0.009
+      },
+      "hybrid_item_paths": {
+        "recall_within_max_depth": 0.4651
+      }
+    },
+    "EB인수": {
+      "gt_items": 138,
+      "structured": {
+        "recall_within_max_depth": 0.3043,
+        "recall_at": {
+          "@25": 0.0145,
+          "@100": 0.029,
+          "@1000": 0.2536
+        }
+      },
+      "item_text": {
+        "recall_within_max_depth": 0.087,
+        "recall_at": {
+          "@25": 0.0,
+          "@100": 0.029,
+          "@1000": 0.0725
+        }
+      },
+      "paragraph_document_level": {
+        "recall_within_doc_depth": 0.029
+      },
+      "hybrid_item_paths": {
+        "recall_within_max_depth": 0.3116
+      }
+    },
+    "SHA": {
+      "gt_items": 71,
+      "structured": {
+        "recall_within_max_depth": 0.7465,
+        "recall_at": {
+          "@25": 0.0563,
+          "@100": 0.2254,
+          "@1000": 0.6479
+        }
+      },
+      "item_text": {
+        "recall_within_max_depth": 0.1408,
+        "recall_at": {
+          "@25": 0.0423,
+          "@100": 0.0986,
+          "@1000": 0.1127
+        }
+      },
+      "paragraph_document_level": {
+        "recall_within_doc_depth": 0.0
+      },
+      "hybrid_item_paths": {
+        "recall_within_max_depth": 0.7465
+      }
+    },
+    "SPA": {
+      "gt_items": 15126,
+      "structured": {
+        "recall_within_max_depth": 0.7611,
+        "recall_at": {
+          "@25": 0.0346,
+          "@100": 0.1205,
+          "@1000": 0.5872
+        }
+      },
+      "item_text": {
+        "recall_within_max_depth": 0.2013,
+        "recall_at": {
+          "@25": 0.0233,
+          "@100": 0.0629,
+          "@1000": 0.1808
+        }
+      },
+      "paragraph_document_level": {
+        "recall_within_doc_depth": 0.0462
+      },
+      "hybrid_item_paths": {
+        "recall_within_max_depth": 0.7791
+      }
+    },
+    "SSA": {
+      "gt_items": 699,
+      "structured": {
+        "recall_within_max_depth": 0.6223,
+        "recall_at": {
+          "@25": 0.02,
+          "@100": 0.0973,
+          "@1000": 0.505
+        }
+      },
+      "item_text": {
+        "recall_within_max_depth": 0.1588,
+        "recall_at": {
+          "@25": 0.0215,
+          "@100": 0.0472,
+          "@1000": 0.1545
+        }
+      },
+      "paragraph_document_level": {
+        "recall_within_doc_depth": 0.0
+      },
+      "hybrid_item_paths": {
+        "recall_within_max_depth": 0.6423
+      }
+    }
+  },
+  "by_answer_key_stored": {
+    "not_yet_stored": {
+      "gt_items": 1786,
+      "structured": {
+        "recall_within_max_depth": 0.0918,
+        "recall_at": {
+          "@25": 0.0,
+          "@100": 0.0017,
+          "@1000": 0.0482
+        }
+      },
+      "item_text": {
+        "recall_within_max_depth": 0.0566,
+        "recall_at": {
+          "@25": 0.0011,
+          "@100": 0.0067,
+          "@1000": 0.0448
+        }
+      },
+      "paragraph_document_level": {
+        "recall_within_doc_depth": 0.0263
+      },
+      "hybrid_item_paths": {
+        "recall_within_max_depth": 0.1316
+      }
+    },
+    "stored": {
+      "gt_items": 15603,
+      "structured": {
+        "recall_within_max_depth": 0.8042,
+        "recall_at": {
+          "@25": 0.0359,
+          "@100": 0.1266,
+          "@1000": 0.6171
+        }
+      },
+      "item_text": {
+        "recall_within_max_depth": 0.2066,
+        "recall_at": {
+          "@25": 0.0242,
+          "@100": 0.0657,
+          "@1000": 0.1856
+        }
+      },
+      "paragraph_document_level": {
+        "recall_within_doc_depth": 0.0445
+      },
+      "hybrid_item_paths": {
+        "recall_within_max_depth": 0.8192
+      }
+    }
+  },
+  "match_rules": {
+    "structured:verbatim_exact": 12424,
+    "structured:verbatim_containment": 271,
+    "structured:loc_subdomain": 17,
+    "item_text:verbatim_containment": 32,
+    "item_text:verbatim_exact": 272,
+    "item_text:loc_subdomain": 1
+  },
+  "missed_by_all_paths": 4290,
+  "missed_by_item_paths": 4372,
+  "miss_sample": [
+    {
+      "gt_id": "01ccec5cdb2f5128:RW:0",
+      "file_key": "01ccec5cdb2f5128",
+      "family": "RW",
+      "ctype": "SSA",
+      "taxonomy_id": "RW.AUTHORITY",
+      "polarity": "affirmative",
+      "loc": [
+        61,
+        61
+      ],
+      "proposition": "Representation and warranty classified as RW.AUTHORITY.",
+      "verbatim": "본 신주인수계약(\"본 계약\")은 2018. []. []. 아래의 당사자들 사이에서 체결되었다.",
+      "found_by_paragraph_path": false,
+      "diagnosis": "taxonomy_mismatch",
+      "detail": "stored under a different node than the proofread answer key asserts",
+      "answer_key_taxonomy_id": "RW.AUTHORITY",
+      "stored_taxonomy_ids": [
+        "RW"
+      ]
+    },
+    {
+      "gt_id": "01ccec5cdb2f5128:RW:1",
+      "file_key": "01ccec5cdb2f5128",
+      "family": "RW",
+      "ctype": "SSA",
+      "taxonomy_id": "RW.CONTRACTS",
+      "polarity": "affirmative",
+      "loc": [
+        61,
+        61
+      ],
+      "proposition": "Representation and warranty classified as RW.CONTRACTS.",
+      "verbatim": "본 신주인수계약(\"본 계약\")은 2018. []. []. 아래의 당사자들 사이에서 체결되었다.",
+      "found_by_paragraph_path": false,
+      "diagnosis": "taxonomy_mismatch",
+      "detail": "stored under a different node than the proofread answer key asserts",
+      "answer_key_taxonomy_id": "RW.CONTRACTS",
+      "stored_taxonomy_ids": [
+        "RW"
+      ]
+    },
+    {
+      "gt_id": "01ccec5cdb2f5128:RW:2",
+      "file_key": "01ccec5cdb2f5128",
+      "family": "RW",
+      "ctype": "SSA",
+      "taxonomy_id": "RW.COMPLIANCE",
+      "polarity": "affirmative",
+      "loc": [
+        63,
+        63
+      ],
+      "proposition": "Representation and warranty classified as RW.COMPLIANCE.",
+      "verbatim": "인수인: [유니슨캐피탈코리아 PEF/PEF-SPC]",
+      "found_by_paragraph_path": false,
+      "diagnosis": "text_not_in_index",
+      "detail": "no item in this family carries this verbatim for this document — never stored, or the wording was rewritten on re-extraction",
+      "probe_hits": 0
+    },
+    {
+      "gt_id": "01ccec5cdb2f5128:RW:3",
+      "file_key": "01ccec5cdb2f5128",
+      "family": "RW",
+      "ctype": "SSA",
+      "taxonomy_id": "RW.COMPLIANCE",
+      "polarity": "affirmative",
+      "loc": [
+        64,
+        64
+      ],
+      "proposition": "Representation and warranty classified as RW.COMPLIANCE.",
+      "verbatim": "이해관계인: 1. 김상미(\"이해관계인 대표\")",
+      "found_by_paragraph_path": false,
+      "diagnosis": "text_not_in_index",
+      "detail": "no item in this family carries this verbatim for this document — never stored, or the wording was rewritten on re-extraction",
+      "probe_hits": 0
+    },
+    {
+      "gt_id": "01ccec5cdb2f5128:RW:4",
+      "file_key": "01ccec5cdb2f5128",
+      "family": "RW",
+      "ctype": "SSA",
+      "taxonomy_id": "RW.COMPLIANCE",
+      "polarity": "affirmative",
+      "loc": [
+        66,
+        66
+      ],
+      "proposition": "Representation and warranty classified as RW.COMPLIANCE.",
+      "verbatim": "3. 최경경(김상미, 김미자 및 최경경을 개별적으로 또는 총칭하여 \"이해 관계인\")",
+      "found_by_paragraph_path": false,
+      "diagnosis": "text_not_in_index",
+      "detail": "no item in this family carries this verbatim for this document — never stored, or the wording was rewritten on re-extraction",
+      "probe_hits": 0
+    },
+    {
+      "gt_id": "01ccec5cdb2f5128:RW:5",
+      "file_key": "01ccec5cdb2f5128",
+      "family": "RW",
+      "ctype": "SSA",
+      "taxonomy_id": "RW.COMPLIANCE",
+      "polarity": "affirmative",
+      "loc": [
+        68,
+        68
+      ],
+      "proposition": "Representation and warranty classified as RW.COMPLIANCE.",
+      "verbatim": "발행회사는 경기도 수원시 영통구 영통로351번길 27(영통동)에 본점을 두고 축산물가공업(유가공업) 및 축산물판매업 등을 영위하는 회사이다.",
+      "found_by_paragraph_path": false,
+      "diagnosis": "text_not_in_index",
+      "detail": "no item in this family carries this verbatim for this document — never stored, or the wording was rewritten on re-extraction",
+      "probe_hits": 0
+    },
+    {
+      "gt_id": "01ccec5cdb2f5128:RW:6",
+      "file_key": "01ccec5cdb2f5128",
+      "family": "RW",
+      "ctype": "SSA",
+      "taxonomy_id": "RW.AUTHORITY",
+      "polarity": "affirmative",
+      "loc": [
+        69,
+        69
+      ],
+      "proposition": "Representation and warranty classified as RW.AUTHORITY.",
+      "verbatim": "본 계약 체결일 현재, 이해관계인은 발행회사 발행주식의 전부인 보통주식 80,000주를 소유하고 있고, 김상미는 발행회사의 최대주주이다.",
+      "found_by_paragraph_path": false,
+      "diagnosis": "taxonomy_mismatch",
+      "detail": "stored under a different node than the proofread answer key asserts",
+      "answer_key_taxonomy_id": "RW.AUTHORITY",
+      "stored_taxonomy_ids": [
+        "RW.CAPITALIZATION.OWNERSHIP"
+      ]
+    },
+    {
+      "gt_id": "01ccec5cdb2f5128:RW:8",
+      "file_key": "01ccec5cdb2f5128",
+      "family": "RW",
+      "ctype": "SSA",
+      "taxonomy_id": "RW.CONTRACTS",
+      "polarity": "affirmative",
+      "loc": [
+        69,
+        69
+      ],
+      "proposition": "Representation and warranty classified as RW.CONTRACTS.",
+      "verbatim": "본 계약 체결일 현재, 이해관계인은 발행회사 발행주식의 전부인 보통주식 80,000주를 소유하고 있고, 김상미는 발행회사의 최대주주이다.",
+      "found_by_paragraph_path": false,
+      "diagnosis": "taxonomy_mismatch",
+      "detail": "stored under a different node than the proofread answer key asserts",
+      "answer_key_taxonomy_id": "RW.CONTRACTS",
+      "stored_taxonomy_ids": [
+        "RW.CAPITALIZATION.OWNERSHIP"
+      ]
+    },
+    {
+      "gt_id": "01ccec5cdb2f5128:RW:9",
+      "file_key": "01ccec5cdb2f5128",
+      "family": "RW",
+      "ctype": "SSA",
+      "taxonomy_id": "RW.AUTHORITY",
+      "polarity": "affirmative",
+      "loc": [
+        70,
+        70
+      ],
+      "proposition": "Representation and warranty classified as RW.AUTHORITY.",
+      "verbatim": "인수인과 이해관계인은 본 계약 체결일에, 이해관계인이 발행회사 발행 보통주식 []주(발행주식총수의 []%)를 인수인에게 매도하고, 인수인은 이를 매수하는 내용의 주식매매계약(\"본건 주식매매계약\")을 체결하였다.",
+      "found_by_paragraph_path": false,
+      "diagnosis": "taxonomy_mismatch",
+      "detail": "stored under a different node than the proofread answer key asserts",
+      "answer_key_taxonomy_id": "RW.AUTHORITY",
+      "stored_taxonomy_ids": [
+        "RW"
+      ]
+    },
+    {
+      "gt_id": "01ccec5cdb2f5128:RW:10",
+      "file_key": "01ccec5cdb2f5128",
+      "family": "RW",
+      "ctype": "SSA",
+      "taxonomy_id": "RW.CAPITALIZATION",
+      "polarity": "affirmative",
+      "loc": [
+        70,
+        70
+      ],
+      "proposition": "Representation and warranty classified as RW.CAPITALIZATION.",
+      "verbatim": "인수인과 이해관계인은 본 계약 체결일에, 이해관계인이 발행회사 발행 보통주식 []주(발행주식총수의 []%)를 인수인에게 매도하고, 인수인은 이를 매수하는 내용의 주식매매계약(\"본건 주식매매계약\")을 체결하였다.",
+      "found_by_paragraph_path": false,
+      "diagnosis": "taxonomy_mismatch",
+      "detail": "stored under a different node than the proofread answer key asserts",
+      "answer_key_taxonomy_id": "RW.CAPITALIZATION",
+      "stored_taxonomy_ids": [
+        "RW"
+      ]
+    },
+    {
+      "gt_id": "01ccec5cdb2f5128:RW:11",
+      "file_key": "01ccec5cdb2f5128",
+      "family": "RW",
+      "ctype": "SSA",
+      "taxonomy_id": "RW.CONTRACTS",
+      "polarity": "affirmative",
+      "loc": [
+        70,
+        70
+      ],
+      "proposition": "Representation and warranty classified as RW.CONTRACTS.",
+      "verbatim": "인수인과 이해관계인은 본 계약 체결일에, 이해관계인이 발행회사 발행 보통주식 []주(발행주식총수의 []%)를 인수인에게 매도하고, 인수인은 이를 매수하는 내용의 주식매매계약(\"본건 주식매매계약\")을 체결하였다.",
+      "found_by_paragraph_path": false,
+      "diagnosis": "taxonomy_mismatch",
+      "detail": "stored under a different node than the proofread answer key asserts",
+      "answer_key_taxonomy_id": "RW.CONTRACTS",
+      "stored_taxonomy_ids": [
+        "RW"
+      ]
+    },
+    {
+      "gt_id": "01ccec5cdb2f5128:RW:12",
+      "file_key": "01ccec5cdb2f5128",
+      "family": "RW",
+      "ctype": "SSA",
+      "taxonomy_id": "RW.CAPITALIZATION",
+      "polarity": "affirmative",
+      "loc": [
+        71,
+        71
+      ],
+      "proposition": "Representation and warranty classified as RW.CAPITALIZATION.",
+      "verbatim": "본 계약에서 정한 조건에 따라, 발행회사는 인수인에게 기명식 보통주식(1주당 액면가 5,000원) []주(\"본건 주식\")를 발행하고, 인수인은 본건 주식을 인수하고자 한다(\"본건 거래\").",
+      "found_by_paragraph_path": false,
+      "diagnosis": "taxonomy_mismatch",
+      "detail": "stored under a different node than the proofread answer key asserts",
+      "answer_key_taxonomy_id": "RW.CAPITALIZATION",
+      "stored_taxonomy_ids": [
+        "RW"
+      ]
+    },
+    {
+      "gt_id": "01ccec5cdb2f5128:RW:13",
+      "file_key": "01ccec5cdb2f5128",
+      "family": "RW",
+      "ctype": "SSA",
+      "taxonomy_id": "RW.CONTRACTS",
+      "polarity": "affirmative",
+      "loc": [
+        71,
+        71
+      ],
+      "proposition": "Representation and warranty classified as RW.CONTRACTS.",
+      "verbatim": "본 계약에서 정한 조건에 따라, 발행회사는 인수인에게 기명식 보통주식(1주당 액면가 5,000원) []주(\"본건 주식\")를 발행하고, 인수인은 본건 주식을 인수하고자 한다(\"본건 거래\").",
+      "found_by_paragraph_path": false,
+      "diagnosis": "taxonomy_mismatch",
+      "detail": "stored under a different node than the proofread answer key asserts",
+      "answer_key_taxonomy_id": "RW.CONTRACTS",
+      "stored_taxonomy_ids": [
+        "RW"
+      ]
+    },
+    {
+      "gt_id": "01ccec5cdb2f5128:RW:14",
+      "file_key": "01ccec5cdb2f5128",
+      "family": "RW",
+      "ctype": "SSA",
+      "taxonomy_id": "RW.COMPLIANCE",
+      "polarity": "affirmative",
+      "loc": [
+        72,
+        72
+      ],
+      "proposition": "Representation and warranty classified as RW.COMPLIANCE.",
+      "verbatim": "이에 발행회사, 인수인 및 이해관계인(총칭하여 \"당사자들\", 개별적으로 \"당사자\")은 아래와 같이 합의한다.",
+      "found_by_paragraph_path": false,
+      "diagnosis": "text_not_in_index",
+      "detail": "no item in this family carries this verbatim for this document — never stored, or the wording was rewritten on re-extraction",
+      "probe_hits": 0
+    },
+    {
+      "gt_id": "01ccec5cdb2f5128:RW:15",
+      "file_key": "01ccec5cdb2f5128",
+      "family": "RW",
+      "ctype": "SSA",
+      "taxonomy_id": "RW.CAPITALIZATION",
+      "polarity": "none_exist",
+      "loc": [
+        74,
+        74
+      ],
+      "proposition": "Representation and warranty classified as RW.CAPITALIZATION.",
+      "verbatim": "본 계약에서 사용되는 용어는 본 계약에서 달리 정의되지 아니하는 한 본건 주식매매계약에서 정한 의미를 가지며, 이 때 주식매매계약상 대상회사는 발행회사, 매도인들은 발행회사 등, 매수인은 인수인을 각 의미하는 것으로 본다.",
+      "found_by_paragraph_path": false,
+      "diagnosis": "text_not_in_index",
+      "detail": "no item in this family carries this verbatim for this document — never stored, or the wording was rewritten on re-extraction",
+      "probe_hits": 1
+    },
+    {
+      "gt_id": "01ccec5cdb2f5128:RW:16",
+      "file_key": "01ccec5cdb2f5128",
+      "family": "RW",
+      "ctype": "SSA",
+      "taxonomy_id": "RW.CONTRACTS",
+      "polarity": "none_exist",
+      "loc": [
+        74,
+        74
+      ],
+      "proposition": "Representation and warranty classified as RW.CONTRACTS.",
+      "verbatim": "본 계약에서 사용되는 용어는 본 계약에서 달리 정의되지 아니하는 한 본건 주식매매계약에서 정한 의미를 가지며, 이 때 주식매매계약상 대상회사는 발행회사, 매도인들은 발행회사 등, 매수인은 인수인을 각 의미하는 것으로 본다.",
+      "found_by_paragraph_path": false,
+      "diagnosis": "text_not_in_index",
+      "detail": "no item in this family carries this verbatim for this document — never stored, or the wording was rewritten on re-extraction",
+      "probe_hits": 1
+    },
+    {
+      "gt_id": "01ccec5cdb2f5128:RW:17",
+      "file_key": "01ccec5cdb2f5128",
+      "family": "RW",
+      "ctype": "SSA",
+      "taxonomy_id": "RW.CAPITALIZATION",
+      "polarity": "affirmative",
+      "loc": [
+        77,
+        77
+      ],
+      "proposition": "Representation and warranty classified as RW.CAPITALIZATION.",
+      "verbatim": "본 계약에서 정하는 내용과 조건에 따라, 발행회사는 본건 주식을 인수인에게 제3자 배정방식으로 발행하며, 인수인은 본건 주식을 인수한다.",
+      "found_by_paragraph_path": false,
+      "diagnosis": "text_not_in_index",
+      "detail": "no item in this family carries this verbatim for this document — never stored, or the wording was rewritten on re-extraction",
+      "probe_hits": 1
+    },
+    {
+      "gt_id": "01ccec5cdb2f5128:RW:18",
+      "file_key": "01ccec5cdb2f5128",
+      "family": "RW",
+      "ctype": "SSA",
+      "taxonomy_id": "RW.CONTRACTS",
+      "polarity": "affirmative",
+      "loc": [
+        77,
+        77
+      ],
+      "proposition": "Representation and warranty classified as RW.CONTRACTS.",
+      "verbatim": "본 계약에서 정하는 내용과 조건에 따라, 발행회사는 본건 주식을 인수인에게 제3자 배정방식으로 발행하며, 인수인은 본건 주식을 인수한다.",
+      "found_by_paragraph_path": false,
+      "diagnosis": "text_not_in_index",
+      "detail": "no item in this family carries this verbatim for this document — never stored, or the wording was rewritten on re-extraction",
+      "probe_hits": 1
+    },
+    {
+      "gt_id": "01ccec5cdb2f5128:RW:19",
+      "file_key": "01ccec5cdb2f5128",
+      "family": "RW",
+      "ctype": "SSA",
+      "taxonomy_id": "RW.CAPITALIZATION",
+      "polarity": "affirmative",
+      "loc": [
+        79,
+        79
+      ],
+      "proposition": "Representation and warranty classified as RW.CAPITALIZATION.",
+      "verbatim": "본건 주식의 발행가액은 1주당 금 []원, 합계 금 []원(\"인수대금\")으로 한다.",
+      "found_by_paragraph_path": false,
+      "diagnosis": "taxonomy_mismatch",
+      "detail": "stored under a different node than the proofread answer key asserts",
+      "answer_key_taxonomy_id": "RW.CAPITALIZATION",
+      "stored_taxonomy_ids": [
+        "RW"
+      ]
+    },
+    {
+      "gt_id": "01ccec5cdb2f5128:RW:20",
+      "file_key": "01ccec5cdb2f5128",
+      "family": "RW",
+      "ctype": "SSA",
+      "taxonomy_id": "RW.AUTHORITY",
+      "polarity": "affirmative",
+      "loc": [
+        82,
+        82
+      ],
+      "proposition": "Representation and warranty classified as RW.AUTHORITY.",
+      "verbatim": "이해관계인은 기준일로부터 본 계약 체결일까지 발행회사에 어떠한 사외유출도 발생하지 않았다는 점을 진술 및 보장하고, 본 계약 체결일로부터 거래종결일까지 발행회사에 어떠한 사외유출도 발생하지 않도록 할 것임을 확약한다.",
+      "found_by_paragraph_path": false,
+      "diagnosis": "text_not_in_index",
+      "detail": "no item in this family carries this verbatim for this document — never stored, or the wording was rewritten on re-extraction",
+      "probe_hits": 0
+    },
+    {
+      "gt_id": "01ccec5cdb2f5128:RW:21",
+      "file_key": "01ccec5cdb2f5128",
+      "family": "RW",
+      "ctype": "SSA",
+      "taxonomy_id": "RW.CONTRACTS",
+      "polarity": "affirmative",
+      "loc": [
+        82,
+        82
+      ],
+      "proposition": "Representation and warranty classified as RW.CONTRACTS.",
+      "verbatim": "이해관계인은 기준일로부터 본 계약 체결일까지 발행회사에 어떠한 사외유출도 발생하지 않았다는 점을 진술 및 보장하고, 본 계약 체결일로부터 거래종결일까지 발행회사에 어떠한 사외유출도 발생하지 않도록 할 것임을 확약한다.",
+      "found_by_paragraph_path": false,
+      "diagnosis": "text_not_in_index",
+      "detail": "no item in this family carries this verbatim for this document — never stored, or the wording was rewritten on re-extraction",
+      "probe_hits": 0
+    },
+    {
+      "gt_id": "01ccec5cdb2f5128:RW:22",
+      "file_key": "01ccec5cdb2f5128",
+      "family": "RW",
+      "ctype": "SSA",
+      "taxonomy_id": "RW.CAPITALIZATION",
+      "polarity": "none_exist",
+      "loc": [
+        84,
+        84
+      ],
+      "proposition": "Representation and warranty classified as RW.CAPITALIZATION.",
+      "verbatim": "기준일부터 거래종결일까지 사이에 발행회사에 사외유출이 발생할 경우, 이해관계인은 인수인으로부터 지급 요청을 받는 날로부터 [10] 영업일 이내에, 인수인에게 사외유출 금액에 거래종결일 현재 본건 주식의 지분율(본건 주식을 반영한 완전희석화 기준)을 곱한 금액 상당액을 상계, 감액, 원천징수 또는 공제 없이 현금으로 지급하여야 한다. 명확히 하면, 이해관계인의 인수인에 대한 사외유출 금액의 지",
+      "found_by_paragraph_path": false,
+      "diagnosis": "taxonomy_mismatch",
+      "detail": "stored under a different node than the proofread answer key asserts",
+      "answer_key_taxonomy_id": "RW.CAPITALIZATION",
+      "stored_taxonomy_ids": [
+        "RW.TAX.WITHHOLDING"
+      ]
+    },
+    {
+      "gt_id": "01ccec5cdb2f5128:RW:24",
+      "file_key": "01ccec5cdb2f5128",
+      "family": "RW",
+      "ctype": "SSA",
+      "taxonomy_id": "RW.COMPLIANCE",
+      "polarity": "affirmative",
+      "loc": [
+        86,
+        86
+      ],
+      "proposition": "Representation and warranty classified as RW.COMPLIANCE.",
+      "verbatim": "발행회사 및 이해관계인(\"발행회사 등\")은 사외유출이 발생하였다는 사실을 인지하였을 경우, 최대한 신속하게 이를 인수인에게 서면으로 통지하여야 한다.",
+      "found_by_paragraph_path": false,
+      "diagnosis": "text_not_in_index",
+      "detail": "no item in this family carries this verbatim for this document — never stored, or the wording was rewritten on re-extraction",
+      "probe_hits": 0
+    },
+    {
+      "gt_id": "01ccec5cdb2f5128:RW:25",
+      "file_key": "01ccec5cdb2f5128",
+      "family": "RW",
+      "ctype": "SSA",
+      "taxonomy_id": "RW.COMPLIANCE",
+      "polarity": "affirmative",
+      "loc": [
+        89,
+        89
+      ],
+      "proposition": "Representation and warranty classified as RW.COMPLIANCE.",
+      "verbatim": "본건 거래의 종결(\"거래종결\")은, 제5조에서 정한 거래종결의 선행조건(그 성격상 거래종결일에 충족되는 선행조건은 제외)이 모두 충족(선행조건의 충족을 면제한 경우를 포함함)된 날로부터 [5]영업일이 되는 날 [오전 10시] 또는 당사자들이 달리 합의하는 일시(\"거래종결일\")에, [서울 강남구 역삼동 646 소재 현대해상빌딩 17층 법무법인(유한) 태평양 회의실] 또는 당사자들이 달리 합의하",
+      "found_by_paragraph_path": false,
+      "diagnosis": "text_not_in_index",
+      "detail": "no item in this family carries this verbatim for this document — never stored, or the wording was rewritten on re-extraction",
+      "probe_hits": 2
+    },
+    {
+      "gt_id": "01ccec5cdb2f5128:RW:26",
+      "file_key": "01ccec5cdb2f5128",
+      "family": "RW",
+      "ctype": "SSA",
+      "taxonomy_id": "RW.AUTHORITY",
+      "polarity": "affirmative",
+      "loc": [
+        121,
+        121
+      ],
+      "proposition": "Representation and warranty classified as RW.AUTHORITY.",
+      "verbatim": "발행회사 등은 각자 그리고 연대하여 인수인에 대하여 별지 6.1에 규정된 사항이 본 계약 체결일 및 거래종결일 현재 (단, 별지 6.1에서 달리 명시된 경우에는 그 일자 현재 또는 기간 동안) 진실하고 정확함을 진술하고 보장한다.",
+      "found_by_paragraph_path": false,
+      "diagnosis": "taxonomy_mismatch",
+      "detail": "stored under a different node than the proofread answer key asserts",
+      "answer_key_taxonomy_id": "RW.AUTHORITY",
+      "stored_taxonomy_ids": [
+        "RW.DISCLOSURE.ACCURACY"
+      ]
+    },
+    {
+      "gt_id": "01ccec5cdb2f5128:RW:27",
+      "file_key": "01ccec5cdb2f5128",
+      "family": "RW",
+      "ctype": "SSA",
+      "taxonomy_id": "RW.COMPLIANCE",
+      "polarity": "affirmative",
+      "loc": [
+        121,
+        121
+      ],
+      "proposition": "Representation and warranty classified as RW.COMPLIANCE.",
+      "verbatim": "발행회사 등은 각자 그리고 연대하여 인수인에 대하여 별지 6.1에 규정된 사항이 본 계약 체결일 및 거래종결일 현재 (단, 별지 6.1에서 달리 명시된 경우에는 그 일자 현재 또는 기간 동안) 진실하고 정확함을 진술하고 보장한다.",
+      "found_by_paragraph_path": false
+    },
+    {
+      "gt_id": "01ccec5cdb2f5128:RW:28",
+      "file_key": "01ccec5cdb2f5128",
+      "family": "RW",
+      "ctype": "SSA",
+      "taxonomy_id": "RW.CONTRACTS",
+      "polarity": "affirmative",
+      "loc": [
+        121,
+        121
+      ],
+      "proposition": "Representation and warranty classified as RW.CONTRACTS.",
+      "verbatim": "발행회사 등은 각자 그리고 연대하여 인수인에 대하여 별지 6.1에 규정된 사항이 본 계약 체결일 및 거래종결일 현재 (단, 별지 6.1에서 달리 명시된 경우에는 그 일자 현재 또는 기간 동안) 진실하고 정확함을 진술하고 보장한다.",
+      "found_by_paragraph_path": false
+    },
+    {
+      "gt_id": "01ccec5cdb2f5128:RW:29",
+      "file_key": "01ccec5cdb2f5128",
+      "family": "RW",
+      "ctype": "SSA",
+      "taxonomy_id": "RW.BUYER",
+      "polarity": "affirmative",
+      "loc": [
+        123,
+        123
+      ],
+      "proposition": "Representation and warranty classified as RW.BUYER.",
+      "verbatim": "인수인은 발행회사에 대하여, 본 계약 체결일 및 거래종결일 현재(단, 본 조에서 달리 명시된 경우에는 그 일자 현재 또는 기간 동안) 다음의 사항이 진실하고 정확함을 진술하고 보장한다.",
+      "found_by_paragraph_path": false
+    },
+    {
+      "gt_id": "01ccec5cdb2f5128:RW:30",
+      "file_key": "01ccec5cdb2f5128",
+      "family": "RW",
+      "ctype": "SSA",
+      "taxonomy_id": "RW.BUYER",
+      "polarity": "affirmative",
+      "loc": [
+        124,
+        124
+      ],
+      "proposition": "Representation and warranty classified as RW.BUYER.",
+      "verbatim": "인수인은 대한민국 법률에 따라 적법하게 설립되어 유효하게 존속하는 법인이다.",
+      "found_by_paragraph_path": false
+    },
+    {
+      "gt_id": "01ccec5cdb2f5128:RW:31",
+      "file_key": "01ccec5cdb2f5128",
+      "family": "RW",
+      "ctype": "SSA",
+      "taxonomy_id": "RW.BUYER",
+      "polarity": "affirmative",
+      "loc": [
+        125,
+        125
+      ],
+      "proposition": "Representation and warranty classified as RW.BUYER.",
+      "verbatim": "인수인은 본 계약을 체결하고 본 계약에 따른 의무를 이행하기 위하여 필요한 권한과 능력을 가지고 있다.",
+      "found_by_paragraph_path": false
+    },
+    {
+      "gt_id": "01ccec5cdb2f5128:RW:32",
+      "file_key": "01ccec5cdb2f5128",
+      "family": "RW",
+      "ctype": "SSA",
+      "taxonomy_id": "RW.BUYER",
+      "polarity": "affirmative",
+      "loc": [
+        126,
+        126
+      ],
+      "proposition": "Representation and warranty classified as RW.BUYER.",
+      "verbatim": "인수인은 본 계약을 체결하고 본 계약에 따른 의무를 이행하기 위하여 필요한 결의 등 유효하고 적법한 내부수권절차를 모두 거쳤다.",
+      "found_by_paragraph_path": false
+    },
+    {
+      "gt_id": "01ccec5cdb2f5128:RW:33",
+      "file_key": "01ccec5cdb2f5128",
+      "family": "RW",
+      "ctype": "SSA",
+      "taxonomy_id": "RW.BUYER",
+      "polarity": "none_exist",
+      "loc": [
+        127,
+        127
+      ],
+      "proposition": "Representation and warranty classified as RW.BUYER.",
+      "verbatim": "인수인이 본 계약을 체결하고 본 계약에 따른 의무를 이행하는 것은 (i) 인수인의 정관 등의 조직서류나 주주총회 또는 이사회 결의, (ii) 인수인에게 적용되는 법률, (iii) 인수인이 당사자인 계약이나 약정에 위반 또는 의무불이행을 구성하거나 기한의 이익을 상실시키지 아니한다(상대방 계약 당사자, 채권 또는 제3자의 통지나 일정 기간의 경과시 위반 또는 의무불이행을 구성하거나 기한의 이익",
+      "found_by_paragraph_path": false
+    },
+    {
+      "gt_id": "01ccec5cdb2f5128:RW:34",
+      "file_key": "01ccec5cdb2f5128",
+      "family": "RW",
+      "ctype": "SSA",
+      "taxonomy_id": "RW.BUYER",
+      "polarity": "none_exist",
+      "loc": [
+        128,
+        128
+      ],
+      "proposition": "Representation and warranty classified as RW.BUYER.",
+      "verbatim": "인수인이 본 계약을 체결하고 본 계약에 따른 의무를 이행하는 것에 정부기관 인허가나 제3자의 동의나 승인은 요구되지 아니한다. 인수인에 대하여 본건 거래를 금지하거나 제한하는 내용의 소송은 제기되지 아니하였고, 인수인이 알고 있는 한 그러한 소송이 제기될 우려도 없다.",
+      "found_by_paragraph_path": false
+    },
+    {
+      "gt_id": "01ccec5cdb2f5128:RW:35",
+      "file_key": "01ccec5cdb2f5128",
+      "family": "RW",
+      "ctype": "SSA",
+      "taxonomy_id": "RW.BUYER",
+      "polarity": "affirmative",
+      "loc": [
+        129,
+        129
+      ],
+      "proposition": "Representation and warranty classified as RW.BUYER.",
+      "verbatim": "본 계약은 인수인에 의하여 적법하게 체결되어 구속력이 있으며, 인수인에 대하여 본 계약의 조건들에 따라 집행 가능하다",
+      "found_by_paragraph_path": false
+    },
+    {
+      "gt_id": "01ccec5cdb2f5128:RW:36",
+      "file_key": "01ccec5cdb2f5128",
+      "family": "RW",
+      "ctype": "SSA",
+      "taxonomy_id": "RW.AUTHORITY",
+      "polarity": "affirmative",
+      "loc": [
+        131,
+        131
+      ],
+      "proposition": "Representation and warranty classified as RW.AUTHORITY.",
+      "verbatim": "이해관계인은 인수인에 대하여, 본 계약 체결일 및 거래종결일 현재(단, 본 조에서 달리 명시된 경우에는 그 일자 현재 또는 기간 동안) 다음의 사항이 진실하고 정확함을 진술하고 보장한다.",
+      "found_by_paragraph_path": false
+    },
+    {
+      "gt_id": "01ccec5cdb2f5128:RW:37",
+      "file_key": "01ccec5cdb2f5128",
+      "family": "RW",
+      "ctype": "SSA",
+      "taxonomy_id": "RW.COMPLIANCE",
+      "polarity": "affirmative",
+      "loc": [
+        131,
+        131
+      ],
+      "proposition": "Representation and warranty classified as RW.COMPLIANCE.",
+      "verbatim": "이해관계인은 인수인에 대하여, 본 계약 체결일 및 거래종결일 현재(단, 본 조에서 달리 명시된 경우에는 그 일자 현재 또는 기간 동안) 다음의 사항이 진실하고 정확함을 진술하고 보장한다.",
+      "found_by_paragraph_path": false
+    },
+    {
+      "gt_id": "01ccec5cdb2f5128:RW:38",
+      "file_key": "01ccec5cdb2f5128",
+      "family": "RW",
+      "ctype": "SSA",
+      "taxonomy_id": "RW.CONTRACTS",
+      "polarity": "affirmative",
+      "loc": [
+        131,
+        131
+      ],
+      "proposition": "Representation and warranty classified as RW.CONTRACTS.",
+      "verbatim": "이해관계인은 인수인에 대하여, 본 계약 체결일 및 거래종결일 현재(단, 본 조에서 달리 명시된 경우에는 그 일자 현재 또는 기간 동안) 다음의 사항이 진실하고 정확함을 진술하고 보장한다.",
+      "found_by_paragraph_path": false
+    },
+    {
+      "gt_id": "01ccec5cdb2f5128:RW:39",
+      "file_key": "01ccec5cdb2f5128",
+      "family": "RW",
+      "ctype": "SSA",
+      "taxonomy_id": "RW.LITIGATION",
+      "polarity": "none_exist",
+      "loc": [
+        331,
+        331
+      ],
+      "proposition": "Representation and warranty classified as RW.LITIGATION.",
+      "verbatim": "발행회사는 본 계약 체결일 및 거래종결일까지 부과되고 납기가 도래한 조세(관세, 부담금, 가산세, 가산금 및 조세의 미납 또는 지연 납부로 인해 부과된 과태료, 벌금을 포함하나 이에 한정되지 않음, 이하 항에서 동일)를 관련 법률에 따라 적법하게 정부기관에 모두 납부하였고, 발행회사가 관련 법률에 따라 원천징수의무를 부담하는 조세는 모두 적법하게 원천징수하여 정부기관에 납부하였다. 발행회사는",
+      "found_by_paragraph_path": false
+    },
+    {
+      "gt_id": "01ccec5cdb2f5128:RW:40",
+      "file_key": "01ccec5cdb2f5128",
+      "family": "RW",
+      "ctype": "SSA",
+      "taxonomy_id": "RW.TAX",
+      "polarity": "none_exist",
+      "loc": [
+        331,
+        331
+      ],
+      "proposition": "Representation and warranty classified as RW.TAX.",
+      "verbatim": "발행회사는 본 계약 체결일 및 거래종결일까지 부과되고 납기가 도래한 조세(관세, 부담금, 가산세, 가산금 및 조세의 미납 또는 지연 납부로 인해 부과된 과태료, 벌금을 포함하나 이에 한정되지 않음, 이하 항에서 동일)를 관련 법률에 따라 적법하게 정부기관에 모두 납부하였고, 발행회사가 관련 법률에 따라 원천징수의무를 부담하는 조세는 모두 적법하게 원천징수하여 정부기관에 납부하였다. 발행회사는",
+      "found_by_paragraph_path": false
+    },
+    {
+      "gt_id": "01ccec5cdb2f5128:RW:41",
+      "file_key": "01ccec5cdb2f5128",
+      "family": "RW",
+      "ctype": "SSA",
+      "taxonomy_id": "RW.COMPLIANCE",
+      "polarity": "none_exist",
+      "loc": [
+        333,
+        333
+      ],
+      "proposition": "Representation and warranty classified as RW.COMPLIANCE.",
+      "verbatim": "발행회사는 환경(대기, 수질, 토양, 폐기물, 소음, 진동, 해양, 유해물질 관리, 비산먼지, 비점오염원, 악취 등 포함, 이하 같음), 보건, 안전과 관련하여 모든 관련 법률을 준수하고 있으며, 그 관련 법률상 발행회사의 사업운영에 필요한 모든 정부기관 인허가를 적법하게 취득하였고 이를 계속적으로 유효하게 보유하고 있으며, 그 관련 법률상 요구사항 준수를 위하여 추가적인 설비투자가 필요하지",
+      "found_by_paragraph_path": false
+    }
+  ],
+  "concepts": [
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.AUTHORITY",
+      "query_label": "권한·구속력",
+      "query_terms": [
+        "권한·구속력",
+        "Authority and enforceability",
+        "적법한 설립"
+      ],
+      "gt_items": 1514,
+      "structured": {
+        "found": 311,
+        "population": 10861,
+        "scanned": 2000,
+        "exhausted": false,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 18,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "PAY",
+      "taxonomy_id": "PAY.BASE_PRICE",
+      "query_label": "기본 매매대금",
+      "query_terms": [
+        "기본 매매대금",
+        "Base purchase price",
+        "base consideration"
+      ],
+      "gt_items": 1496,
+      "structured": {
+        "found": 1496,
+        "population": 1608,
+        "scanned": 1608,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 74,
+        "scanned": 192,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.BUYER",
+      "query_label": "매수인 관련 진술보장",
+      "query_terms": [
+        "매수인 관련 진술보장",
+        "Buyer representations",
+        "purchaser representations"
+      ],
+      "gt_items": 1348,
+      "structured": {
+        "found": 401,
+        "population": 6142,
+        "scanned": 2000,
+        "exhausted": false,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 18,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "PAY",
+      "taxonomy_id": "PAY.CLOSING_MECHANICS",
+      "query_label": "거래종결 시기·장소·절차",
+      "query_terms": [
+        "거래종결 시기·장소·절차",
+        "Closing time, place and mechanics",
+        "closing time and place"
+      ],
+      "gt_items": 793,
+      "structured": {
+        "found": 793,
+        "population": 962,
+        "scanned": 962,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 0,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.CAPITALIZATION",
+      "query_label": "자본구조",
+      "query_terms": [
+        "자본구조",
+        "Capitalization",
+        "capital structure"
+      ],
+      "gt_items": 777,
+      "structured": {
+        "found": 278,
+        "population": 4930,
+        "scanned": 2000,
+        "exhausted": false,
+        "error": null
+      },
+      "item_text": {
+        "found": 47,
+        "scanned": 585,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 16,
+        "document_level": 51,
+        "error": null
+      }
+    },
+    {
+      "family": "PAY",
+      "taxonomy_id": "PAY.CLOSING_PAYMENT",
+      "query_label": "종결 지급",
+      "query_terms": [
+        "종결 지급",
+        "Closing payment"
+      ],
+      "gt_items": 761,
+      "structured": {
+        "found": 761,
+        "population": 1464,
+        "scanned": 1464,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 48,
+        "scanned": 292,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 1,
+        "document_level": 2,
+        "error": null
+      }
+    },
+    {
+      "family": "PAY",
+      "taxonomy_id": "PAY.COMPLETION_ACCOUNTS",
+      "query_label": "종결계정 조정",
+      "query_terms": [
+        "종결계정 조정",
+        "Completion accounts",
+        "closing statement"
+      ],
+      "gt_items": 751,
+      "structured": {
+        "found": 751,
+        "population": 1076,
+        "scanned": 1076,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 113,
+        "scanned": 273,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.CONTRACTS",
+      "query_label": "중요계약",
+      "query_terms": [
+        "중요계약",
+        "Material contracts",
+        "중요한 계약"
+      ],
+      "gt_items": 751,
+      "structured": {
+        "found": 336,
+        "population": 2825,
+        "scanned": 2000,
+        "exhausted": false,
+        "error": null
+      },
+      "item_text": {
+        "found": 128,
+        "scanned": 1648,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 19,
+        "document_level": 60,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.COMPLIANCE",
+      "query_label": "법규준수·반부패",
+      "query_terms": [
+        "법규준수·반부패",
+        "Compliance and anti-corruption",
+        "compliance with laws"
+      ],
+      "gt_items": 725,
+      "structured": {
+        "found": 429,
+        "population": 2356,
+        "scanned": 2000,
+        "exhausted": false,
+        "error": null
+      },
+      "item_text": {
+        "found": 5,
+        "scanned": 111,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "PAY",
+      "taxonomy_id": "PAY.DEPOSIT",
+      "query_label": "계약금·중도금",
+      "query_terms": [
+        "계약금·중도금",
+        "Deposit and interim payment",
+        "down payment"
+      ],
+      "gt_items": 719,
+      "structured": {
+        "found": 719,
+        "population": 1140,
+        "scanned": 1140,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 1,
+        "scanned": 9,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.FINANCIAL",
+      "query_label": "재무",
+      "query_terms": [
+        "Financial statements",
+        "재무제표"
+      ],
+      "gt_items": 632,
+      "structured": {
+        "found": 327,
+        "population": 3624,
+        "scanned": 2000,
+        "exhausted": false,
+        "error": null
+      },
+      "item_text": {
+        "found": 280,
+        "scanned": 3334,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 39,
+        "document_level": 65,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.LITIGATION",
+      "query_label": "소송·분쟁",
+      "query_terms": [
+        "소송·분쟁",
+        "Litigation",
+        "legal proceedings"
+      ],
+      "gt_items": 592,
+      "structured": {
+        "found": 223,
+        "population": 4692,
+        "scanned": 2000,
+        "exhausted": false,
+        "error": null
+      },
+      "item_text": {
+        "found": 29,
+        "scanned": 582,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.TAX",
+      "query_label": "RW.TAX",
+      "query_terms": [
+        "Tax",
+        "tax matters"
+      ],
+      "gt_items": 429,
+      "structured": {
+        "found": 329,
+        "population": 2493,
+        "scanned": 2000,
+        "exhausted": false,
+        "error": null
+      },
+      "item_text": {
+        "found": 251,
+        "scanned": 1961,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 11,
+        "document_level": 27,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.IP",
+      "query_label": "지식재산",
+      "query_terms": [
+        "지식재산",
+        "Intellectual property"
+      ],
+      "gt_items": 423,
+      "structured": {
+        "found": 398,
+        "population": 1738,
+        "scanned": 1738,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 228,
+        "scanned": 1585,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 15,
+        "document_level": 17,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.PERMITS",
+      "query_label": "인허가",
+      "query_terms": [
+        "인허가",
+        "Permits",
+        "licenses and permits"
+      ],
+      "gt_items": 416,
+      "structured": {
+        "found": 294,
+        "population": 2150,
+        "scanned": 2000,
+        "exhausted": false,
+        "error": null
+      },
+      "item_text": {
+        "found": 151,
+        "scanned": 2741,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 10,
+        "document_level": 18,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.ASSETS",
+      "query_label": "자산",
+      "query_terms": [
+        "Assets",
+        "title to assets",
+        "자산 소유권"
+      ],
+      "gt_items": 404,
+      "structured": {
+        "found": 280,
+        "population": 2167,
+        "scanned": 2000,
+        "exhausted": false,
+        "error": null
+      },
+      "item_text": {
+        "found": 58,
+        "scanned": 2016,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 26,
+        "document_level": 56,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.LABOR",
+      "query_label": "인사·노무",
+      "query_terms": [
+        "인사·노무",
+        "Labor and employment",
+        "인사노무"
+      ],
+      "gt_items": 400,
+      "structured": {
+        "found": 281,
+        "population": 2453,
+        "scanned": 2000,
+        "exhausted": false,
+        "error": null
+      },
+      "item_text": {
+        "found": 17,
+        "scanned": 440,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 3,
+        "document_level": 5,
+        "error": null
+      }
+    },
+    {
+      "family": "PAY",
+      "taxonomy_id": "PAY.LOCKED_BOX",
+      "query_label": "Locked-box",
+      "query_terms": [
+        "Locked-box",
+        "Locked box",
+        "leakage amount"
+      ],
+      "gt_items": 387,
+      "structured": {
+        "found": 387,
+        "population": 389,
+        "scanned": 389,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 363,
+        "scanned": 456,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 242,
+        "document_level": 280,
+        "error": null
+      }
+    },
+    {
+      "family": "PAY",
+      "taxonomy_id": "PAY.WITHHOLDING",
+      "query_label": "원천징수·공제",
+      "query_terms": [
+        "원천징수·공제",
+        "Withholding",
+        "deduction and withholding"
+      ],
+      "gt_items": 337,
+      "structured": {
+        "found": 337,
+        "population": 463,
+        "scanned": 463,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 329,
+        "scanned": 668,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "PAY",
+      "taxonomy_id": "PAY.INTEREST",
+      "query_label": "이자",
+      "query_terms": [
+        "Interest",
+        "default interest",
+        "지연이자"
+      ],
+      "gt_items": 336,
+      "structured": {
+        "found": 336,
+        "population": 388,
+        "scanned": 388,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 336,
+        "scanned": 853,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 6,
+        "document_level": 10,
+        "error": null
+      }
+    },
+    {
+      "family": "PAY",
+      "taxonomy_id": "PAY.TRUE_UP_DEADLINE",
+      "query_label": "정산금 지급기한",
+      "query_terms": [
+        "정산금 지급기한",
+        "True-up payment deadline",
+        "adjustment payment deadline"
+      ],
+      "gt_items": 327,
+      "structured": {
+        "found": 327,
+        "population": 327,
+        "scanned": 327,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 0,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.REAL_ESTATE",
+      "query_label": "부동산",
+      "query_terms": [
+        "부동산",
+        "Real estate",
+        "real property"
+      ],
+      "gt_items": 258,
+      "structured": {
+        "found": 239,
+        "population": 1223,
+        "scanned": 1223,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 182,
+        "scanned": 2151,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 7,
+        "document_level": 8,
+        "error": null
+      }
+    },
+    {
+      "family": "PAY",
+      "taxonomy_id": "PAY.ESCROW",
+      "query_label": "에스크로·유보",
+      "query_terms": [
+        "에스크로·유보",
+        "Escrow and holdback",
+        "holdback"
+      ],
+      "gt_items": 251,
+      "structured": {
+        "found": 251,
+        "population": 460,
+        "scanned": 460,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 6,
+        "scanned": 63,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.ABSENCE_OF_CHANGES",
+      "query_label": "중요 변경·변동 부재",
+      "query_terms": [
+        "중요 변경·변동 부재",
+        "Absence of changes",
+        "absence of certain changes"
+      ],
+      "gt_items": 244,
+      "structured": {
+        "found": 218,
+        "population": 1368,
+        "scanned": 1368,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 6,
+        "scanned": 107,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.BENEFITS",
+      "query_label": "복리후생·연금",
+      "query_terms": [
+        "복리후생·연금",
+        "Benefits and pensions",
+        "employee benefit plans"
+      ],
+      "gt_items": 239,
+      "structured": {
+        "found": 218,
+        "population": 396,
+        "scanned": 396,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 37,
+        "scanned": 205,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "PAY",
+      "taxonomy_id": "PAY.ALLOCATION",
+      "query_label": "대금배분",
+      "query_terms": [
+        "대금배분",
+        "Purchase price allocation",
+        "allocation schedule"
+      ],
+      "gt_items": 237,
+      "structured": {
+        "found": 237,
+        "population": 238,
+        "scanned": 238,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 2,
+        "scanned": 13,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "PAY",
+      "taxonomy_id": "PAY.TRANSACTION_COSTS",
+      "query_label": "거래 관련 세금·비용 부담",
+      "query_terms": [
+        "거래 관련 세금·비용 부담",
+        "Transaction taxes and expenses allocation",
+        "each party bears its own costs"
+      ],
+      "gt_items": 193,
+      "structured": {
+        "found": 193,
+        "population": 244,
+        "scanned": 244,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 0,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "PAY",
+      "taxonomy_id": "PAY.SETOFF",
+      "query_label": "상계",
+      "query_terms": [
+        "Set-off",
+        "setoff"
+      ],
+      "gt_items": 189,
+      "structured": {
+        "found": 189,
+        "population": 450,
+        "scanned": 450,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 180,
+        "scanned": 369,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 15,
+        "document_level": 16,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.RELATED_PARTY",
+      "query_label": "특수관계인 거래",
+      "query_terms": [
+        "특수관계인 거래",
+        "Related-party transactions",
+        "affiliate transactions"
+      ],
+      "gt_items": 175,
+      "structured": {
+        "found": 140,
+        "population": 625,
+        "scanned": 625,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 27,
+        "scanned": 487,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 3,
+        "document_level": 14,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.ENVIRONMENT",
+      "query_label": "환경",
+      "query_terms": [
+        "Environmental",
+        "environmental matters",
+        "환경법"
+      ],
+      "gt_items": 162,
+      "structured": {
+        "found": 146,
+        "population": 1429,
+        "scanned": 1429,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 83,
+        "scanned": 886,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 33,
+        "document_level": 37,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.INSURANCE",
+      "query_label": "보험",
+      "query_terms": [
+        "Insurance",
+        "insurance policies",
+        "보험계약"
+      ],
+      "gt_items": 156,
+      "structured": {
+        "found": 135,
+        "population": 975,
+        "scanned": 975,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 108,
+        "scanned": 1786,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 20,
+        "document_level": 24,
+        "error": null
+      }
+    },
+    {
+      "family": "PAY",
+      "taxonomy_id": "PAY.ESCROW.RELEASE",
+      "query_label": "에스크로 해제·분배",
+      "query_terms": [
+        "에스크로 해제·분배",
+        "Escrow release mechanics",
+        "escrow release"
+      ],
+      "gt_items": 145,
+      "structured": {
+        "found": 145,
+        "population": 209,
+        "scanned": 209,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 4,
+        "scanned": 7,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.PRIVACY",
+      "query_label": "개인정보",
+      "query_terms": [
+        "개인정보",
+        "Privacy and data",
+        "data privacy"
+      ],
+      "gt_items": 97,
+      "structured": {
+        "found": 89,
+        "population": 249,
+        "scanned": 249,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 40,
+        "scanned": 507,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 3,
+        "document_level": 3,
+        "error": null
+      }
+    },
+    {
+      "family": "PAY",
+      "taxonomy_id": "PAY.DISPUTE_ACCOUNTANT",
+      "query_label": "독립회계인 결정",
+      "query_terms": [
+        "독립회계인 결정",
+        "Independent accountant",
+        "accounting referee"
+      ],
+      "gt_items": 94,
+      "structured": {
+        "found": 94,
+        "population": 96,
+        "scanned": 96,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 69,
+        "scanned": 79,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "PAY",
+      "taxonomy_id": "PAY.DEFERRED",
+      "query_label": "지급유예·분할지급",
+      "query_terms": [
+        "지급유예·분할지급",
+        "Deferred payment",
+        "deferred consideration"
+      ],
+      "gt_items": 93,
+      "structured": {
+        "found": 93,
+        "population": 96,
+        "scanned": 96,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 2,
+        "scanned": 13,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "PAY",
+      "taxonomy_id": "PAY.EQUITY_CONSIDERATION",
+      "query_label": "주식·지분 대가",
+      "query_terms": [
+        "주식·지분 대가",
+        "Equity consideration",
+        "share consideration"
+      ],
+      "gt_items": 72,
+      "structured": {
+        "found": 72,
+        "population": 72,
+        "scanned": 72,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 2,
+        "scanned": 2,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "PAY",
+      "taxonomy_id": "PAY.EARNOUT",
+      "query_label": "언아웃",
+      "query_terms": [
+        "언아웃",
+        "Earn-out",
+        "contingent consideration"
+      ],
+      "gt_items": 66,
+      "structured": {
+        "found": 66,
+        "population": 162,
+        "scanned": 162,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 53,
+        "scanned": 104,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 35,
+        "document_level": 37,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.PRODUCTS",
+      "query_label": "제품책임·리콜·보증",
+      "query_terms": [
+        "제품책임·리콜·보증",
+        "Products",
+        "product liability"
+      ],
+      "gt_items": 56,
+      "structured": {
+        "found": 50,
+        "population": 141,
+        "scanned": 141,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 22,
+        "scanned": 356,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "PAY",
+      "taxonomy_id": "PAY.EARNOUT.PAYMENT",
+      "query_label": "언아웃 지급구조",
+      "query_terms": [
+        "언아웃 지급구조",
+        "Earn-out payment mechanics",
+        "earn-out payment"
+      ],
+      "gt_items": 50,
+      "structured": {
+        "found": 50,
+        "population": 92,
+        "scanned": 92,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 7,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.CUSTOMERS_SUPPLIERS",
+      "query_label": "주요 고객·공급업체",
+      "query_terms": [
+        "주요 고객·공급업체",
+        "Key customers and suppliers",
+        "material customers"
+      ],
+      "gt_items": 35,
+      "structured": {
+        "found": 34,
+        "population": 260,
+        "scanned": 260,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 5,
+        "scanned": 15,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.DISCLOSURE.ACCURACY",
+      "query_label": "허위·부정확 기재 부재",
+      "query_terms": [
+        "허위·부정확 기재 부재",
+        "Accuracy of disclosed information",
+        "no false statement"
+      ],
+      "gt_items": 31,
+      "structured": {
+        "found": 31,
+        "population": 1839,
+        "scanned": 1839,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 0,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "PAY",
+      "taxonomy_id": "PAY.FX",
+      "query_label": "환율·통화환산",
+      "query_terms": [
+        "환율·통화환산",
+        "Foreign exchange",
+        "exchange rate"
+      ],
+      "gt_items": 19,
+      "structured": {
+        "found": 19,
+        "population": 25,
+        "scanned": 25,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 9,
+        "scanned": 44,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "PAY",
+      "taxonomy_id": "PAY.ROLLOVER",
+      "query_label": "재투자·롤오버",
+      "query_terms": [
+        "재투자·롤오버",
+        "Rollover",
+        "reinvestment"
+      ],
+      "gt_items": 19,
+      "structured": {
+        "found": 19,
+        "population": 20,
+        "scanned": 20,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 14,
+        "scanned": 32,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "PAY",
+      "taxonomy_id": "PAY.HOLDBACK",
+      "query_label": "대금 유보",
+      "query_terms": [
+        "대금 유보",
+        "Purchase-price holdback",
+        "purchase price holdback"
+      ],
+      "gt_items": 14,
+      "structured": {
+        "found": 14,
+        "population": 14,
+        "scanned": 14,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 0,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 12,
+        "document_level": 12,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.AUTHORITY.NO_CONFLICT",
+      "query_label": "충돌·위반 부재",
+      "query_terms": [
+        "충돌·위반 부재",
+        "No conflict"
+      ],
+      "gt_items": 12,
+      "structured": {
+        "found": 12,
+        "population": 2163,
+        "scanned": 2000,
+        "exhausted": false,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 238,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.LITIGATION.NO_PENDING",
+      "query_label": "계류 중 소송 부재",
+      "query_terms": [
+        "계류 중 소송 부재",
+        "No pending proceedings"
+      ],
+      "gt_items": 12,
+      "structured": {
+        "found": 12,
+        "population": 1870,
+        "scanned": 1870,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 1,
+        "scanned": 14,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.CAPITALIZATION.OWNERSHIP",
+      "query_label": "주식·지분 소유권",
+      "query_terms": [
+        "주식·지분 소유권",
+        "Share ownership"
+      ],
+      "gt_items": 9,
+      "structured": {
+        "found": 9,
+        "population": 581,
+        "scanned": 500,
+        "exhausted": false,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 9,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "PAY",
+      "taxonomy_id": "PAY.PAYING_AGENT",
+      "query_label": "지급대리인",
+      "query_terms": [
+        "지급대리인",
+        "Paying agent",
+        "payment agent"
+      ],
+      "gt_items": 8,
+      "structured": {
+        "found": 8,
+        "population": 8,
+        "scanned": 8,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 1,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.SOLVENCY",
+      "query_label": "지급능력·도산 부재",
+      "query_terms": [
+        "지급능력·도산 부재",
+        "Solvency",
+        "solvent"
+      ],
+      "gt_items": 8,
+      "structured": {
+        "found": 8,
+        "population": 588,
+        "scanned": 500,
+        "exhausted": false,
+        "error": null
+      },
+      "item_text": {
+        "found": 3,
+        "scanned": 1242,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "PAY",
+      "taxonomy_id": "PAY.MILESTONE",
+      "query_label": "마일스톤 지급",
+      "query_terms": [
+        "마일스톤 지급",
+        "Milestone payment",
+        "development milestone"
+      ],
+      "gt_items": 7,
+      "structured": {
+        "found": 7,
+        "population": 7,
+        "scanned": 7,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 0,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.AUTHORITY.AUTHORIZATION",
+      "query_label": "내부승인·수권",
+      "query_terms": [
+        "내부승인·수권",
+        "Authorization"
+      ],
+      "gt_items": 7,
+      "structured": {
+        "found": 7,
+        "population": 832,
+        "scanned": 832,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 2164,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.AUTHORITY.ORGANIZATION",
+      "query_label": "설립·존속",
+      "query_terms": [
+        "설립·존속",
+        "Organization and good standing"
+      ],
+      "gt_items": 7,
+      "structured": {
+        "found": 7,
+        "population": 929,
+        "scanned": 929,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 1,
+        "scanned": 86,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "PAY",
+      "taxonomy_id": "PAY.VAT",
+      "query_label": "부가가치세",
+      "query_terms": [
+        "부가가치세",
+        "VAT",
+        "value added tax"
+      ],
+      "gt_items": 6,
+      "structured": {
+        "found": 6,
+        "population": 8,
+        "scanned": 8,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 5,
+        "scanned": 110,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.AUTHORITY.ENFORCEABILITY",
+      "query_label": "유효성·구속력",
+      "query_terms": [
+        "유효성·구속력",
+        "Enforceability"
+      ],
+      "gt_items": 5,
+      "structured": {
+        "found": 5,
+        "population": 1194,
+        "scanned": 1000,
+        "exhausted": false,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 1619,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.AUTHORITY.POWER",
+      "query_label": "권리능력·행위능력",
+      "query_terms": [
+        "권리능력·행위능력",
+        "Power and capacity"
+      ],
+      "gt_items": 5,
+      "structured": {
+        "found": 5,
+        "population": 1332,
+        "scanned": 1332,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 11,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "PAY",
+      "taxonomy_id": "PAY.EARNOUT.DISPUTE",
+      "query_label": "언아웃 산정 분쟁절차",
+      "query_terms": [
+        "언아웃 산정 분쟁절차",
+        "Earn-out dispute procedure",
+        "earnout dispute"
+      ],
+      "gt_items": 4,
+      "structured": {
+        "found": 4,
+        "population": 4,
+        "scanned": 4,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 0,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.DISCLOSURE",
+      "query_label": "제공정보의 진실성",
+      "query_terms": [
+        "제공정보의 진실성",
+        "Disclosure and information accuracy",
+        "full disclosure representation"
+      ],
+      "gt_items": 4,
+      "structured": {
+        "found": 4,
+        "population": 2232,
+        "scanned": 500,
+        "exhausted": false,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 0,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.CAPITALIZATION.AUTHORIZED_ISSUED",
+      "query_label": "수권·발행주식",
+      "query_terms": [
+        "수권·발행주식",
+        "Authorized and issued shares"
+      ],
+      "gt_items": 3,
+      "structured": {
+        "found": 3,
+        "population": 485,
+        "scanned": 485,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 10,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.TAX.WITHHOLDING",
+      "query_label": "RW.TAX.WITHHOLDING",
+      "query_terms": [
+        "원천징수",
+        "Tax withholding"
+      ],
+      "gt_items": 3,
+      "structured": {
+        "found": 3,
+        "population": 255,
+        "scanned": 255,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 3,
+        "scanned": 896,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "PAY",
+      "taxonomy_id": "PAY.SELLER_NOTE",
+      "query_label": "매도인 금융",
+      "query_terms": [
+        "매도인 금융",
+        "Seller financing",
+        "seller note"
+      ],
+      "gt_items": 2,
+      "structured": {
+        "found": 2,
+        "population": 2,
+        "scanned": 2,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 1,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.ASSETS.TITLE",
+      "query_label": "RW.ASSETS.TITLE",
+      "query_terms": [
+        "자산 소유권",
+        "Title to assets"
+      ],
+      "gt_items": 2,
+      "structured": {
+        "found": 2,
+        "population": 138,
+        "scanned": 138,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 16,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.AUTHORITY.NO_CONSENT",
+      "query_label": "추가 동의·승인 불요",
+      "query_terms": [
+        "추가 동의·승인 불요",
+        "No additional consent"
+      ],
+      "gt_items": 2,
+      "structured": {
+        "found": 2,
+        "population": 734,
+        "scanned": 734,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 0,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.BENEFITS.NO_ACCELERATION",
+      "query_label": "거래로 인한 급여 가속 부재",
+      "query_terms": [
+        "거래로 인한 급여 가속 부재",
+        "No benefit acceleration"
+      ],
+      "gt_items": 2,
+      "structured": {
+        "found": 2,
+        "population": 3,
+        "scanned": 3,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 0,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.CAPITALIZATION.NO_DILUTIVE_SECURITIES",
+      "query_label": "잠재주식·희석증권 부재",
+      "query_terms": [
+        "잠재주식·희석증권 부재",
+        "No dilutive securities"
+      ],
+      "gt_items": 2,
+      "structured": {
+        "found": 2,
+        "population": 3,
+        "scanned": 3,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 0,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.CAPITALIZATION.SUBSIDIARIES",
+      "query_label": "자회사·투자지분",
+      "query_terms": [
+        "자회사·투자지분",
+        "Subsidiaries and equity interests"
+      ],
+      "gt_items": 2,
+      "structured": {
+        "found": 2,
+        "population": 496,
+        "scanned": 496,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 0,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.COMPLIANCE.GENERAL",
+      "query_label": "일반 법규준수",
+      "query_terms": [
+        "일반 법규준수",
+        "General compliance with laws",
+        "compliance with applicable laws"
+      ],
+      "gt_items": 2,
+      "structured": {
+        "found": 2,
+        "population": 703,
+        "scanned": 500,
+        "exhausted": false,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 325,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.CONTRACTS.NO_CHANGE_CONTROL_EFFECT",
+      "query_label": "거래로 인한 계약상 불이익 부재",
+      "query_terms": [
+        "거래로 인한 계약상 불이익 부재",
+        "No change-of-control effect"
+      ],
+      "gt_items": 2,
+      "structured": {
+        "found": 2,
+        "population": 34,
+        "scanned": 34,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 0,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.CONTRACTS.NO_DEFAULT",
+      "query_label": "계약 위반·채무불이행 부재",
+      "query_terms": [
+        "계약 위반·채무불이행 부재",
+        "No contract default"
+      ],
+      "gt_items": 2,
+      "structured": {
+        "found": 2,
+        "population": 105,
+        "scanned": 105,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 0,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.CONTRACTS.VALID_BINDING",
+      "query_label": "계약 유효성·구속력",
+      "query_terms": [
+        "계약 유효성·구속력",
+        "Contract validity"
+      ],
+      "gt_items": 2,
+      "structured": {
+        "found": 2,
+        "population": 84,
+        "scanned": 84,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 0,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.ENVIRONMENT.COMPLIANCE",
+      "query_label": "환경법 준수",
+      "query_terms": [
+        "환경법 준수",
+        "Environmental compliance"
+      ],
+      "gt_items": 2,
+      "structured": {
+        "found": 2,
+        "population": 669,
+        "scanned": 500,
+        "exhausted": false,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 4,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.ENVIRONMENT.NO_CLAIMS",
+      "query_label": "환경청구·조사 부재",
+      "query_terms": [
+        "환경청구·조사 부재",
+        "No environmental claims"
+      ],
+      "gt_items": 2,
+      "structured": {
+        "found": 2,
+        "population": 70,
+        "scanned": 70,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 0,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.FINANCIAL.FAIR_PRESENTATION",
+      "query_label": "재무상태 적정표시",
+      "query_terms": [
+        "재무상태 적정표시",
+        "Fair presentation"
+      ],
+      "gt_items": 2,
+      "structured": {
+        "found": 2,
+        "population": 227,
+        "scanned": 227,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 1,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.FINANCIAL.NO_UNDISCLOSED_LIABILITIES",
+      "query_label": "미공개 채무 부재",
+      "query_terms": [
+        "미공개 채무 부재",
+        "No undisclosed liabilities",
+        "undisclosed liabilities"
+      ],
+      "gt_items": 2,
+      "structured": {
+        "found": 2,
+        "population": 132,
+        "scanned": 132,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 352,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.INSURANCE.ADEQUACY",
+      "query_label": "보험보장 적정성",
+      "query_terms": [
+        "보험보장 적정성",
+        "Adequacy of insurance"
+      ],
+      "gt_items": 2,
+      "structured": {
+        "found": 2,
+        "population": 106,
+        "scanned": 106,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 0,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.INVENTORY.ADEQUACY",
+      "query_label": "재고 수량·구성 적정성",
+      "query_terms": [
+        "재고 수량·구성 적정성",
+        "Inventory quantity and mix",
+        "adequate inventory"
+      ],
+      "gt_items": 2,
+      "structured": {
+        "found": 2,
+        "population": 3,
+        "scanned": 3,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 0,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.IP.EMPLOYEE_ASSIGNMENT",
+      "query_label": "임직원 발명·권리양도",
+      "query_terms": [
+        "임직원 발명·권리양도",
+        "Employee IP assignment"
+      ],
+      "gt_items": 2,
+      "structured": {
+        "found": 2,
+        "population": 70,
+        "scanned": 70,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 3,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.IP.NO_INFRINGEMENT",
+      "query_label": "제3자 권리 비침해",
+      "query_terms": [
+        "제3자 권리 비침해",
+        "No infringement by company"
+      ],
+      "gt_items": 2,
+      "structured": {
+        "found": 2,
+        "population": 84,
+        "scanned": 84,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 2,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.IP.OWNERSHIP",
+      "query_label": "지식재산권 소유권",
+      "query_terms": [
+        "지식재산권 소유권",
+        "IP ownership"
+      ],
+      "gt_items": 2,
+      "structured": {
+        "found": 2,
+        "population": 125,
+        "scanned": 125,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 1,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.IP.TRADE_SECRETS",
+      "query_label": "영업비밀 보호",
+      "query_terms": [
+        "영업비밀 보호",
+        "Trade secrets"
+      ],
+      "gt_items": 2,
+      "structured": {
+        "found": 2,
+        "population": 65,
+        "scanned": 65,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 1,
+        "scanned": 206,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.LABOR.CLASSIFICATION",
+      "query_label": "근로자 분류",
+      "query_terms": [
+        "근로자 분류",
+        "Worker classification",
+        "independent contractor classification"
+      ],
+      "gt_items": 2,
+      "structured": {
+        "found": 2,
+        "population": 67,
+        "scanned": 67,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 28,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.LABOR.WORKING_CONDITIONS",
+      "query_label": "근로조건 준수",
+      "query_terms": [
+        "근로조건 준수",
+        "Compliance with working conditions",
+        "근로기준 준수"
+      ],
+      "gt_items": 2,
+      "structured": {
+        "found": 2,
+        "population": 71,
+        "scanned": 71,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 0,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.PERMITS.ALL_REQUIRED",
+      "query_label": "필수 인허가 보유",
+      "query_terms": [
+        "필수 인허가 보유",
+        "All required permits"
+      ],
+      "gt_items": 2,
+      "structured": {
+        "found": 2,
+        "population": 516,
+        "scanned": 500,
+        "exhausted": false,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 7,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.RELATED_PARTY.NO_TRANSACTION",
+      "query_label": "미공개 특수관계인 거래 부재",
+      "query_terms": [
+        "미공개 특수관계인 거래 부재",
+        "No undisclosed related-party transaction"
+      ],
+      "gt_items": 2,
+      "structured": {
+        "found": 2,
+        "population": 4,
+        "scanned": 4,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 0,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.TAX.NO_AUDIT",
+      "query_label": "세무조사 부재",
+      "query_terms": [
+        "세무조사 부재",
+        "No tax audit"
+      ],
+      "gt_items": 2,
+      "structured": {
+        "found": 2,
+        "population": 20,
+        "scanned": 20,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 7,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.TAX.PAID",
+      "query_label": "조세납부",
+      "query_terms": [
+        "조세납부",
+        "Taxes paid"
+      ],
+      "gt_items": 2,
+      "structured": {
+        "found": 2,
+        "population": 632,
+        "scanned": 500,
+        "exhausted": false,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 5,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.TAX.RETURNS_FILED",
+      "query_label": "RW.TAX.RETURNS_FILED",
+      "query_terms": [
+        "조세신고",
+        "Tax returns filed"
+      ],
+      "gt_items": 2,
+      "structured": {
+        "found": 2,
+        "population": 201,
+        "scanned": 201,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 51,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.ACCOUNTS_RECEIVABLE.COLLECTIBILITY",
+      "query_label": "매출채권 회수가능성",
+      "query_terms": [
+        "매출채권 회수가능성",
+        "Collectibility of accounts receivable",
+        "collectible receivables"
+      ],
+      "gt_items": 1,
+      "structured": {
+        "found": 1,
+        "population": 2,
+        "scanned": 2,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 8,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.ASSETS.CONDITION",
+      "query_label": "자산 상태",
+      "query_terms": [
+        "자산 상태",
+        "Condition of assets"
+      ],
+      "gt_items": 1,
+      "structured": {
+        "found": 1,
+        "population": 114,
+        "scanned": 114,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 0,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.ASSETS.NO_ENCUMBRANCE",
+      "query_label": "자산 제한부담 부재",
+      "query_terms": [
+        "자산 제한부담 부재",
+        "No asset encumbrance"
+      ],
+      "gt_items": 1,
+      "structured": {
+        "found": 1,
+        "population": 92,
+        "scanned": 92,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 0,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.BUYER.SUFFICIENT_FUNDS",
+      "query_label": "매수인 자금충분성",
+      "query_terms": [
+        "매수인 자금충분성",
+        "Sufficiency of buyer funds",
+        "sufficient funds"
+      ],
+      "gt_items": 1,
+      "structured": {
+        "found": 1,
+        "population": 93,
+        "scanned": 93,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 122,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.CAPITALIZATION.FULLY_PAID",
+      "query_label": "완전납입·추가납입의무 부재",
+      "query_terms": [
+        "완전납입·추가납입의무 부재",
+        "Fully paid and non-assessable"
+      ],
+      "gt_items": 1,
+      "structured": {
+        "found": 1,
+        "population": 193,
+        "scanned": 193,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 1003,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.CAPITALIZATION.NO_SHAREHOLDER_AGREEMENT",
+      "query_label": "주주간계약 등 부재",
+      "query_terms": [
+        "주주간계약 등 부재",
+        "No shareholders' agreement",
+        "no shareholders agreement"
+      ],
+      "gt_items": 1,
+      "structured": {
+        "found": 1,
+        "population": 83,
+        "scanned": 83,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 23,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.CONTRACTS.COMPLETE_LIST",
+      "query_label": "중요계약 목록 완전성",
+      "query_terms": [
+        "중요계약 목록 완전성",
+        "Complete material contract list"
+      ],
+      "gt_items": 1,
+      "structured": {
+        "found": 1,
+        "population": 117,
+        "scanned": 117,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 0,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.DISCLOSURE.NO_OTHER_REPRESENTATIONS",
+      "query_label": "명시된 것 외 진술보장 부인",
+      "query_terms": [
+        "명시된 것 외 진술보장 부인",
+        "No other representations",
+        "exclusive representations and warranties"
+      ],
+      "gt_items": 1,
+      "structured": {
+        "found": 1,
+        "population": 388,
+        "scanned": 388,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 166,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.FINANCIAL.CONSISTENCY",
+      "query_label": "회계정책 계속성",
+      "query_terms": [
+        "회계정책 계속성",
+        "Consistent accounting policies"
+      ],
+      "gt_items": 1,
+      "structured": {
+        "found": 1,
+        "population": 25,
+        "scanned": 25,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 0,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.GOVERNMENT_CONTRACTS.COMPLIANCE",
+      "query_label": "정부계약 준수",
+      "query_terms": [
+        "정부계약 준수",
+        "Government contract compliance",
+        "public procurement compliance"
+      ],
+      "gt_items": 1,
+      "structured": {
+        "found": 1,
+        "population": 1,
+        "scanned": 1,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 0,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.INSURANCE.IN_FORCE",
+      "query_label": "보험 유효성",
+      "query_terms": [
+        "보험 유효성",
+        "Insurance in force"
+      ],
+      "gt_items": 1,
+      "structured": {
+        "found": 1,
+        "population": 102,
+        "scanned": 102,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 0,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.INSURANCE.PREMIUMS_PAID",
+      "query_label": "보험료 납부",
+      "query_terms": [
+        "보험료 납부",
+        "Insurance premiums paid"
+      ],
+      "gt_items": 1,
+      "structured": {
+        "found": 1,
+        "population": 73,
+        "scanned": 73,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 3,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.IP.LICENSES",
+      "query_label": "지식재산 라이선스",
+      "query_terms": [
+        "지식재산 라이선스",
+        "IP licenses"
+      ],
+      "gt_items": 1,
+      "structured": {
+        "found": 1,
+        "population": 48,
+        "scanned": 48,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 7,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.LABOR.COLLECTIVE",
+      "query_label": "노조·단체협약·쟁의",
+      "query_terms": [
+        "노조·단체협약·쟁의",
+        "Unions and collective bargaining",
+        "labor union"
+      ],
+      "gt_items": 1,
+      "structured": {
+        "found": 1,
+        "population": 258,
+        "scanned": 258,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 684,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.LABOR.NO_STRIKE",
+      "query_label": "파업·쟁의행위 없음",
+      "query_terms": [
+        "파업·쟁의행위 없음",
+        "No strike or work stoppage",
+        "no strike"
+      ],
+      "gt_items": 1,
+      "structured": {
+        "found": 1,
+        "population": 62,
+        "scanned": 62,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 84,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.PRODUCTS.NO_LIABILITY_CLAIM",
+      "query_label": "제품책임청구 부재",
+      "query_terms": [
+        "제품책임청구 부재",
+        "No product liability claim"
+      ],
+      "gt_items": 1,
+      "structured": {
+        "found": 1,
+        "population": 2,
+        "scanned": 2,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 3,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.PRODUCTS.NO_RECALL",
+      "query_label": "리콜 부재",
+      "query_terms": [
+        "리콜 부재",
+        "No product recall"
+      ],
+      "gt_items": 1,
+      "structured": {
+        "found": 1,
+        "population": 1,
+        "scanned": 1,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 1,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.REAL_ESTATE.LEASE_VALID",
+      "query_label": "임대차 유효성",
+      "query_terms": [
+        "임대차 유효성",
+        "Lease validity"
+      ],
+      "gt_items": 1,
+      "structured": {
+        "found": 1,
+        "population": 153,
+        "scanned": 153,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 0,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.REAL_ESTATE.NO_CONDEMNATION",
+      "query_label": "수용·철거 절차 부재",
+      "query_terms": [
+        "수용·철거 절차 부재",
+        "No condemnation",
+        "eminent domain"
+      ],
+      "gt_items": 1,
+      "structured": {
+        "found": 1,
+        "population": 20,
+        "scanned": 20,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 57,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.REAL_ESTATE.OWNED",
+      "query_label": "소유 부동산",
+      "query_terms": [
+        "소유 부동산",
+        "Owned real property"
+      ],
+      "gt_items": 1,
+      "structured": {
+        "found": 1,
+        "population": 50,
+        "scanned": 50,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 1,
+        "scanned": 295,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.RELATED_PARTY.NO_INTEREST",
+      "query_label": "특수관계인의 자산·거래처 이해관계 부재",
+      "query_terms": [
+        "특수관계인의 자산·거래처 이해관계 부재",
+        "No related-party interest"
+      ],
+      "gt_items": 1,
+      "structured": {
+        "found": 1,
+        "population": 2,
+        "scanned": 2,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 0,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    },
+    {
+      "family": "RW",
+      "taxonomy_id": "RW.TAX.RESIDENCY",
+      "query_label": "세법상 거주자 지위",
+      "query_terms": [
+        "세법상 거주자 지위",
+        "Tax residency",
+        "tax resident"
+      ],
+      "gt_items": 1,
+      "structured": {
+        "found": 1,
+        "population": 99,
+        "scanned": 99,
+        "exhausted": true,
+        "error": null
+      },
+      "item_text": {
+        "found": 0,
+        "scanned": 122,
+        "error": null
+      },
+      "paragraph": {
+        "para_localized": 0,
+        "document_level": 0,
+        "error": null
+      }
+    }
+  ],
+  "elapsed_s": 1767.12
+}

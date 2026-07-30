@@ -32,6 +32,7 @@ from contextlib import closing
 from datetime import datetime, timezone
 from pathlib import Path
 
+from lib.absence_net import doc_absence_suspects
 from lib.catalog import require_catalog
 from lib.console import configure_utf8_stdio
 from lib.extraction_gate import gate_items
@@ -244,6 +245,14 @@ def store_one(conn: sqlite3.Connection, out: Path, data: dict, known_pay: set,
         if full_read:
             # proofread deliberately dropped these domains — surface for owner review
             res["regress_overridden"] = True
+    # Absence recall-net (advisory): after this store, does the document still MENTION a
+    # sub-domain it now has zero items for? Sees the just-inserted rows. Never fails a store.
+    try:
+        suspects = doc_absence_suspects(conn, out, file_key, "PAY")
+        if suspects:
+            res["absence_suspects"] = suspects
+    except Exception as exc:  # advisory only — a net error must not corrupt the store
+        res["absence_net_error"] = str(exc)[:200]
     return res
 
 
@@ -298,6 +307,11 @@ def main(argv=None) -> int:
         known_pay = {
             r[0] for r in conn.execute("SELECT taxonomy_id FROM v4_taxonomy_node WHERE family='PAY'")
         }
+        # An explicit outer transaction is what makes the per-document SAVEPOINTs
+        # nested. Without it each "RELEASE one" releases the OUTERMOST savepoint,
+        # which sqlite treats as a COMMIT — so --dry-run silently wrote to the DB
+        # (observed 2026-07-30 in store_rw_reextraction.py, same pattern here).
+        conn.execute("BEGIN IMMEDIATE")
         for f in files:
             fk = f.stem
             conn.execute("SAVEPOINT one")
@@ -332,6 +346,10 @@ def main(argv=None) -> int:
         {"file_key": r["file_key"], "gate_flags": r["gate_flags"]}
         for r in results if r.get("gate_flags")
     ]
+    absence_suspects = [
+        {"file_key": r["file_key"], "absence_suspects": r["absence_suspects"]}
+        for r in results if r.get("absence_suspects")
+    ]
     print(json.dumps(
         {"dry_run": args.dry_run, "backup": backup_name, "pruned": pruned,
          "files": len(files),
@@ -341,6 +359,8 @@ def main(argv=None) -> int:
          "regress_overridden": regress_overridden[:40],
          "regression_count": len(regressions), "regressions": regressions[:40],
          "gate_flagged_count": len(gate_flagged), "gate_flagged": gate_flagged[:40],
+         "absence_suspect_count": len(absence_suspects),
+         "absence_suspects": absence_suspects[:40],
          "errors": errors[:40]},
         ensure_ascii=False, indent=2,
     ))
