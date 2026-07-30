@@ -25,6 +25,26 @@ _이 수치를 손으로 베끼지 말 것 — `python burndown.py --out cs_inde
 
 ---
 
+## 🧭 추출 로드맵 (2026-07-30 합의안, Fable 검증 반영) — 이 순서가 아래 Next 표를 지배한다
+
+**목표**: 모든 유형 × 모든 질의형(존재·부재·비교). 병목은 검색 엔진이 아니라 추출·데이터 축.
+두 전선 병행 — (A) 이미 가진 코퍼스의 개념 공백 정리, (B) 유형 커버리지 확장 준비.
+단일 writer 규율 유지(정독 병렬·store만 직렬). **운영 원칙**: "키워드 미검출≠부재"의 쌍둥이
+**"키워드 검출≠존재"** — 센서스·스윕 전 과정에 적용(2026-07-30 실증: RWI 790·TERMINATION_FEE 92 정확구문 히트가 정독 결과 거의 허수).
+
+- **Phase 0 (즉시·셋 병렬)**: ① RW 잔여~58 + PAY 잔여 재추출 **완결**(반쯤 끝난 상태가 최대 리스크; Next #2) ·
+  ② **T-C 비-SPA 소표본 정독**(SHA·SSA·ATA/BTA·CB류 각 5~10건 full_read — RW/PAY 뒤 직렬 금지, **병렬**;
+  산출물은 결함'프로파일'이 아니라 스멜테스트+**유형별 절대-recall 정답지**(SPA 89% 편중 해소)+게이트 요건; Next #8) ·
+  ③ **죽은-노드 센서스 v2**(정확구문·distinct-doc; 노드당 4분류=추출누락/형제흡수/키워드오탐/소싱공백; **분류는 히트문서~10건 AI 정독 실재율로 확정**; 지금 진행 중 표 참조).
+- **Phase 1 (센서스 v2 결과 기반)**: ① **추출-누락 확정 노드만** 표적 재추출 스윕(모집단=정확구문 히트집합, v1 느슨키워드 모집단 금지; 프롬프트 극성 규율 필수—"있으면 추출·없으면 명시적 없음", "찾아라" 단독 금지; extraction_gate+store전 표본정밀도 통과조건; RW/PAY 인프라 재사용) ·
+  ② **형제 흡수 노드는 재추출 안 함** — 기존 item 소급 재분류 또는 질의측 alias/인접노드 고지(DEF #20 계열); 형제흡수+coverage complete가 만드는 오(誤)confirmed_absent 경로 동시 점검 ·
+  ④ **소싱 공백 노드**(FIRPTA·materiality scrape 등)는 소유자 이관·기대치 문서화; ③ 오탐은 제외.
+- **Phase 2 (측정·게이트)**: 존재·비교형 정밀도 측정(§9.1 #5, SPA 먼저→T-C 유형마다 표준절차화; Next #6·#16) · 하이브리드 합집합 실측(T4 선행; Next #17 완료).
+- **Phase 3 (확장 재개)**: V4-6 재개는 기존 게이트(§9.1+T-C) 그대로, 단 **순서는 물량이 아니라 v4_query_log 수요+센서스 v2 죽은-노드 지도+희소가치**로 재조정(SHA 상향—거버넌스류는 소싱 필요가 센서스로 확인; Next #14) · 하위영역 부재 선해제 사이클 정례화(환경 모델 반복, 조세 근접; Next #3).
+- **병행**: 18a RTF 5건(승인·즉시)·18b OCR(승인)·18c 별지(소유자). **연기(명시)**: boilerplate 전파는 §9.3-3(경계 필드) 이후 · 검색측 백로그(윈도우 dedup·resolve_taxonomy 근사후보). **금지**: v1 센서스 수치로 스윕 착수 · v1 42종 목록 무수정 기록 · "찾아라" 단독 프롬프트 표적 재추출.
+
+---
+
 ## ⛳ 소유자 승인 대기 (DB 쓰기 — 조율자가 단일 writer로 실행)
 
 다른 세션이 DB를 만지고 있지 않을 때 실행한다.
@@ -53,6 +73,7 @@ _2026-07-29 추가 반영(조율자 단일 writer): (a) `v4_clause_item` **exact
 | PAY 재추출(과소추출 시스템 결함 대응) | GPT/Codex(정독 배정), store는 조율자 | 착수 — 매니페스트 392 타깃(tier1 61/tier2 24/tier3 307) 중 **8문서 반영** | [PAY_REEXTRACTION_AGENT_BRIEF](.docs/PAY_REEXTRACTION_AGENT_BRIEF.md), `cs_index/pay_reextraction_manifest.json` |
 | ~~번다운 지표 도구 + 웹 대시보드 패널~~ | — | **완료(2026-07-29)** — `burndown.py` + UI-2 대시보드 번다운 패널(`/api/ops/burndown`). 절대 drift하지 않도록 `v4_search`의 부재 판정 로직을 직접 import해 재사용 | [PLAN_REVIEW 권고 5](.docs/PLAN_REVIEW_20260727.md), `burndown.py` |
 | 존재형(과대추출) 축 방지장치 | 미배정(1번은 구현 완료) | 부분 — 감사기 과다분절·중복 탐지 구현(advisory, `audit_t3_v4.py`). 나머지 2~5는 미착수 | [V4_PLAN §9.3](.docs/V4_PLAN.md) |
+| **죽은-노드 센서스 v2** (Phase 0-③) | 조율자(읽기전용) | **기계층 완료(2026-07-31)** — 정확구문·`COUNT(DISTINCT file_key)`로 truly-dead subtree **42노드** 재산출. 신뢰 확정: **sourcing_gap(문서≤5) 22노드**(추출 대상 아님). mid-range **20노드는 실재율 정독 대기**(기계 버킷명 비신뢰—`sibling_absorb?`가 "family가 큼"을 오인). **4노드 보정 정독**: SANDBAGGING=진짜 추출누락, PRIVILEGE~75% 후보, **RWI(790)·TERMINATION_FEE(92)=거의 허수**(위약금이 손해·조세 *정의*에 등장). **다음: 20노드 실재율 정독→4분류 확정 후 NOW·메모리·번다운 편입.** 스크립트 `scratchpad/census_v2.py` | [V4_PLAN §9.2](.docs/V4_PLAN.md) 로드맵 Phase 0 |
 | ~~`full_read` 누락 소급감사 + 저장시 강등~~ | — | **완료(2026-07-30)** — 390건 backfill, 명확한 목차/조항표지↔sub-domain 불일치 39건 확인. 기존 `complete` 위험 36건을 `partial`로 강등했고 재감사 `complete_rows_at_risk=0`. `partial`은 기존 item은 유지하되 부재형에서는 `needs_review`로 제외하며, 환경 소유자 판정 89건 풀과 별개다. 이후 full-read 저장도 동일 검사 후 누락 시 자동 partial | [full-read 감사 결과](.docs/full_read_omission_backfill_20260730_postapply.json), `audit_full_read_omissions.py`, `lib/full_read_guard.py` |
 
 ---
