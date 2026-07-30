@@ -64,27 +64,43 @@ def verbatim_needle(item: dict) -> str | None:
     return text if len(normalize_text(text)) >= MIN_CONTAINMENT else None
 
 
-def paraphrase_needle(item: dict) -> str | None:
-    """The proposition's most distinctive content tokens (up to 4, longest first) —
-    a keyword-style description in the restatement's vocabulary, not the verbatim's."""
-    tokens = [t for t in _WORD.findall(str(item.get("proposition") or "")) if len(t) >= 2]
-    # longest distinct tokens carry the most signal; keep original casing for the query
+# Trailing Korean particles (조사). The proposition's longest token is often a
+# josa-attached form ("손해배상액의") that fails a substring match against the bare
+# stem in the verbatim ("손해배상액") — a morphological artifact, not a real gap.
+_JOSA = re.compile(
+    r"(으로서|으로써|이라도|으로|로서|로써|에게서|에게|에서|께서|한테|부터|까지|마다|조차|처럼|"
+    r"보다|이나|나마|든지|이라|라도|란|은|는|이|가|을|를|의|에|와|과|도|만|랑|이랑|께|더러|보고)$"
+)
+
+
+def strip_josa(tok: str) -> str:
+    if re.search(r"[가-힣]$", tok):
+        m = _JOSA.search(tok)
+        if m and m.start() >= 2:  # keep a stem of >=2 syllables
+            return tok[: m.start()]
+    return tok
+
+
+def paraphrase_tokens(item: dict, n: int = 6) -> list[str]:
+    """Distinctive proposition content tokens, josa-stripped — the vocabulary a user
+    would type to describe the clause, normalized past inflection."""
+    raw = [t for t in _WORD.findall(str(item.get("proposition") or "")) if len(t) >= 2]
     seen, picked = set(), []
-    for tok in sorted(tokens, key=len, reverse=True):
-        low = tok.lower()
-        if low not in seen:
+    for tok in sorted(raw, key=len, reverse=True):
+        stem = strip_josa(tok)
+        low = stem.lower()
+        if len(stem) >= 2 and low not in seen:
             seen.add(low)
-            picked.append(tok)
-        if len(picked) >= 4:
+            picked.append(stem)
+        if len(picked) >= n:
             break
-    query = " ".join(picked)
-    return query if len(normalize_text(query)) >= MIN_CONTAINMENT else None
+    return picked
 
 
-def _verbatim_token_coverage(item: dict, query: str) -> float:
+def _verbatim_token_coverage(item: dict, tokens) -> float:
     """Fraction of the query tokens that literally appear in the item's verbatim —
     the direct lexical-gap indicator (1.0 = fully lexical, low = paraphrased away)."""
-    toks = [t.lower() for t in query.split() if t]
+    toks = [t.lower() for t in (tokens.split() if isinstance(tokens, str) else tokens) if t]
     if not toks:
         return 0.0
     v = str(item.get("verbatim") or "").lower()
@@ -92,6 +108,7 @@ def _verbatim_token_coverage(item: dict, query: str) -> float:
 
 
 def rank_of(item: dict, query: str, depth: int = DEPTH) -> int | None:
+    """AND retrieval (the product's current text path): every token must co-occur."""
     try:
         page = search_clause_items(OUT, item["family"], text=query,
                                    show_duplicates=True, limit=depth)
@@ -103,6 +120,8 @@ def rank_of(item: dict, query: str, depth: int = DEPTH) -> int | None:
     return None
 
 
+
+
 def _median(values):
     if not values:
         return None
@@ -112,18 +131,27 @@ def _median(values):
 
 
 def evaluate(n_sample=300, seed=17, mode="verbatim", dump_misses=0) -> dict:
-    make_needle = verbatim_needle if mode == "verbatim" else paraphrase_needle
     items = [it for doc in load_ground_truth(OUT, DEFAULT_SOURCES) for it in doc["items"]]
     random.Random(seed).shuffle(items)
     records, coverages = [], []
     for it in items:
-        query = make_needle(it)
-        if not query:
-            continue
+        if mode == "paraphrase":
+            # josa-stripped proposition tokens through the product path (now FTS AND +
+            # bm25): the fair lexical baseline — normalized past inflection, IDF-ranked.
+            toks = paraphrase_tokens(it, n=4)
+            query = " ".join(toks)
+            if len(normalize_text(query)) < MIN_CONTAINMENT:
+                continue
+            cov = _verbatim_token_coverage(it, toks)
+        else:
+            query = verbatim_needle(it)
+            if not query:
+                continue
+            cov = _verbatim_token_coverage(it, query)
         if len(records) >= n_sample:
             break
         rank = rank_of(it, query)
-        coverages.append(_verbatim_token_coverage(it, query))
+        coverages.append(cov)
         records.append({"item": it, "query": query, "rank": rank})
     found = [r["rank"] for r in records if r["rank"] is not None]
     n = len(records)

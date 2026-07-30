@@ -7,6 +7,7 @@ from pathlib import Path
 from v4_search import (
     V4SearchError,
     compare_clause_items,
+    log_v4_query,
     search_clause_absence,
     search_clause_items,
 )
@@ -38,15 +39,26 @@ def handle_v4_item_search(app, match, query, body):
             "limit": body.get("limit", 50),
         }
         if mode == "present":
-            return 200, search_clause_items(
+            text = body.get("text") or None
+            result = search_clause_items(
                 app.out,
                 taxonomy_id,
                 subject=body.get("subject") or None,
                 effective_time=body.get("effective_time") or None,
-                text=body.get("text") or None,
+                text=text,
                 offset=body.get("offset", 0),
                 **common,
             )
+            # Web is a real usage entry point too (§9.6 #7): log the query signal.
+            log_v4_query(app.out, {
+                "tool": "web_item_search",
+                "taxonomy_id": taxonomy_id,
+                "has_text": bool(text and str(text).strip()),
+                "population": result.get("total_items"),
+                "low_query_signal": "low_query_signal" in result,
+                "offset": body.get("offset", 0),
+            })
+            return 200, result
         if mode == "absent":
             return 200, search_clause_absence(app.out, taxonomy_id, **common)
         raise V4SearchError("'mode' must be present or absent.")

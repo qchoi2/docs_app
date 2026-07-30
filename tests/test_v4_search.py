@@ -341,9 +341,12 @@ def test_text_query_ranks_by_match_quality_over_file_key(tmp_path):
         out, "CP.THIRD_PARTY_CONSENT", text="인허가 취득", show_duplicates=True, limit=10
     )
     order = [row["file_key"] for row in result["results"]]
-    # verbatim prefix(c) first, verbatim-later(a) next, proposition-only(b) last —
-    # the exact inverse of alphabetical file_key order, proving relevance wins.
-    assert order == ["c" * 16, "a" * 16, "b" * 16]
+    # bm25 ranks the focused item (c: both terms in a short verbatim) first — the item
+    # that sorts LAST alphabetically, so relevance provably beats the file_key
+    # enumeration order (a < b < c). The exact tail order is bm25-specific.
+    assert order[0] == "c" * 16
+    assert order != sorted(order)
+    assert set(order) == {"a" * 16, "b" * 16, "c" * 16}
 
 
 def test_concept_query_keeps_stable_enumeration_order(tmp_path):
@@ -407,6 +410,25 @@ def test_low_query_signal_hint_on_broad_concept_query(tmp_path, monkeypatch):
         out, "CP.THIRD_PARTY_CONSENT", text="인허가", show_duplicates=True
     )
     assert "low_query_signal" not in narrowed
+    # lang/ctype only shrink the file set without ranking it, so they must NOT
+    # suppress the hint — the ranking signal is text/subject/polarity.
+    lang_only = search_clause_items(
+        out, "CP.THIRD_PARTY_CONSENT", lang="국문", show_duplicates=True
+    )
+    assert "low_query_signal" in lang_only
+
+
+def test_zero_result_multi_keyword_gets_absence_safe_hint(tmp_path):
+    # An AND text query that no item satisfies returns 0 — the response must flag that
+    # 0 != absence so an agent re-queries instead of misreading it (project principle).
+    out = make_index(tmp_path)
+    _seed_text_ranking_items(out)
+    result = search_clause_items(
+        out, "CP.THIRD_PARTY_CONSENT", text="존재하지 않는키워드조합", show_duplicates=True
+    )
+    assert result["total_items"] == 0
+    assert "zero_result_hint" in result
+    assert result["zero_result_hint"]["tokens"] == ["존재하지", "않는키워드조합"]
 
 
 def test_log_v4_query_appends_jsonl(tmp_path):

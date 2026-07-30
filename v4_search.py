@@ -477,35 +477,38 @@ def _bulk_coverage_states(
     requested = {str(row["file_key"]): row for row in file_rows}
     if not requested:
         return {}
+    # The caller passes one page of items (<= limit), so scope every coverage read to
+    # exactly those file_keys instead of scanning the whole family and filtering in
+    # Python (Fable #5c). limit is bounded to MAX_LIMIT (500) < SQLite's variable cap.
+    keys = list(requested)
+    ph = ",".join("?" for _ in keys)
     coverage_by_file = {
         str(row["file_key"]): row
         for row in conn.execute(
-            """
+            f"""
             SELECT file_key,body_status,annex_status,reason,txt_hash,
                    taxonomy_version,reviewed_at
             FROM v4_document_coverage
-            WHERE family=?
+            WHERE family=? AND file_key IN ({ph})
             """,
-            (family,),
+            (family, *keys),
         )
-        if str(row["file_key"]) in requested
     }
     bad_sources: dict[str, list[sqlite3.Row]] = {}
     for row in conn.execute(
-        """
+        f"""
         SELECT file_key,source_kind,status,COUNT(*) AS n
         FROM v4_source_coverage
-        WHERE family=? AND status!='complete'
+        WHERE family=? AND status!='complete' AND file_key IN ({ph})
         GROUP BY file_key,source_kind,status
         ORDER BY file_key,source_kind,status
         """,
-        (family,),
+        (family, *keys),
     ):
-        if str(row["file_key"]) in requested:
-            bad_sources.setdefault(str(row["file_key"]), []).append(row)
+        bad_sources.setdefault(str(row["file_key"]), []).append(row)
     complete_sources: dict[str, list[sqlite3.Row]] = {}
     for row in conn.execute(
-        """
+        f"""
         SELECT s.file_key,s.storage_file_key,s.txt_hash,
                owner.content_hash AS owner_hash,
                storage.content_hash AS storage_hash,
@@ -513,12 +516,11 @@ def _bulk_coverage_states(
         FROM v4_source_coverage s
         JOIN files owner ON owner.file_key=s.file_key
         LEFT JOIN files storage ON storage.file_key=s.storage_file_key
-        WHERE s.family=? AND s.status='complete'
+        WHERE s.family=? AND s.status='complete' AND s.file_key IN ({ph})
         """,
-        (family,),
+        (family, *keys),
     ):
-        if str(row["file_key"]) in requested:
-            complete_sources.setdefault(str(row["file_key"]), []).append(row)
+        complete_sources.setdefault(str(row["file_key"]), []).append(row)
     pending = _blocking_pending_candidates(conn, family, requested.keys())
 
     states = {}
@@ -636,14 +638,26 @@ def search_clause_items(
         if effective_time:
             clauses.append("lower(COALESCE(i.effective_time,''))=lower(?)")
             params.append(effective_time.strip())
-        # A `text` query is tokenized on whitespace: every token must appear in the
-        # item's verbatim OR proposition (AND across tokens). A single token degrades
-        # to the old substring filter; multi-keyword queries ("손해배상 상한 10%") — the
-        # common real query, not an exact quote — used to return 0 unless the whole
-        # string sat contiguously in one field, and now match on keyword coverage.
+        # A `text` query is tokenized on whitespace. Tokens >=3 chars go through the
+        # v4_item_fts trigram index (fast substring match + bm25 IDF ranking, so a
+        # boilerplate word like "매도인" is down-weighted vs a rare one); tokens <3 chars
+        # cannot be matched by the trigram tokenizer, so they fall back to a LIKE scan.
+        # Semantics stay AND (every token must appear) — the same result set as before,
+        # only the ranking (bm25) and the retrieval (index vs full scan) improve.
         text_tokens = [tok for tok in text.lower().split() if tok] if text else []
         text_raw = text.strip().lower() if text else ""
-        for tok in text_tokens:
+        fts_tokens = [tok for tok in text_tokens if len(tok) >= 3]
+        short_tokens = [tok for tok in text_tokens if len(tok) < 3]
+        cte_sql, fts_join, fts_params = "", "", []
+        if fts_tokens:
+            # Each token as a quoted FTS5 string (literal, immune to MATCH operators);
+            # space-separated => implicit AND. bm25() is computed once in the CTE.
+            match_expr = " ".join('"%s"' % tok.replace('"', '""') for tok in fts_tokens)
+            cte_sql = ("WITH fts AS (SELECT rowid AS fid, bm25(v4_item_fts) AS score "
+                       "FROM v4_item_fts WHERE v4_item_fts MATCH ?) ")
+            fts_join = "JOIN fts ON fts.fid=i.item_id"
+            fts_params = [match_expr]
+        for tok in short_tokens:
             clauses.append("(lower(i.verbatim) LIKE ? OR lower(i.proposition) LIKE ?)")
             like = f"%{tok}%"
             params.extend([like, like])
@@ -651,13 +665,15 @@ def search_clause_items(
         if version_roles:
             scope_rows = conn.execute(
                 f"""
+                {cte_sql}
                 SELECT DISTINCT f.file_key,f.path,f.ctype,f.lang,f.version_role,
                        {version_meta_select(conn)}
                 FROM v4_clause_item i
+                {fts_join}
                 JOIN files f ON f.file_key=i.file_key
                 WHERE {' AND '.join(clauses)}
                 """,
-                params,
+                [*fts_params, *params],
             ).fetchall()
             version_notice = _version_notice_from_rows(
                 conn, [dict(row) for row in scope_rows], version_roles
@@ -665,20 +681,26 @@ def search_clause_items(
             version_sql, version_params = _version_clause(version_roles)
             clauses.append(version_sql)
             params.extend(version_params)
-        # Ordering. A bare concept query has no signal that distinguishes one item
-        # from its hundreds of same-node siblings, so it stays in a stable document
-        # order (file_key, ¶) — an *enumeration* for compare/count queries. But when
-        # a `text` query is given it DOES carry a discriminating signal, and file_key
-        # order buries the best match (measured: recall@1 ~0.54 on distinctive queries
-        # because a sibling sorts first). Rank those by match quality: more query tokens
-        # landing in the verbatim (the clause text) beats a proposition-only hit, a
-        # contiguous full-phrase match beats scattered tokens, an earlier first-token
-        # position beats a later one, and a shorter (more focused) item beats a long
-        # catch-all. Purely a reorder — totals/pagination and the no-text path untouched.
+        # Ordering. A bare concept query has no signal that distinguishes one item from
+        # its hundreds of same-node siblings, so it stays in a stable document order
+        # (file_key, ¶) — an *enumeration* for compare/count queries. A `text` query does
+        # carry a signal: FTS-indexed tokens rank by bm25 (relevance + IDF); a short-only
+        # LIKE query ranks by verbatim coverage / contiguous phrase / position. Purely a
+        # reorder — the no-text enumeration path is untouched.
         order_params: list = []
-        if text_tokens:
+        if fts_tokens:
+            # Hybrid: a contiguous full-phrase hit in the verbatim wins first (a pasted
+            # quote must rank #1 — bm25 alone loses that, favouring term frequency over
+            # phrase), then bm25 orders the rest by relevance + IDF (down-weighting the
+            # boilerplate tokens that a scattered paraphrase query shares), then focus.
+            order_sql = (
+                "CASE WHEN instr(lower(i.verbatim),?)>0 THEN 0 ELSE 1 END,"
+                "fts.score,length(COALESCE(i.verbatim,'')),f.file_key,i.loc_start,i.item_id"
+            )
+            order_params = [text_raw]
+        elif short_tokens:
             coverage = "+".join(
-                ["CASE WHEN instr(lower(i.verbatim),?)>0 THEN 1 ELSE 0 END"] * len(text_tokens)
+                ["CASE WHEN instr(lower(i.verbatim),?)>0 THEN 1 ELSE 0 END"] * len(short_tokens)
             )
             order_sql = (
                 f"({coverage}) DESC,"
@@ -687,10 +709,11 @@ def search_clause_items(
                 "     ELSE 2147483647 END,"
                 "length(COALESCE(i.verbatim,'')),f.file_key,i.loc_start,i.item_id"
             )
-            order_params = [*text_tokens, text_raw, text_tokens[0], text_tokens[0]]
+            order_params = [*short_tokens, text_raw, short_tokens[0], short_tokens[0]]
         else:
             order_sql = "f.file_key,i.loc_start,i.item_id"
         select_sql = f"""
+            {cte_sql}
             SELECT i.item_id,i.item_ref,i.file_key,i.family,i.taxonomy_id,
                    n.canonical_ko,n.canonical_en,i.proposition,
                    i.statement_polarity,i.subject_role,i.counterparty_role,
@@ -703,6 +726,7 @@ def search_clause_items(
                    f.dup_group,f.is_draft,f.version_hint,f.version_role,
                    {version_meta_select(conn)}
             FROM v4_clause_item i
+            {fts_join}
             JOIN v4_taxonomy_node n ON n.taxonomy_id=i.taxonomy_id
             JOIN files f ON f.file_key=i.file_key
             WHERE {' AND '.join(clauses)}
@@ -711,6 +735,7 @@ def search_clause_items(
         if show_duplicates:
             totals = conn.execute(
                 f"""
+                {cte_sql}
                 SELECT COUNT(*) AS total_items,
                        COUNT(DISTINCT i.file_key) AS total_documents,
                        COALESCE(SUM(
@@ -719,21 +744,22 @@ def search_clause_items(
                               THEN 1 ELSE 0 END
                        ),0) AS stale_items
                 FROM v4_clause_item i
+                {fts_join}
                 JOIN files f ON f.file_key=i.file_key
                 WHERE {' AND '.join(clauses)}
                 """,
-                params,
+                [*fts_params, *params],
             ).fetchone()
             total_items = int(totals["total_items"])
             total_documents = int(totals["total_documents"])
             stale = int(totals["stale_items"])
             page_rows = conn.execute(
                 select_sql + " LIMIT ? OFFSET ?",
-                [*params, *order_params, limit, offset],
+                [*fts_params, *params, *order_params, limit, offset],
             ).fetchall()
             items = [_item_dict(row) for row in page_rows]
         else:
-            rows = conn.execute(select_sql, [*params, *order_params]).fetchall()
+            rows = conn.execute(select_sql, [*fts_params, *params, *order_params]).fetchall()
             all_items = _dedupe_item_rows(
                 (_item_dict(row) for row in rows), show_duplicates
             )
@@ -782,17 +808,27 @@ def search_clause_items(
         }
         if version_notice is not None:
             result["version_filter_notice"] = version_notice
-        narrowed = bool(
-            text_tokens or polarity or subject or effective_time or ctype or lang
-            or version_roles
-        )
-        if not narrowed and total_items > LOW_SIGNAL_POPULATION:
+        # Ranking signal comes from text (and, weakly, the item-level discriminators
+        # subject/polarity/effective_time); lang/ctype/version only shrink the file set
+        # without ordering it, so a "개념+lang=ko" 5k enumeration still needs the hint.
+        has_ranking_signal = bool(text_tokens or polarity or subject or effective_time)
+        if not has_ranking_signal and total_items > LOW_SIGNAL_POPULATION:
             result["low_query_signal"] = {
                 "population": total_items,
                 "hint": (
                     "개념 라벨만으로는 좁혀지지 않아 결과가 관련도순이 아닌 문서 순서로 열거됩니다. "
-                    "사용자 질의의 변별 키워드를 text로 전달하거나 subject/polarity/ctype/lang으로 "
+                    "사용자 질의의 변별 키워드를 text로 전달하거나 subject/polarity로 "
                     "좁히면 관련도 정렬이 작동합니다."
+                ),
+            }
+        # Symmetric hint for the opposite failure: a multi-keyword text query is an AND,
+        # so one absent token drops it to 0 — which an agent must NOT read as "부재".
+        if text_tokens and total_items == 0:
+            result["zero_result_hint"] = {
+                "tokens": text_tokens,
+                "hint": (
+                    "모든 키워드를 동시에 포함하는 item이 없습니다(AND 매칭). 키워드 수를 줄이거나 "
+                    "동의어로 바꿔 재질의하세요 — 0건이 이 조항의 부재를 의미하지 않습니다."
                 ),
             }
         return result
