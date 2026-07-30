@@ -1632,5 +1632,14 @@ DB 쓰기(기존 backlog 재분류·`document_count` 백필)는 수치 검토 �
   `eval_ranking_signal.py`로 확증(변별 문구 질의 = recall@10 90.5%·중앙 1위 vs 개념 1.5%). **text 질의 관련도 정렬**
   착수(verbatim 히트·이른 위치·짧은 verbatim 우선; text 없으면 열거순 불변) → 변별 recall@1 0.536→0.623(+8.6pp),
   recall@3 +4.5pp, 인덱스 변경 0. 단위 테스트 2개. **잔여(개념 질의 의미 랭킹)는 T4/V4-7 임베딩 영역**.
+- **§9.6 Fable 2차 검토 반영(질의 신호 강화).** "잔여는 T4" 서술이 부정확했음을 교정: T4는 개념-라벨 벤치마크를
+  못 올리고(한 단어는 형제와 near-등거리), 실제 표적은 **패러프레이즈**. `eval_ranking_signal.py --mode paraphrase`
+  신설로 3단 실측 — 개념 1.5% / **패러프레이즈 recall@10 59.6%(verbatim 커버리지 0.415 = 질의어 59%가 원문에 없음,
+  T4 사전등록 베이스라인)** / verbatim 92.7%. miss 3종(교차언어→사전·임베딩 / boilerplate 공통어→IDF 여지 /
+  퇴화 proposition→artifact)이라 59.6%는 순수 의미 gap을 과대평가. 착수: **#1 다중키워드 text**(공백 토큰 AND,
+  종전 단일 substring은 "손해배상 상한 10%" 0건) · **#5 MCP docstring**(text=랭킹신호 안내) · **#6 low_query_signal**
+  힌트 필드 · **#7 v4_query_log.jsonl**(진입점 로깅, T4 판정 실데이터, 파일 append→단일 writer 무관). 신규 테스트
+  5개, **487 pass**. 보류(근거 문서화): #4 정적 prior(전역 열거순서 변경), #8 사전 확장(#2 후), #9 하이브리드/dedup
+  실측, #10 문서 다양화.
 - **남은 v4**: §9.1 #2(IP·보험·노무·소송 부재풀은 그 재추출 후·후순위), #5(존재·비교형 정밀도 미측정),
-  §9.6 잔여(개념 질의 의미 랭킹→T4), COV review 191/noise 61 후속.
+  §9.6 잔여(패러프레이즈 gap→#8 사전확장·T4 순), COV review 191/noise 61 후속.

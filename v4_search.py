@@ -12,6 +12,7 @@ import json
 import sqlite3
 import sys
 from contextlib import closing
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable, Sequence
 
@@ -35,6 +36,11 @@ FAMILIES = {"RW", "CP", "COV", "DEF", "PAY", "REM"}
 POLARITIES = {"affirmative", "negative", "none_exist", "not_applicable"}
 MAX_LIMIT = 500
 MAX_COMPARE = 10
+# A concept query with no narrowing signal (no text/subject/polarity/ctype/lang) that
+# still returns more items than this is an unranked alphabetical enumeration — the
+# result carries a machine-readable low_query_signal hint so an agent re-queries with
+# keywords instead of scrolling (V4_PLAN §9.6).
+LOW_SIGNAL_POPULATION = 200
 
 
 class V4SearchError(ValueError):
@@ -68,6 +74,24 @@ def connect_v4_ro(out: Path) -> sqlite3.Connection:
             "V4 index is not initialized.", code="V4_INDEX_NOT_INITIALIZED"
         )
     return conn
+
+
+def log_v4_query(out: Path, record: dict) -> None:
+    """Append one real-usage search query to ``out/v4_query_log.jsonl``.
+
+    v3's search_contracts logs to query_log.jsonl but v4_search never did, so we had
+    no way to measure what fraction of real queries arrive concept-only — which is the
+    actual size of the problem T4/embeddings would solve (V4_PLAN §9.6, §10.1). This
+    is a plain file append, not a DB write, so it is safe under the single-writer rule.
+    Call it ONLY from real entry points (MCP/CLI/web), never from search_clause_items
+    itself, so eval/probe traffic that drives the library directly does not pollute the
+    usage signal. Best-effort: a logging failure must never break a search."""
+    try:
+        rec = {"ts": datetime.now(timezone.utc).isoformat(), **record}
+        with (Path(out) / "v4_query_log.jsonl").open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(rec, ensure_ascii=False) + "\n")
+    except Exception:  # noqa: BLE001 — logging is never allowed to fail a query
+        pass
 
 
 def _bounded_int(value: object, name: str, default: int, high: int) -> int:
@@ -612,12 +636,17 @@ def search_clause_items(
         if effective_time:
             clauses.append("lower(COALESCE(i.effective_time,''))=lower(?)")
             params.append(effective_time.strip())
-        if text:
-            clauses.append(
-                "(lower(i.proposition) LIKE lower(?) OR lower(i.verbatim) LIKE lower(?))"
-            )
-            needle = f"%{text.strip()}%"
-            params.extend([needle, needle])
+        # A `text` query is tokenized on whitespace: every token must appear in the
+        # item's verbatim OR proposition (AND across tokens). A single token degrades
+        # to the old substring filter; multi-keyword queries ("손해배상 상한 10%") — the
+        # common real query, not an exact quote — used to return 0 unless the whole
+        # string sat contiguously in one field, and now match on keyword coverage.
+        text_tokens = [tok for tok in text.lower().split() if tok] if text else []
+        text_raw = text.strip().lower() if text else ""
+        for tok in text_tokens:
+            clauses.append("(lower(i.verbatim) LIKE ? OR lower(i.proposition) LIKE ?)")
+            like = f"%{tok}%"
+            params.extend([like, like])
         version_notice = None
         if version_roles:
             scope_rows = conn.execute(
@@ -639,23 +668,26 @@ def search_clause_items(
         # Ordering. A bare concept query has no signal that distinguishes one item
         # from its hundreds of same-node siblings, so it stays in a stable document
         # order (file_key, ¶) — an *enumeration* for compare/count queries. But when
-        # a `text` needle is given the query DOES carry a discriminating signal, and
-        # file_key order buries the best match (measured: recall@1 ~0.54 on distinctive
-        # queries because a sibling sorts first). Rank those by match quality: a hit in
-        # the verbatim beats a proposition-only hit, an earlier hit beats a later one,
-        # and a shorter (more focused) item beats a long catch-all. Purely a reorder of
-        # the same result set — totals/pagination and the no-text path are untouched.
+        # a `text` query is given it DOES carry a discriminating signal, and file_key
+        # order buries the best match (measured: recall@1 ~0.54 on distinctive queries
+        # because a sibling sorts first). Rank those by match quality: more query tokens
+        # landing in the verbatim (the clause text) beats a proposition-only hit, a
+        # contiguous full-phrase match beats scattered tokens, an earlier first-token
+        # position beats a later one, and a shorter (more focused) item beats a long
+        # catch-all. Purely a reorder — totals/pagination and the no-text path untouched.
         order_params: list = []
-        if text:
-            needle = text.strip().lower()
+        if text_tokens:
+            coverage = "+".join(
+                ["CASE WHEN instr(lower(i.verbatim),?)>0 THEN 1 ELSE 0 END"] * len(text_tokens)
+            )
             order_sql = (
-                "CASE WHEN instr(lower(i.verbatim),?)>0 THEN 0 "
-                "     WHEN instr(lower(i.proposition),?)>0 THEN 1 ELSE 2 END,"
+                f"({coverage}) DESC,"
+                "CASE WHEN instr(lower(i.verbatim),?)>0 THEN 1 ELSE 0 END DESC,"
                 "CASE WHEN instr(lower(i.verbatim),?)>0 THEN instr(lower(i.verbatim),?) "
                 "     ELSE 2147483647 END,"
                 "length(COALESCE(i.verbatim,'')),f.file_key,i.loc_start,i.item_id"
             )
-            order_params = [needle, needle, needle, needle]
+            order_params = [*text_tokens, text_raw, text_tokens[0], text_tokens[0]]
         else:
             order_sql = "f.file_key,i.loc_start,i.item_id"
         select_sql = f"""
@@ -750,6 +782,19 @@ def search_clause_items(
         }
         if version_notice is not None:
             result["version_filter_notice"] = version_notice
+        narrowed = bool(
+            text_tokens or polarity or subject or effective_time or ctype or lang
+            or version_roles
+        )
+        if not narrowed and total_items > LOW_SIGNAL_POPULATION:
+            result["low_query_signal"] = {
+                "population": total_items,
+                "hint": (
+                    "개념 라벨만으로는 좁혀지지 않아 결과가 관련도순이 아닌 문서 순서로 열거됩니다. "
+                    "사용자 질의의 변별 키워드를 text로 전달하거나 subject/polarity/ctype/lang으로 "
+                    "좁히면 관련도 정렬이 작동합니다."
+                ),
+            }
         return result
 
 

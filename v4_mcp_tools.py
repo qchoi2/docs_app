@@ -9,7 +9,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Optional
 
-from v4_search import compare_clause_items, search_clause_absence, search_clause_items
+from v4_search import (
+    compare_clause_items,
+    log_v4_query,
+    search_clause_absence,
+    search_clause_items,
+)
 
 
 class V4McpService:
@@ -47,7 +52,7 @@ class V4McpService:
                 include_descendants=include_descendants,
                 limit=limit,
             )
-        return search_clause_items(
+        result = search_clause_items(
             self.out,
             taxonomy_id,
             polarity=polarity,
@@ -61,6 +66,22 @@ class V4McpService:
             limit=limit,
             offset=offset,
         )
+        # Real-usage signal for the §9.6 / T4 decision: how often does a query arrive
+        # concept-only (no text), and how large is the node it hits? File append only.
+        log_v4_query(self.out, {
+            "tool": "search_clause_items",
+            "taxonomy_id": taxonomy_id,
+            "has_text": bool(text and text.strip()),
+            "narrowed_by": [k for k, v in (
+                ("text", text), ("subject", subject), ("polarity", polarity),
+                ("effective_time", effective_time), ("ctype", ctype),
+                ("lang", lang), ("version", version),
+            ) if v],
+            "population": result.get("total_items"),
+            "low_query_signal": "low_query_signal" in result,
+            "offset": offset,
+        })
+        return result
 
     def compare_clause_items(
         self,
@@ -104,7 +125,7 @@ def register_v4_tools(mcp: Any, out: Path, annotations: Any = None) -> V4McpServ
         limit: int = 50,
         offset: int = 0,
     ) -> dict[str, Any]:
-        """Search approved V4 atomic items. If item_absent is true, only complete current body/annex coverage can produce confirmed_absent; all other non-matches are needs_review. version filters by contract version-role (execution/buyer_draft/... or Korean labels, comma-separated). That role is a FILENAME HEURISTIC, so a version-filtered call also returns version_filter_notice (excluded_unknown / excluded_partial / excluded_low_confidence / review_candidates): report those counts and never present the result as the complete population of that version. Rows carry version_confidence (high/med/low; null = not backfilled), version_basis and version_review_required — treat true as 확인 필요."""
+        """Search approved V4 atomic items. text is not just a filter but the RANKING signal: a bare concept query (taxonomy_id only) returns the whole node's items in document order (unranked enumeration — a node holds hundreds to thousands of items), so ALWAYS pass the user query's distinctive keywords as text. text is whitespace-tokenized (each token must appear in the item's verbatim or proposition — keyword-style, not an exact quote), and relevance ordering (verbatim hit > proposition-only, contiguous phrase, position, focus) engages only when text is present; subject / polarity / ctype / lang narrow further. If a result carries low_query_signal (population N), the query was too broad — re-issue it with keywords from the user's request. If item_absent is true, only complete current body/annex coverage can produce confirmed_absent; all other non-matches are needs_review. version filters by contract version-role (execution/buyer_draft/... or Korean labels, comma-separated). That role is a FILENAME HEURISTIC, so a version-filtered call also returns version_filter_notice (excluded_unknown / excluded_partial / excluded_low_confidence / review_candidates): report those counts and never present the result as the complete population of that version. Rows carry version_confidence (high/med/low; null = not backfilled), version_basis and version_review_required — treat true as 확인 필요."""
         return service.search_clause_items(
             taxonomy_id,
             polarity=polarity,

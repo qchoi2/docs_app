@@ -356,3 +356,66 @@ def test_concept_query_keeps_stable_enumeration_order(tmp_path):
     )
     keys = [row["file_key"] for row in result["results"]]
     assert keys == sorted(keys)
+
+
+def test_multi_keyword_text_query_ands_scattered_tokens(tmp_path):
+    # "인허가 위약벌" as two keywords: only the item carrying BOTH (scattered, not
+    # contiguous) matches. The old single-substring filter needed them adjacent and
+    # would have returned 0 for this common keyword-style query.
+    out = make_index(tmp_path)
+    seeds = [
+        ("a" * 16, "매도인은 인허가 취득 위반 시 위약벌을 부담한다", "위반 제재 명제"),  # both -> match
+        ("b" * 16, "인허가 취득 관련 동의가 필요하다", "동의 명제"),              # 인허가 only
+        ("c" * 16, "위약벌 관련 조항 없음", "제재 명제"),                      # 위약벌 only
+    ]
+    with closing(sqlite3.connect(out / "catalog.sqlite")) as conn:
+        for i, (fk, verbatim, prop) in enumerate(seeds):
+            conn.execute(
+                """
+                INSERT INTO v4_clause_item(
+                  file_key,item_ref,family,taxonomy_id,proposition,statement_polarity,
+                  source_kind,verbatim,loc_start,loc_end,confidence,txt_hash,
+                  taxonomy_version,extractor_version,prompt_version,review_status,
+                  created_at,updated_at
+                ) VALUES (?,?,?,?,?,?,'body',?,?,?,'high',?,12,'test','test',
+                          'approved',?,?)
+                """,
+                (fk, f"CPK-{i}", "CP", "CP.THIRD_PARTY_CONSENT", prop, "affirmative",
+                 verbatim, 30, 30, fk, NOW, NOW),
+            )
+        conn.commit()
+    result = search_clause_items(
+        out, "CP.THIRD_PARTY_CONSENT", text="인허가 위약벌", show_duplicates=True, limit=10
+    )
+    keys = [row["file_key"] for row in result["results"]]
+    assert keys == ["a" * 16]
+    assert result["total_items"] == 1
+
+
+def test_low_query_signal_hint_on_broad_concept_query(tmp_path, monkeypatch):
+    # A bare concept query over a population above the threshold gets a machine-readable
+    # hint so an agent re-queries with keywords; a text-narrowed query never does.
+    import v4_search
+    monkeypatch.setattr(v4_search, "LOW_SIGNAL_POPULATION", 1)
+    out = make_index(tmp_path)
+    _seed_text_ranking_items(out)  # -> several CP.THIRD_PARTY_CONSENT items
+    broad = search_clause_items(out, "CP.THIRD_PARTY_CONSENT", show_duplicates=True)
+    assert broad["total_items"] > 1
+    assert "low_query_signal" in broad
+    assert broad["low_query_signal"]["population"] == broad["total_items"]
+    narrowed = search_clause_items(
+        out, "CP.THIRD_PARTY_CONSENT", text="인허가", show_duplicates=True
+    )
+    assert "low_query_signal" not in narrowed
+
+
+def test_log_v4_query_appends_jsonl(tmp_path):
+    import json as _json
+    from v4_search import log_v4_query
+    out = make_index(tmp_path)
+    log_v4_query(out, {"tool": "search_clause_items", "has_text": False, "population": 42})
+    lines = (out / "v4_query_log.jsonl").read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 1
+    record = _json.loads(lines[0])
+    assert record["population"] == 42 and record["has_text"] is False
+    assert "ts" in record  # timestamp is stamped by the logger
