@@ -1,0 +1,746 @@
+{
+  "generated": "2026-07-30",
+  "batch": "RW 정독 재추출 next 40",
+  "store_report": {
+    "backup": "catalog.pre_rw_reextract_20260730T135942.sqlite",
+    "files": 40,
+    "by_status": {
+      "stored": 39,
+      "skipped_no_items": 1
+    },
+    "integrity": "ok",
+    "full_read_stored": 39,
+    "regress_overridden_count": 30,
+    "regression_count": 0,
+    "oversegmented_count": 0
+  },
+  "regress_overridden": [
+    {
+      "file_key": "035120389c7c26d0",
+      "lost_domains": [
+        "RW",
+        "RW.PRODUCTS"
+      ]
+    },
+    {
+      "file_key": "0ab42727a9219b81",
+      "lost_domains": [
+        "RW"
+      ]
+    },
+    {
+      "file_key": "0fcd6a6297fc8a73",
+      "lost_domains": [
+        "RW",
+        "RW.DISCLOSURE",
+        "RW.PERMITS"
+      ]
+    },
+    {
+      "file_key": "167299b34d606e60",
+      "lost_domains": [
+        "RW.ABSENCE_OF_CHANGES",
+        "RW.ASSETS",
+        "RW.CAPITALIZATION",
+        "RW.COMPLIANCE",
+        "RW.CONTRACTS",
+        "RW.CUSTOMERS_SUPPLIERS",
+        "RW.ENVIRONMENT",
+        "RW.FINANCIAL",
+        "RW.INSURANCE",
+        "RW.IP",
+        "RW.LABOR",
+        "RW.LITIGATION",
+        "RW.PERMITS",
+        "RW.PRIVACY",
+        "RW.REAL_ESTATE",
+        "RW.RELATED_PARTY",
+        "RW.TAX"
+      ]
+    },
+    {
+      "file_key": "18951fc609380244",
+      "lost_domains": [
+        "RW"
+      ]
+    },
+    {
+      "file_key": "1c3db4ca335c4f39",
+      "lost_domains": [
+        "RW",
+        "RW.DISCLOSURE",
+        "RW.ENVIRONMENT"
+      ]
+    },
+    {
+      "file_key": "2a85f1dd1f73b0e2",
+      "lost_domains": [
+        "RW.CAPITALIZATION",
+        "RW.REAL_ESTATE"
+      ]
+    },
+    {
+      "file_key": "3a8f1f6844464a84",
+      "lost_domains": [
+        "RW"
+      ]
+    },
+    {
+      "file_key": "3f179223e26b2f3b",
+      "lost_domains": [
+        "RW"
+      ]
+    },
+    {
+      "file_key": "44fe31b52107c3c9",
+      "lost_domains": [
+        "RW.CUSTOMERS_SUPPLIERS"
+      ]
+    },
+    {
+      "file_key": "4596477fe5af5444",
+      "lost_domains": [
+        "RW.ABSENCE_OF_CHANGES"
+      ]
+    },
+    {
+      "file_key": "4997e306e66695ec",
+      "lost_domains": [
+        "RW"
+      ]
+    },
+    {
+      "file_key": "49a2e1b07786778c",
+      "lost_domains": [
+        "RW",
+        "RW.ABSENCE_OF_CHANGES",
+        "RW.CONTRACTS",
+        "RW.REAL_ESTATE"
+      ]
+    },
+    {
+      "file_key": "4e95c9b4b7181e1b",
+      "lost_domains": [
+        "RW"
+      ]
+    },
+    {
+      "file_key": "613a963a60846e50",
+      "lost_domains": [
+        "RW.CONTRACTS",
+        "RW.DISCLOSURE",
+        "RW.PERMITS"
+      ]
+    },
+    {
+      "file_key": "6b490cb70a9e2d62",
+      "lost_domains": [
+        "RW.BENEFITS"
+      ]
+    },
+    {
+      "file_key": "7bb588f0c1637a71",
+      "lost_domains": [
+        "RW",
+        "RW.DISCLOSURE",
+        "RW.ENVIRONMENT"
+      ]
+    },
+    {
+      "file_key": "81075014d5064351",
+      "lost_domains": [
+        "RW.CAPITALIZATION"
+      ]
+    },
+    {
+      "file_key": "830df8ae07fc25d7",
+      "lost_domains": [
+        "RW",
+        "RW.BUYER"
+      ]
+    },
+    {
+      "file_key": "924cff0facbcf243",
+      "lost_domains": [
+        "RW.CONTRACTS",
+        "RW.DISCLOSURE"
+      ]
+    },
+    {
+      "file_key": "953488d0ea9cabd1",
+      "lost_domains": [
+        "RW.CUSTOMERS_SUPPLIERS"
+      ]
+    },
+    {
+      "file_key": "970b1bb34267a8e9",
+      "lost_domains": [
+        "RW"
+      ]
+    },
+    {
+      "file_key": "b418916cfda31bb0",
+      "lost_domains": [
+        "RW"
+      ]
+    },
+    {
+      "file_key": "b98ed3a7aa24d41d",
+      "lost_domains": [
+        "RW"
+      ]
+    },
+    {
+      "file_key": "bb0f559e346407cf",
+      "lost_domains": [
+        "RW"
+      ]
+    },
+    {
+      "file_key": "c9fabb4ac4ba7eea",
+      "lost_domains": [
+        "RW.CUSTOMERS_SUPPLIERS"
+      ]
+    },
+    {
+      "file_key": "ca74a79991091638",
+      "lost_domains": [
+        "RW",
+        "RW.DISCLOSURE",
+        "RW.PERMITS"
+      ]
+    },
+    {
+      "file_key": "d1696613b9214743",
+      "lost_domains": [
+        "RW",
+        "RW.ENVIRONMENT"
+      ]
+    },
+    {
+      "file_key": "e45d3402878d30f6",
+      "lost_domains": [
+        "RW.CUSTOMERS_SUPPLIERS"
+      ]
+    },
+    {
+      "file_key": "e7ce3f8a57347935",
+      "lost_domains": [
+        "RW.CUSTOMERS_SUPPLIERS"
+      ]
+    }
+  ],
+  "domain_drop_detail": [
+    {
+      "file_key": "035120389c7c26d0",
+      "dropped_domains": [
+        "RW",
+        "RW.PRODUCTS"
+      ],
+      "gained_domains": [
+        "RW.ASSETS",
+        "RW.BENEFITS",
+        "RW.PERMITS",
+        "RW.SOLVENCY"
+      ],
+      "items_before": 87,
+      "items_after": 50,
+      "reason": "RW 하위영역 재추출 (정독) — 제6.1조 발행회사 진술 및 보장 ¶98~¶118(19개 항목 전수), 제6.2조 투자자 진술 및 보장 ¶120~¶126 전문 정독. 별첨 6.1 공개목록(¶278~¶321)은 진술의 예외(exception)이므로 별도 진술 item으로 추출하지 않고, 그 항목번호 6.1(2)·(8)·(9)·(12)·(13)·(16)·(19)로 본문 진술 19개 항목의 누락 없음을 교차확인함. 별첨 2.2(대상주식 조건)·별첨 5.1(4)(사전동의사항)은 진술이 아님. 부동산·개인정보·제품책임·고객/공급업체·재고·매출채권·중개수수료 진술은 원문에 없음."
+    },
+    {
+      "file_key": "0ab42727a9219b81",
+      "dropped_domains": [
+        "RW"
+      ],
+      "gained_domains": [
+        "RW.ABSENCE_OF_CHANGES",
+        "RW.ASSETS",
+        "RW.BUYER",
+        "RW.CONTRACTS",
+        "RW.FINANCIAL",
+        "RW.INSURANCE",
+        "RW.IP",
+        "RW.PERMITS",
+        "RW.RELATED_PARTY"
+      ],
+      "items_before": 40,
+      "items_after": 60,
+      "reason": "RW 하위영역 재추출 (정독). 진술 조항 = 회사의 진술 및 보장(¶52-¶79)과 인수인의 진술 및 보장(¶80-¶88). 전환우선주 신주인수계약(SSA, 회사·베트남자회사 대상). ¶53이 편입하는 [별지 1] 공개목록(¶230-¶237)까지 확인 — 베트남자회사 차입금 보증 사실을 예외로 기재한 공시목록이며 독립 진술이 아니므로 항목화하지 않음(범위밖 긁어오기 방지). 별첨 1(¶182 이하)은 우선주식 발행조건·전환청구서 양식으로 진술 아님. 진짜 부재로 확정한 하위영역: RW.PRIVACY(개인정보/정보보호 grep 0건) · RW.PRODUCTS(제품/리콜/하자 grep — ¶16 사업목적 기술뿐) · RW.CUSTOMERS_SUPPLIERS(고객/공급업체 0건) · RW.BENEFITS(퇴직/연금/복리 0건) · RW.INVENTORY(재고 0건) · RW.ACCOUNTS_RECEIVABLE(매출채권 0건) · RW.BROKERS. RW.RELATED_PARTY는 독립 조항 없이 ¶63 법령준수 진술 내 '특수관계인 간의 거래 관련 법령' 문구에서만 도출되어 med. RW.REAL_ESTATE도 독립 조항 없이 ¶67 유형자산 진술 내 부동산 문구에서 도출되어 med."
+    },
+    {
+      "file_key": "0fcd6a6297fc8a73",
+      "dropped_domains": [
+        "RW",
+        "RW.DISCLOSURE",
+        "RW.PERMITS"
+      ],
+      "gained_domains": [],
+      "items_before": 26,
+      "items_after": 14,
+      "reason": "RW 하위영역 재추출 (정독) — 전환사채매매계약. 제5조 진술 및 보장 전문(¶56-¶72: 제5.1조 매도인 ¶57-¶63, 제5.2조 매수인들 ¶64-¶72) 및 편입 별지(별지 1 정의 ¶170-187, 별지 2.3 ¶188-193, 별지 3.2(2)·3.3(3)) 전부 정독. 매도인은 CB 보유자에 불과해 대상회사(주식회사 네추럴웨이)에 관한 사업 진술을 일절 하지 않으며, 근본적 진술(권한·집행가능성·위반없음·소송부존재)과 대상사채 소유·부담없음 진술만 존재. 조세·IP·노무·환경·부동산·보험·개인정보·재무제표·변경부존재·준법·인허가·중요계약·자산·복리후생·특수관계자·고객공급자·제품책임 진술은 진짜 부재('조세/세금·지식재산·근로·환경·부동산·보험·개인정보' 어휘 교차확인 결과 해당 어휘는 별지 1 정의조항 ¶174('세금 또는 조세')·제10.5조 비용및조세 ¶125-126·확약 ¶85(특수관계인 거래 제한)에만 등장하며 모두 RW 범위 밖). 종전 자동추출 24항목의 오류를 정정: (a) 선행조건 제4조 문장(¶45·¶48·¶49·¶53)과 손해배상 제7.1조 문장(¶90)을 RW로 긁어온 false-present 5건 제거, (b) 실재하지 않는 leaf RW.DISCLOSURE.ACCURACY 창작 5건 제거, (c) 'The buyer makes the representation set out in the quoted paragraph' 등 무내용 템플릿 proposition 및 동일 ¶ 중복항목(AUTHORITY leaf + RW.BUYER 이중계상 6건) 정리."
+    },
+    {
+      "file_key": "167299b34d606e60",
+      "dropped_domains": [
+        "RW.ABSENCE_OF_CHANGES",
+        "RW.ASSETS",
+        "RW.CAPITALIZATION",
+        "RW.COMPLIANCE",
+        "RW.CONTRACTS",
+        "RW.CUSTOMERS_SUPPLIERS",
+        "RW.ENVIRONMENT",
+        "RW.FINANCIAL",
+        "RW.INSURANCE",
+        "RW.IP",
+        "RW.LABOR",
+        "RW.LITIGATION",
+        "RW.PERMITS",
+        "RW.PRIVACY",
+        "RW.REAL_ESTATE",
+        "RW.RELATED_PARTY",
+        "RW.TAX"
+      ],
+      "gained_domains": [],
+      "items_before": 57,
+      "items_after": 13,
+      "reason": "RW 하위영역 재추출 (정독) — 영문 SHA(Preciseley Microtechnology Corporation Shareholders Agreement, 2022-02-18). 진술 조항은 Article 6 Section 6.1(¶383-¶390)이 유일하며 'Each Shareholder, severally and not jointly, represents and warrants ... as to itself only'의 당사자 상호(각자 자신에 관한) 진술이다. 대상회사(the Corporation)는 계약 당사자이나 Shareholder가 아니어서 회사 진술을 전혀 하지 않는다 → 조세·노무·IP·환경·부동산·보험·개인정보·복리후생·제품책임·주요고객/공급업체·특수관계자·중요계약·재무제표·자본구성·변경부존재·소송 등 실질 진술은 이 계약에 존재하지 않음(진짜 부재, ¶384-¶390 전문 정독 + represent/warrant 전문 grep 교차확인). Schedule H General Sale Provisions ¶670은 장래 주식양도 시 'customary representations and warranties'를 제공할 의무(양도 절차상 확약)이고 ¶280 tag-along도 동일 성격이므로 RW 항목화하지 않음. Schedule E(¶503-¶554)는 회사-임직원 간 기밀유지·발명양도 계약 서식이고 Schedule F(¶555-¶646)는 이사 면책계약 서식으로, 본 계약 당사자의 진술이 아니어서 제외(종전 자동추출이 여기서 RW.IP/RW.PRIVACY/RW.REAL_ESTATE 등을 만들어낸 false-present). 종전 자동추출 57항목 중 진술 조항 범위 내 항목은 ¶389 1건뿐이고 나머지는 정의조항(¶93-¶176)·Schedule B/C 특별승인사항(확약 목록)·분리가능성 등 일반조항·별지 서식에서 긁어온 것이며 proposition이 전부 무내용 템플릿이었다 — 전량 교체. 이 정독 결과는 그 다수 도메인을 의도적으로 떨어뜨린다(false-present 정정)."
+    },
+    {
+      "file_key": "18951fc609380244",
+      "dropped_domains": [
+        "RW"
+      ],
+      "gained_domains": [
+        "RW.BENEFITS",
+        "RW.BROKERS",
+        "RW.DISCLOSURE",
+        "RW.INVENTORY",
+        "RW.REAL_ESTATE",
+        "RW.SOLVENCY"
+      ],
+      "items_before": 66,
+      "items_after": 74,
+      "reason": "RW 하위영역 재추출 (정독) — 제5조(진술 및 보장) + 편입 별지 5.1(발행회사의 진술 및 보장, ¶143-180) 및 그에 이중 편입된 공개목록 5.1(3) 주식매수선택권 발행내역(¶185-199)·공개목록 5.1(4) 자회사 목록(¶200-211) 전문 정독. 기존 자동추출 bare RW 28건을 구체 하위영역 노드로 재분류. 환경·개인정보·제품·고객공급업체·IT·매출채권 진술은 어휘 grep(환경/오염/폐기물/개인정보/정보보호/고객/공급업체/제품/리콜/매출채권/전산) 결과 0건으로 진짜 부재."
+    },
+    {
+      "file_key": "1c3db4ca335c4f39",
+      "dropped_domains": [
+        "RW",
+        "RW.DISCLOSURE",
+        "RW.ENVIRONMENT"
+      ],
+      "gained_domains": [
+        "RW.ABSENCE_OF_CHANGES",
+        "RW.ASSETS",
+        "RW.BENEFITS",
+        "RW.BUYER",
+        "RW.CAPITALIZATION",
+        "RW.IP",
+        "RW.PERMITS",
+        "RW.PRIVACY",
+        "RW.REAL_ESTATE",
+        "RW.RELATED_PARTY"
+      ],
+      "items_before": 24,
+      "items_after": 31,
+      "reason": "RW 하위영역 재추출 (정독) — 제3조(진술 및 보장) ¶28~¶48 전문 정독. 발행회사·이해관계인 진술 ¶30~¶44, 투자자(매수인) 진술 ¶45~¶48(RW.BUYER 4항목) 포함. RW.TAX·RW.ENVIRONMENT·RW.INSURANCE·RW.PRODUCTS·RW.CUSTOMERS_SUPPLIERS·RW.SOLVENCY·RW.BROKERS 진술은 원문에 존재하지 않음(제3조 전문 확인). RW.PRIVACY는 ¶37 법령준수 진술 내 '개인정보 보호법을 포함함' 문구에서만 도출되는 파생 항목이므로 med."
+    },
+    {
+      "file_key": "2a85f1dd1f73b0e2",
+      "dropped_domains": [
+        "RW.CAPITALIZATION",
+        "RW.REAL_ESTATE"
+      ],
+      "gained_domains": [
+        "RW.ACCOUNTS_RECEIVABLE",
+        "RW.DISCLOSURE",
+        "RW.INVENTORY"
+      ],
+      "items_before": 41,
+      "items_after": 73,
+      "reason": "RW 하위영역 재추출 (정독) — SECTION 5 (Representations and Warranties of Seller) ¶105~¶131 전항(5.1~5.20, IP 하위항 ¶118~¶123 포함), SECTION 6 (Representations and Warranties of the Purchasers) ¶133~¶135 전문 정독. SECTION 7 GUARANTEE(¶136~¶144)에는 보증인의 진술보장이 없음(grep 'represents and warrants' 교차확인: ¶105·¶123·¶133만). 자산양수도 특성 확인 결과 부동산은 Excluded Assets(¶34 'insert description or schedule for excluded real property')이고 진술 조항에 대상은 Target Personal Property·Inventories·Accounts Receivable·IP뿐이므로 RW.REAL_ESTATE 진술 없음. 개인정보는 Section 8.4 확약(¶151 고객 개인정보 이전 통지)뿐이고 진술이 아니므로 RW.PRIVACY 없음. 퇴직금(severance)은 Section 2.1·4.2·8.8 확약·선행조건(¶53·¶91·¶156)에만 나오고 진술이 아니므로 RW.BENEFITS 없음. 특수관계자 거래 진술 없음. 인용된 Schedule 5.2·5.12, Exhibit A·C는 txt 캐시에 본문이 없으나(계약 말미 ¶228에서 종료) 본문 진술 자체가 완결돼 있어 정독 조건 충족."
+    },
+    {
+      "file_key": "3a8f1f6844464a84",
+      "dropped_domains": [
+        "RW"
+      ],
+      "gained_domains": [
+        "RW.ACCOUNTS_RECEIVABLE",
+        "RW.BENEFITS",
+        "RW.BROKERS",
+        "RW.CORPORATE_GOVERNANCE",
+        "RW.INVENTORY",
+        "RW.IP",
+        "RW.PRIVACY",
+        "RW.PRODUCTS",
+        "RW.REAL_ESTATE",
+        "RW.SOLVENCY"
+      ],
+      "items_before": 177,
+      "items_after": 112,
+      "reason": "RW 하위영역 재추출 (정독). 진술 조항은 제5.1조(¶67-69)가 별지 5.1(¶366-419)을 편입하는 별지 편입형이고, 그 예외는 공개목록(¶420-453)에 있어 공개목록 본문(자회사 목록·미감사 재무제표·기존주주 명의 상표 12건·거래수수료)까지 항목화. 인수인 진술은 제5.2조(¶71-80), 기존주주등 진술은 제5.3조(¶82-87) 본문에 있으며, 별지 6.1(7) 주식근질권설정계약서 제4조(¶472-480)의 근질권설정자 진술도 포함(parent_clause_ref로 구분). 개인정보(RW.PRIVACY)·제조물책임(RW.PRODUCTS)은 독립 조항이 없고 ¶384 법률준수 진술의 열거(개인정보 보호법·식품위생법)에서만 도출되어 confidence=med. 고객·공급업체(RW.CUSTOMERS_SUPPLIERS) 진술은 진술 조항에 없음(¶92는 확약). 자동추출이 창작한 RW.DISCLOSURE.ACCURACY 대신 실재 노드만 사용."
+    },
+    {
+      "file_key": "3f179223e26b2f3b",
+      "dropped_domains": [
+        "RW"
+      ],
+      "gained_domains": [
+        "RW.ACCOUNTS_RECEIVABLE",
+        "RW.BENEFITS",
+        "RW.CORPORATE_GOVERNANCE",
+        "RW.DISCLOSURE",
+        "RW.ENVIRONMENT",
+        "RW.INVENTORY",
+        "RW.PRODUCTS",
+        "RW.RELATED_PARTY",
+        "RW.SOLVENCY",
+        "RW.TAX"
+      ],
+      "items_before": 66,
+      "items_after": 73,
+      "reason": "RW 하위영역 재추출 (정독). 진술 조항은 제4조(¶29-30)가 별첨 2(¶149-217)를 편입하는 별지 편입형이며, 투자자(매수인) 진술은 제5조(¶32-35)에 본문으로 있음. 별첨 2 전문 + 제5조를 정독해 RW 전체를 재구성. 개인정보(RW.PRIVACY)·브로커·고객공급업체 진술은 원문에 없어 항목 생성하지 않음. 별첨 1(사채조건)·별첨 3(사전동의사항)은 PAY/COV 영역이므로 제외."
+    },
+    {
+      "file_key": "44fe31b52107c3c9",
+      "dropped_domains": [
+        "RW.CUSTOMERS_SUPPLIERS"
+      ],
+      "gained_domains": [
+        "RW.DISCLOSURE"
+      ],
+      "items_before": 84,
+      "items_after": 44,
+      "reason": "RW 하위영역 재추출 (정독) — SPA(대상회사: 에스케이엠앤서비스 주식회사). 제5조 진술 및 보장 전문(¶109-¶132: 제5.1조 매도인 ¶110-¶119, 제5.2조 매도인의 대상회사에 대한 진술 ¶120-¶122, 제5.3조 매수인 ¶123-¶132)과 **본문이 편입한 별지 5.2(매도인의 대상회사에 대한 진술 및 보장) 전문(¶305-¶338)** 및 별지 5.3(6)(¶343-345)을 모두 정독. 본문 ¶121은 '별지 5.2와 같이 진술 및 보장한다'로 인용만 하고 대상회사 실질 진술 16개 항목은 전부 별지 5.2에 있으므로(§4 별지 편입형), 별지 5.2의 각 항을 항목화했다(조직및권한·정관법률준수·주식및자본구조·정부기관인허가·재무제표·우발채무부존재·MAE부존재·중요계약·자산·지적재산권·인사및노무·조세·준법·쟁송·특수관계인거래·정보보호). 진짜 부재로 확정한 하위영역: RW.ENVIRONMENT('환경' 문서 전체 0회), RW.REAL_ESTATE('부동산·임대차' 0회 — 별지 5.2 제(9)항 자산 진술은 '중요한 유형자산' 일반 소유권만 다루고 부동산/임대차 진술은 없음), RW.INSURANCE('보험'은 별지 4.1(7) 동의필요계약 목록 ¶299-303의 보험대리점 위탁계약명으로만 등장 — 이는 선행조건 별지이고 보험 유지 진술이 아님), RW.PRODUCTS·RW.CUSTOMERS_SUPPLIERS·RW.INVENTORY·RW.ACCOUNTS_RECEIVABLE·RW.IT·RW.SOLVENCY·RW.BROKERS·RW.GOVERNMENT_CONTRACTS(각 어휘 0회). 범위 밖 문단 배제: 선행조건 ¶92·¶101, 존속기간 ¶176-177, 확약 ¶133 이하, 정의조항 ¶250-287, 공개목록 전문(¶339-342 — 진술의 예외 서문이지 진술 아님), 별지 3.3(3) 사임서 양식 ¶288-296, 별지 4.1(7) 계약목록 ¶297-303."
+    },
+    {
+      "file_key": "4596477fe5af5444",
+      "dropped_domains": [
+        "RW.ABSENCE_OF_CHANGES"
+      ],
+      "gained_domains": [
+        "RW.BENEFITS",
+        "RW.DISCLOSURE",
+        "RW.SOLVENCY"
+      ],
+      "items_before": 44,
+      "items_after": 51,
+      "reason": "RW 하위영역 재추출 (정독). 제5조 진술 조항(¶77-83)이 별지 5.1(1)(¶299-308 매도인)·별지 5.1(2)(¶309-326 대상회사)·별지 5.2(¶359-369 매수인)를 편입하는 별지 편입형이며, 진술의 예외는 공개목록(¶327-358)에 있어 공개목록 본문까지 항목화. 환경(RW.ENVIRONMENT)·개인정보(RW.PRIVACY)·제조물책임·변경부존재·고객공급업체·브로커 진술은 원문에 없어 항목 생성하지 않음(환경/개인정보/제조물·리콜 키워드 전문 검색 결과 진술 조항 내 언급 0건; ¶31의 '환경정보공개시스템'은 적정공개 정의). ¶138(제7.1조)의 '중대한 부정적인 영향' 문구는 선행조건(CP)이므로 RW.ABSENCE_OF_CHANGES로 넣지 않음."
+    },
+    {
+      "file_key": "4997e306e66695ec",
+      "dropped_domains": [
+        "RW"
+      ],
+      "gained_domains": [
+        "RW.ABSENCE_OF_CHANGES",
+        "RW.BENEFITS",
+        "RW.CONTRACTS",
+        "RW.CORPORATE_GOVERNANCE",
+        "RW.INSURANCE",
+        "RW.IP",
+        "RW.LABOR",
+        "RW.PERMITS",
+        "RW.RELATED_PARTY"
+      ],
+      "items_before": 57,
+      "items_after": 90,
+      "reason": "RW 하위영역 재추출 (정독). 진술 조항 제5조(¶71-108: 제5.1조 매도인·대상주식 ¶74-82, 제5.2조 대상회사 ¶84-106)와 제6조 매수인(¶109-118)을 전문 정독. 각 진술이 전제하는 공개목록 본문(¶438-1331: 대상주식 부담·필요적 승인·자본현황·기준재무정보·토지 4종 목록·전대차·인허가·노무·소송·보증·특수관계자 거래·관계사 채무)까지 항목화했다(별지 편입형). 개인정보(RW.PRIVACY)·제조물책임·재고자산·고객공급업체·브로커 진술은 원문에 없어 항목 생성하지 않음(개인정보/제조물/리콜/고객/공급업체 키워드 전문 검색 0건). ¶119 이하 제7조 확약사항과 제10조 손해배상은 COV/REM이므로 제외."
+    },
+    {
+      "file_key": "49a2e1b07786778c",
+      "dropped_domains": [
+        "RW",
+        "RW.ABSENCE_OF_CHANGES",
+        "RW.CONTRACTS",
+        "RW.REAL_ESTATE"
+      ],
+      "gained_domains": [
+        "RW.ASSETS",
+        "RW.PERMITS"
+      ],
+      "items_before": 67,
+      "items_after": 33,
+      "reason": "RW 하위영역 재추출 (정독). 제5조(매도인·대상회사)·제6조(매수인) 진술 전문 + 본문이 편입한 별지 5.2(c)·별지 5.2(g) 정독. 37.36% 소수지분 매각으로 회사 진술이 8개 항목뿐이며, 노무·IP·환경·개인정보·보험·부동산·중요계약·법령준수(포괄) 진술은 원문에 존재하지 않음(진짜 부재). 일반 공개목록 별지 자체는 txt 캐시에 첨부되지 않았으나(예외 열거 문서로 추가 진술을 창설하지 않음), 진술 조항이 인용한 별지 5.2(c)·5.2(g)는 모두 캐시에 존재하여 RW 세트는 완전함."
+    },
+    {
+      "file_key": "4e95c9b4b7181e1b",
+      "dropped_domains": [
+        "RW"
+      ],
+      "gained_domains": [
+        "RW.BROKERS",
+        "RW.INVENTORY",
+        "RW.PRIVACY",
+        "RW.REAL_ESTATE",
+        "RW.SOLVENCY"
+      ],
+      "items_before": 115,
+      "items_after": 108,
+      "reason": "RW 하위영역 재추출 (정독) — 제5조(진술 및 보장: 5.1 발행회사 ¶62-71, 5.2 투자자 ¶72-79, 5.3 이해관계인 ¶80-87) + 편입 별지 5.1(8) 발행회사에 대한 진술 및 보장(¶366-412) + 그에 이중 편입된 별지 5.1(8)(A) 공개목록(¶413-420) 전문 정독. 특수관계인 진술이 카브아웃으로 인용하는 별지 6.2(3)(¶611-615) 내용도 med로 반영. 범위 밖(선행조건 ¶43·¶56, 확약 ¶88-137, 별첨 1 사채조건 ¶290-357, 별지 6.1(5) 정관 개정안, 별지 6.2(1) 공장 임대차계약서 ¶483-580)은 제외 — 기존 자동추출은 ¶43 선행조건을 RW.DISCLOSURE.ACCURACY로 잡는 등 범위 밖 항목이 다수였다."
+    },
+    {
+      "file_key": "613a963a60846e50",
+      "dropped_domains": [
+        "RW.CONTRACTS",
+        "RW.DISCLOSURE",
+        "RW.PERMITS"
+      ],
+      "gained_domains": [],
+      "items_before": 37,
+      "items_after": 24,
+      "reason": "RW 하위영역 재추출 (정독). 진술 및 보장은 제5조 전부 — 제5.1조 매도인들의 진술 및 보장(¶66~¶73), 제5.2조 매수인의 진술 및 보장(¶75~¶81). 본 계약은 재무적 투자자(조합)들이 보유한 대상회사 전환사채를 매수인에게 매도하는 2차 매매로, 대상회사 사업에 관한 진술(조세·노무·IP·환경·개인정보·부동산·보험·재무제표 등)이 원문에 아예 없다 — 매도인 자신에 관한 근본적 진술과 대상사채 소유·부담없음 진술만 존재한다(¶66~¶73 전문 정독 + '환경/지적재산/개인정보/부동산/보험/노무' 어휘 전수 확인, 해당 표현은 별지 1 정의조항(¶297 '지적재산권' 정의)과 확약·비밀유지 조항(¶122)에만 등장). 기존 자동추출 오분류 정정: 선행조건(¶48·¶50·¶52·¶58)을 RW.DISCLOSURE.ACCURACY/RW.LITIGATION/RW.AUTHORITY로, 진술 조항 도입문(¶66·¶75)을 RW 항목으로 넣은 것을 제외했다."
+    },
+    {
+      "file_key": "6b490cb70a9e2d62",
+      "dropped_domains": [
+        "RW.BENEFITS"
+      ],
+      "gained_domains": [
+        "RW.ACCOUNTS_RECEIVABLE",
+        "RW.BROKERS",
+        "RW.CORPORATE_GOVERNANCE",
+        "RW.CUSTOMERS_SUPPLIERS",
+        "RW.INVENTORY",
+        "RW.IT",
+        "RW.PRIVACY",
+        "RW.PRODUCTS"
+      ],
+      "items_before": 50,
+      "items_after": 144,
+      "reason": "RW 하위영역 재추출 (정독) — Section 4 (Representations and Warranties of Seller on Sale Shares, ¶269~¶274), Section 5 (Representations and Warranties on Company, ¶275~¶369), Section 6 (Representations and Warranties of Purchaser, ¶370~¶379) 전문 정독. Section 5 하위조 번호는 본문 Schedule 교차참조(5.3 Subsidiaries, 5.4(c)(d) Assets;Real Property, 5.7(c) Material Contracts, 5.8(a)-(h) IP, 5.10 Insurance, 5.11(h) Compliance with Laws, 5.17(a)(b) Customers and Suppliers, 5.20(a)(b) Affiliate Transactions)와 일치 확인 — 누락 조 없음. 참고: 예외·목록용 disclosure schedule(Schedule 4.2, 5.3, 5.4(c)(d), 5.7(c), 5.8(a)-(h), 5.10, 5.11(h), 5.17(a)(b), 5.20(a)(b))은 txt에 수록되어 있지 않다(txt 수록 별첨은 Exhibit A~C 표제, Schedule 1.2 Key Employees, 2.5 Milestones, 8.1(h) Remedial Actions뿐). 그러나 진술 본문 자체는 전부 계약 본문에 있어 '별지 편입형'이 아니며 정독에 결손이 없다. RW.BENEFITS(퇴직연금·복리후생 플랜) 진술은 원문에 없음 — Labor Matters(5.13)는 보수 지급·노조·쟁의·법령준수만 다룬다. RW.SOLVENCY 진술도 없음. RW.PRODUCTS는 5.11(h) Medical Devices Act 준수 진술로 존재한다."
+    },
+    {
+      "file_key": "7bb588f0c1637a71",
+      "dropped_domains": [
+        "RW",
+        "RW.DISCLOSURE",
+        "RW.ENVIRONMENT"
+      ],
+      "gained_domains": [
+        "RW.ABSENCE_OF_CHANGES",
+        "RW.CAPITALIZATION",
+        "RW.PERMITS"
+      ],
+      "items_before": 13,
+      "items_after": 15,
+      "reason": "RW 하위영역 재추출 (정독) — BW(신주인수권부사채) 인수계약. 진술 조항은 제2조(¶12-¶23) 발행회사 단독 진술이며 인수인 진술 조항은 원문에 없음(RW.BUYER 진짜 부재). RW.LABOR는 확약조항(¶40, 근로조건·단체협약 변경 사전합의)에만 등장하는 COV이므로 RW로 항목화하지 않음(진짜 부재). 별첨(¶83-¶104)은 사채 발행조건표이며 진술 조항이 편입하지 않음. 종전 자동추출은 ¶21 법령준수 1문장을 AUTHORITY/COMPLIANCE/ENVIRONMENT/LITIGATION 4개 도메인으로 복제(RW.ENVIRONMENT false-present)하고, 선행조건 조항 ¶26·¶30·¶31을 RW로 긁어왔으며 실재하지 않는 leaf RW.DISCLOSURE.ACCURACY를 창작함 — 모두 제거."
+    },
+    {
+      "file_key": "81075014d5064351",
+      "dropped_domains": [
+        "RW.CAPITALIZATION"
+      ],
+      "gained_domains": [
+        "RW.ENVIRONMENT",
+        "RW.REAL_ESTATE"
+      ],
+      "items_before": 4,
+      "items_after": 4,
+      "reason": "RW 하위영역 재추출 (정독). 본 문서는 주식매매계약서 '추가합의서'로 독립된 '진술 및 보장' 조항이 없고, 진술·보장 성격의 문장은 ¶20(매도인들의 인허가 취득 및 부동산 점유·사용 보장 + 매수인의 신뢰 인정)뿐이다. ¶15~¶23은 매수청구권(풋옵션) 조항, ¶25~¶26은 매도인1의 주식처분제한 확약(COV)이므로 RW에서 제외했다 — 기존 자동추출이 ¶25·¶26을 RW.CAPITALIZATION.OWNERSHIP으로 오분류했던 것을 정정한다. ¶38 서명란에 문장 중복 결합 아티팩트가 있으나 진술 조항 범위 밖이다."
+    },
+    {
+      "file_key": "830df8ae07fc25d7",
+      "dropped_domains": [
+        "RW",
+        "RW.BUYER"
+      ],
+      "gained_domains": [
+        "RW.ABSENCE_OF_CHANGES",
+        "RW.BENEFITS",
+        "RW.COMPLIANCE",
+        "RW.CORPORATE_GOVERNANCE",
+        "RW.IT",
+        "RW.PRODUCTS",
+        "RW.REAL_ESTATE",
+        "RW.SOLVENCY"
+      ],
+      "items_before": 110,
+      "items_after": 45,
+      "reason": "RW 하위영역 재추출 (정독) — 본문 제3조(¶84-86)가 편입하는 별지 1 '진술과 보장'(¶449-703) 전문 정독: 제1장 공통사항(제1~5조), 제2장 회사에 관한 사항(제6~12조), 제3장 이해관계인에 관한 사항(제13~16조). 이 계약은 회사·이해관계인 → 투자자 일방향 진술 구조로 투자자(매수인)의 진술 조항이 존재하지 않는다 (¶84-86 및 별지 1 전문 정독, '투자자는' grep 교차확인 결과 투자자 진술 없음) → RW.BUYER 0건은 진짜 부재. 기존 자동추출 결과(108항목)는 68항목이 진술 조항 범위(¶449-703) 밖(선행조건 ¶75, 면책 ¶107, 우선주 조건 ¶335 등)에서 긁어온 것이었고 RW.BUYER 2건은 이해관계인 연대배상(REM, ¶685-686)의 오분류, RW.DISCLOSURE.ACCURACY 3건은 실재하지 않는 leaf였다 — 정독으로 시정. 캐시 유의사항: 별지1 제8조 제1항 담보제공·입보 표(¶594-603)는 머리행만 있고 데이터행이 확인되지 않아 해당 항목을 confidence=low로 표시했다(전환사채·신주인수권부사채 표(¶507-518)도 데이터행이 없으나 이는 ¶479의 '그 이외의 발행 주식은 존재하지 아니한다'와 일치하여 진짜 공란으로 판단). 별지1 제14조 제1항이 인용하는 '첨부 주주명부'는 이 파일에 첨부되어 있지 않다(¶688). 진술 조항 본문 자체는 처음부터 끝까지 온전히 읽혔으므로 full_read 마커를 부여한다. RW.PRIVACY·RW.CUSTOMERS_SUPPLIERS·RW.ACCOUNTS_RECEIVABLE·RW.INVENTORY·RW.BROKERS·RW.GOVERNMENT_CONTRACTS는 별지 1 전문 정독 결과 진짜 부재."
+    },
+    {
+      "file_key": "924cff0facbcf243",
+      "dropped_domains": [
+        "RW.CONTRACTS",
+        "RW.DISCLOSURE"
+      ],
+      "gained_domains": [],
+      "items_before": 43,
+      "items_after": 30,
+      "reason": "RW 하위영역 재추출 (정독). 소수지분(5.46%) SPA — 진술 조항은 제4조(¶52-¶72)뿐이고 별지·별첨 편입 없음. 이전 자동추출 43항목은 정의조항(¶14 '공정하게 공개')·손해배상(제7조)·선행조건에서 문장을 긁어 RW.DISCLOSURE.ACCURACY 5건 등 범위밖 항목을 만든 over-extraction이었다. 정독 결과 실재 진술은 매도인 10개항·매수인 7개항이며, 환경·IP·노무·부동산·보험·중요계약·특수관계자 진술은 원문에 실재하지 않음(진짜 부재)."
+    },
+    {
+      "file_key": "953488d0ea9cabd1",
+      "dropped_domains": [
+        "RW.CUSTOMERS_SUPPLIERS"
+      ],
+      "gained_domains": [
+        "RW.ACCOUNTS_RECEIVABLE",
+        "RW.BENEFITS",
+        "RW.BROKERS",
+        "RW.CORPORATE_GOVERNANCE",
+        "RW.DISCLOSURE",
+        "RW.INVENTORY",
+        "RW.IT",
+        "RW.RELATED_PARTY",
+        "RW.SOLVENCY"
+      ],
+      "items_before": 228,
+      "items_after": 190,
+      "reason": "RW 하위영역 재추출 (정독) — Section 2.6(a) Locked Box 진술 + ARTICLE III(매도인)·IV(대상회사)·V(매수인) 전문 정독. 주의: 진술보장을 한정하는 Seller Disclosure Letter(Schedule 4.2(a)/(c)/(h)/(i), 4.11(c) 등)는 본 계약에 편입되나 txt 캐시에 원문이 없어 별지 기재 내용 자체는 항목화하지 못함(본문 진술은 모두 실질 내용을 담고 있어 정독 가능)."
+    },
+    {
+      "file_key": "970b1bb34267a8e9",
+      "dropped_domains": [
+        "RW"
+      ],
+      "gained_domains": [
+        "RW.BENEFITS",
+        "RW.BROKERS",
+        "RW.CORPORATE_GOVERNANCE",
+        "RW.REAL_ESTATE"
+      ],
+      "items_before": 116,
+      "items_after": 68,
+      "reason": "RW 하위영역 재추출 (정독) — 별지 편입형. 본문 제5조 진술 및 보장(매도인 ¶125~¶132, 대상회사 편입 ¶134~¶135, 매수인 ¶137~¶143) 전문과, 대상회사 진술의 실질 전부가 담긴 별지 5.2(¶337~¶392)를 처음부터 끝까지 정독해 항목화함. 별지 5.1(5)(¶332~¶336)·별지 5.3(5)(¶448~¶449)는 진술이 인용하는 필요적 정부승인 목록이고, 공개목록(¶393~¶447)은 진술의 예외 목록임. ¶471~¶604(영문)·¶605~¶786(국문)은 별지 6.1(12) 'Tag-Along 행사대상주식 주식매매계약의 주요 조건(형식)'으로 첨부된 **다른 당사자(Delivery Hero Ventures GmbH·씨제이올리브영) 간 장래 계약의 agreed form**이므로 본 문서 자신의 RW로 추출하지 않음. 주요고객·공급업체 진술은 원문에 없음."
+    },
+    {
+      "file_key": "b418916cfda31bb0",
+      "dropped_domains": [
+        "RW"
+      ],
+      "gained_domains": [
+        "RW.COMPLIANCE"
+      ],
+      "items_before": 43,
+      "items_after": 22,
+      "reason": "RW 하위영역 재추출 (정독). 진술 조항 = 제6조 (¶66-¶88: 매도인 진술 ¶67-76, 매수인 진술 ¶77-86, 추가 진술 부존재 ¶87-88). 소수지분 2단계 매각 SPA로 매도인이 대상회사 경영지배권을 보유하지 않아 대상회사 사업 전반 진술을 제공하지 않음(¶75 Note에 명시). 편입 별지는 별지 2(¶184-187, 매도인·대상회사 간 계약/거래관계 목록)뿐이며 본문이 '[*]' 템플릿 공란이어서 항목화할 실질 진술 없음. 조세·지식재산·환경·노무·부동산·보험·개인정보·재무제표·제품책임·인허가 진술은 원문에 진짜 부재(진술 조항 전문 정독 + 조세/세무/납세/지식재산/특허/상표/환경/오염/보험/근로/임금/노동/부동산/임대차/개인정보/인허가/재무제표/리콜/제품 grep 교차확인 — 히트는 ¶140·¶142 '비용 및 조세' 확약조항뿐으로 진술 조항 범위 밖). 종전 자동추출 43항목에는 선행조건(CP) 문장 ¶36·¶42·¶49를 RW.DISCLOSURE.ACCURACY로, 손해배상(REM) 문장 ¶91을 RW.AUTHORITY.NO_CONFLICT로 넣은 범위밖 긁어오기와, 조항 도입부(¶68·¶78) 및 무내용 템플릿 proposition('The seller or company makes the representation set out in the quoted paragraph.') 중복이 있었음 — 정독으로 정정."
+    },
+    {
+      "file_key": "b98ed3a7aa24d41d",
+      "dropped_domains": [
+        "RW"
+      ],
+      "gained_domains": [
+        "RW.ACCOUNTS_RECEIVABLE",
+        "RW.BROKERS",
+        "RW.CORPORATE_GOVERNANCE",
+        "RW.DISCLOSURE",
+        "RW.SOLVENCY"
+      ],
+      "items_before": 140,
+      "items_after": 111,
+      "reason": "RW 하위영역 재추출 (정독). 진술 조항 범위 = Article III (¶64-203, 대상회사 진술) + Article IV (¶204-219, 매수인 진술) 전문 정독. 범위 밖(정의조항 ¶12-38, 확약 ¶220 이하, 선행조건 ¶289-310, 손해배상 ¶311 이하, Exhibit A 우선주 조건 ¶397-445)은 제외. 본 문서는 초안(DRAFT 12/24/04)으로 Schedule 3.1~3.25 별지 본문이 원문에 첨부되지 않았으나, 별지는 공시목록·명세이고 진술 명제 자체는 모두 본문에 서술되어 있어 추출에 지장이 없다. ¶202-203 'Validity of Group Restructuring'은 본문이 '[To Come]'이라 항목화하지 않았다. ¶98·¶172·¶179(보험)는 초안 대괄호 조항이라 confidence=med. RW.PRIVACY와 RW.PRODUCTS는 진짜 부재(personal information/privacy/개인정보/product liability/recall/defect/consumer 어휘가 문서 전역 0건)."
+    },
+    {
+      "file_key": "bb0f559e346407cf",
+      "dropped_domains": [
+        "RW"
+      ],
+      "gained_domains": [
+        "RW.ACCOUNTS_RECEIVABLE",
+        "RW.BENEFITS",
+        "RW.CORPORATE_GOVERNANCE",
+        "RW.DISCLOSURE",
+        "RW.INVENTORY",
+        "RW.PRIVACY",
+        "RW.REAL_ESTATE",
+        "RW.SOLVENCY"
+      ],
+      "items_before": 56,
+      "items_after": 80,
+      "reason": "RW 하위영역 재추출 (정독) — 제6.1조(매도인)·제6.3조(매수인) 진술 및 제6.2조가 편입하는 별지 3 '대상회사에 관한 진술 및 보장' 제(1)~(22)항 전문 정독. 별지 2는 정의조항이므로 RW 범위 밖(추출 제외). 공개목록(Disclosure Schedule)은 ¶270 협상 코멘트에 따라 작성되지 않아 편입 대상 없음. 기준재무제표에 포함되는 자회사 재무제표 별첨은 '[별첨 예정]'(¶330-332)으로 초안 단계 미첨부. RW.PRIVACY는 독립 조항이 아니라 법률준수 진술(¶307)에 개인정보보호법이 명시 열거된 데서 도출 → med. RW.PRODUCTS·RW.CUSTOMERS_SUPPLIERS·RW.BROKERS·RW.IT·RW.GOVERNMENT_CONTRACTS는 진술 조항(¶60-79 + 별지 3) 전문 정독 결과 진짜 부재(고객·거래처 관계 유지는 ¶84 확약이므로 RW 아님)."
+    },
+    {
+      "file_key": "c9fabb4ac4ba7eea",
+      "dropped_domains": [
+        "RW.CUSTOMERS_SUPPLIERS"
+      ],
+      "gained_domains": [
+        "RW.BROKERS",
+        "RW.CORPORATE_GOVERNANCE",
+        "RW.DISCLOSURE",
+        "RW.RELATED_PARTY",
+        "RW.SOLVENCY"
+      ],
+      "items_before": 76,
+      "items_after": 99,
+      "reason": "RW 하위영역 재추출 (정독) — 진술 조항 전문 Article 4(매도인·대상주식) ¶192-199 · Article 5(대상회사) ¶202-254 · Article 6(매수인) ¶257-263 전수 정독. 공개목록(Disclosure Schedule, ¶815-1031)은 진술의 예외·공개 사항이며(¶817), 진술이 실질을 편입한 Schedule 5.3(a)·5.4(a)(b)·5.10만 항목에 반영. 원문에 개인정보(RW.PRIVACY)·제품책임(RW.PRODUCTS)·주요고객/공급업체(RW.CUSTOMERS_SUPPLIERS) 진술은 존재하지 않음 — 조항 전문 정독 + privacy/personal information/product liability/recall/customer/supplier grep 교차확인으로 부재 확정."
+    },
+    {
+      "file_key": "ca74a79991091638",
+      "dropped_domains": [
+        "RW",
+        "RW.DISCLOSURE",
+        "RW.PERMITS"
+      ],
+      "gained_domains": [],
+      "items_before": 44,
+      "items_after": 12,
+      "reason": "RW 하위영역 재추출 (정독) — 보통주식매매계약(대상회사: 주식회사 네추럴웨이). 제5조 진술 및 보장 전문(¶58-¶73: 제5.1조 매도인들 ¶59-¶65, 제5.2조 매수인들 ¶66-¶73) 및 편입 별지 전부(별첨 매도인들 ¶165-168, 별지 1 정의 ¶169-198, 별지 2.3 ¶199-204, 별지 3.2(2)·3.3(3) ¶205-216) 정독. 매도인들(문미정·문미라 개인주주)은 대상회사 사업에 관한 진술을 일절 하지 않고 근본적 진술(권한·집행가능성·법령위반없음·소송부존재)과 대상주식 유효발행·부담없음 진술만 제공한다. 조세·IP·노무·환경·부동산·보험·개인정보·재무제표·변경부존재·준법·인허가·중요계약·자산·복리후생·특수관계자·고객공급자·제품책임 진술은 진짜 부재: 해당 어휘는 별지 1 정의조항('세금 또는 조세' ¶182, '사외유출' ¶174-181, '특수관계인' ¶195)·제10.6조 비용및조세 ¶131·확약 ¶86(특수관계인 거래 제한)·거래종결 후 확약 ¶91-92(경업금지·유인금지 — 매도인 자신의 부작위 약속이므로 COV)에만 등장하며 모두 RW 범위 밖이다. 종전 자동추출 44항목의 오류를 정정: (a) 선행조건 제4조 문장(¶45·¶54)·손해배상 제7.1조(¶95)·확약 제6조 표제와 본문(¶75·¶76)을 RW로 긁어온 false-present 5건 제거, (b) 실재하지 않는 leaf RW.DISCLOSURE.ACCURACY 창작 4건 제거, (c) 매도인 진술 ¶61-¶65를 RW.BUYER로 동시 태깅한 subject_role 오분류 5건 정정, (d) 'The seller or company makes the representation set out in the quoted paragraph' 무내용 템플릿 proposition 및 동일 ¶ 3중 계상(도메인노드+leaf+RW.BUYER) 정리."
+    },
+    {
+      "file_key": "d1696613b9214743",
+      "dropped_domains": [
+        "RW",
+        "RW.ENVIRONMENT"
+      ],
+      "gained_domains": [
+        "RW.BENEFITS",
+        "RW.CORPORATE_GOVERNANCE",
+        "RW.IP",
+        "RW.PERMITS",
+        "RW.REAL_ESTATE",
+        "RW.RELATED_PARTY"
+      ],
+      "items_before": 51,
+      "items_after": 56,
+      "reason": "RW 하위영역 재추출 (정독) — 제5조(매도인·대상회사 진술 및 보장) ¶69~¶98, 제6조(매수인 진술 및 보장) ¶100~¶104 전문 정독. ¶98은 '중대한 측면에서'의 정의조항이므로 진술로 추출하지 않음. 환경·개인정보·제품책임·고객/공급업체·재고·매출채권·중개수수료 진술은 원문에 없음(별지 편입 없음, 공개목록은 자회사 목록만)."
+    },
+    {
+      "file_key": "e45d3402878d30f6",
+      "dropped_domains": [
+        "RW.CUSTOMERS_SUPPLIERS"
+      ],
+      "gained_domains": [
+        "RW.DISCLOSURE"
+      ],
+      "items_before": 69,
+      "items_after": 56,
+      "reason": "RW 하위영역 재추출 (정독) — 제5조(진술 및 보장) 전문 + 편입 별지 5.2(매도인의 대상회사에 대한 진술 및 보장, ¶299-332) + 별지 5.3(6)(¶337-339) 정독. 제6.1조 사외유출 항에 명시적으로 포함된 진술(¶156)도 포함. 환경·부동산·보험·제품·고객공급업체·재고·매출채권 진술은 진술 조항 전문 정독 및 어휘 grep(환경/오염/폐기물/부동산/임대차/임차/토지/건물/보험/고객/공급/제품/리콜/재고/매출채권) 교차확인 결과 진짜 부재."
+    },
+    {
+      "file_key": "e7ce3f8a57347935",
+      "dropped_domains": [
+        "RW.CUSTOMERS_SUPPLIERS"
+      ],
+      "gained_domains": [
+        "RW.ACCOUNTS_RECEIVABLE",
+        "RW.DISCLOSURE",
+        "RW.INVENTORY",
+        "RW.SOLVENCY"
+      ],
+      "items_before": 209,
+      "items_after": 86,
+      "reason": "RW 하위영역 재추출 (정독). 제4조 매도인 진술(¶123-163)·제5조 매수인 진술(¶165-169) 전문 + 진술이 명시적으로 정확성·완전성을 보장하며 편입한 부록 4.1(b)(¶347-349)·4.2(c)(¶350-360)·4.5(b)(¶361-367)·4.6(¶367-379)·4.7(¶380-382)·4.9(¶383-410)·4.15(¶411-413)·5.3(¶414-416) 정독. 영업양수도 특유의 양도자산·부동산 임대차·근로관계 승계 진술을 RW.ASSETS/RW.REAL_ESTATE/RW.LABOR/RW.BENEFITS/RW.INVENTORY/RW.ACCOUNTS_RECEIVABLE로 정리. 범위 밖 제외: 별첨 A 자산목록(¶243-271)·별첨 B 대상채무(¶272-297)는 매수대상자산·대상채무 '정의'로 편입된 거래대상 명세이고, 별첨 C 양도증서(¶298-313)·별첨 D 매도증서(¶314-327)는 agreed-form 부속증서이며, 부록 1.1(a) 양도대상계약 목록(¶328-346)은 제6조 확약(¶96)이 인용하는 목록이므로 RW 진술 항목으로 만들지 않음. 진짜 부재: RW.PRODUCTS(제품책임·리콜·품질보증 진술 없음 — 재고 품질 진술은 RW.INVENTORY로 처리), RW.PRIVACY(개인정보 진술 없음), RW.CUSTOMERS_SUPPLIERS(주요 고객·공급업체 진술 없음 — '고객/공급업체'는 ¶65 양도대상계약 정의와 ¶176 확약에만 등장), RW.CAPITALIZATION(개인 매도인의 영업양수도로 주식 관련 진술 없음), 매수인 자금조달·no-reliance 진술 없음. 부록 4.4(법률 준수 예외목록, ¶140에서 인용)는 txt 캐시에 첨부되지 않았으나 예외 열거 문서로 진술을 창설하지 않으며 제4·5조 진술 본문은 완전함."
+    }
+  ],
+  "verified_false_presents": {
+    "RW.ENVIRONMENT": [
+      "1c3db4ca335c4f39",
+      "d1696613b9214743",
+      "7bb588f0c1637a71",
+      "167299b34d606e60"
+    ],
+    "RW.CUSTOMERS_SUPPLIERS": [
+      "c9fabb4ac4ba7eea",
+      "953488d0ea9cabd1",
+      "e7ce3f8a57347935",
+      "167299b34d606e60",
+      "44fe31b52107c3c9",
+      "e45d3402878d30f6"
+    ]
+  }
+}
