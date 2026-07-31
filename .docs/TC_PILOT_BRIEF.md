@@ -112,11 +112,28 @@ store가 그 문서 한정으로 가드를 해제하고 정독 세트를 그대�
       "normalized": {}, "confidence": "high|medium|low",
       "review_status": "approved"
     }
+  ],
+  "taxonomy_candidates": [             // ★ 기존 leaf에 안 맞는 조항마다 1건 (아래 규율)
+    {"family": "REM", "recommended_parent_id": "REM", "proposed_ko": "<제안 노드명 국문>",
+     "proposed_en": "<en>", "distinction_reason": "<기존 노드로 부족한 이유>",
+     "verbatim": "<원문 그대로 짧게>", "loc_start": <문단>, "loc_end": <문단>}
   ]
 }
 ```
 `loc_start`/`loc_end`는 txt 캐시의 `[¶n]` 문단번호다(정답지 좌표로 쓰이므로 정확히). `verbatim`은 원문
 그대로(수치·조항 내용 보존), `proposition`은 그 조항의 규범적 요지 한 문장.
+
+**★ taxonomy_candidates — 발견 패스 규율(중요)**: 재추출은 재분류만이 아니라 **신규 조항유형 발견**을 겸한다.
+어떤 조항이 기존 leaf에 깔끔히 안 맞으면:
+1. **item은 반드시 만들어라** — 가장 가까운 노드(확신 없으면 **family root**)에 담고 descriptive proposition으로
+   적어(FTS 검색 보장). **절대 skip 금지** — 정독의 요점은 빠짐없는 포착이다.
+2. **동시에 `taxonomy_candidates`에 1건 emit**(위 필드). 이게 있어야 코퍼스 전체 **재발이 집계**돼 신유형이 노드로
+   승격된다. **defect_notes에 prose로만 적으면 발견 파이프라인을 못 탄다**(집계·승격 불가).
+3. **`recommended_parent_id`는 보수적으로 = 해당 family root**(예: `"REM"`, **점 없이**). 점 있는 하위노드
+   (예: `"REM.INDEMNITY"`)를 지정하면 **단 1개 문서만으로 즉시 admit**돼 후보 백로그가 폭증한다(2026-07 29,807건 사태).
+   **기존 dotted 노드 옆의 명확한 하위도메인 공백이라고 확신할 때만** dotted parent를 써라. "'찾아라' 프롬프트는
+   없는 것도 찾아낸다"는 §9.3 경고가 **후보 생성에도 그대로 적용**된다 — 억지 신유형 금지, 진짜 새 유형만.
+4. 정말 이 계약 하나에만 있는 유일 조항도 후보로 내라 — 재발 안 하면 캐치올+FTS로 남는다(노드 폭증 방지). 정상이다.
 
 **coverage 의미(중요)**: 처음부터 끝까지 정독했으면 그 문서에서 **평가된 계열은 `body_status:"complete"`**로 적어라.
 **item이 0건인 계열도 정독으로 확인했으면 "complete"** — 이는 "정독 결과 이 계열은 부재"라는 confirmed-absent

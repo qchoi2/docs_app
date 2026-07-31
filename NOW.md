@@ -55,6 +55,17 @@ _이 수치를 손으로 베끼지 말 것 — `python burndown.py --out cs_inde
 > **재추출 store 확정(소유자)**: full-replace·정독 RW 신뢰. 단 `replace_v4_result`는 `coverage`+`source_coverage` 필수 →
 > 브리프 스키마 보강함(정독 6건은 store 전 coverage 백필 필요, 캠페인에서 처리).
 
+> **재추출 캠페인 = 발견 패스 (Fable 2차 검토 2026-07-31, 조건 3개 반영)**: 재추출은 재분류만이 아니라
+> **신규 조항유형 발견**을 겸해야 한다 — 안 그러면 소수 계약의 마이너 유형이 캐치올에 묻혀 구조화(존재·부재·비교)
+> 검색에서 빠진다. 정독이 기존 leaf에 안 맞는 조항마다 `taxonomy_candidates` emit(브리프 반영). **실행 제약**:
+> ① **재발증거 소거 주의** — `replace_v4_result`는 저장 시 그 문서의 `v4_candidate_recurrence`+pending 후보를 삭제한다
+> (`clear_document_recurrence`). 따라서 후보는 **같은 full_read 저장 패스에서 emit**돼야 하고 옛 재발증거에 의존 못 한다.
+> ② **저장 경로 통일** — 후보 처리는 `replace_v4_result`(=`store_v4_results.py`) 경로에만 있다. 수술적 저장기
+> (`store_rw_reextraction`·`store_pay_reextraction`)는 taxonomy_candidates를 **안 읽어 무음 폐기**(참조 0 확인) →
+> 후보 담긴 정독은 반드시 전체교체 경로로 store. ③ **승격+재태깅은 한 묶음** — 캠페인 후 재발후보 노드 승격(v21)
+> 시 흡수돼 있던 item **재태깅 동반 필수**. 승격만 하면 신노드가 half-populated → "형제흡수→부재질의 오답"(센서스 v2에서
+> 본 병리)을 신설한다. **정정**: 앞서 cpcovrem 6건은 store되지 **않았다**(coverage 누락 실패, extractor_version 원본 유지).
+
 - **Phase 0 (즉시·병렬)**: ① RW 잔여~58 + PAY 잔여 재추출 **완결**(반쯤 끝난 상태가 최대 리스크; Next #2) ·
   ② **T-C 비-SPA 소표본 정독**(SHA·SSA·ATA/BTA·CB류 각 5~10건 full_read — RW/PAY 뒤 직렬 금지, **병렬**;
   산출물은 결함'프로파일'이 아니라 스멜테스트+**유형별 절대-recall 정답지**(SPA 89% 편중 해소)+게이트 요건; Next #8.
